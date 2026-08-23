@@ -11,7 +11,9 @@
     "migrate:dev": "prisma migrate dev --schema prisma/schema.prisma",
     "migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
     "prisma:validate": "prisma validate --schema database/prisma/schema.prisma",
-    "erd": "node scripts/generate-erd.mjs"
+    "erd:puml": "node scripts/generate-erd.mjs",
+    "erd:png": "plantuml -tpng docs/generated/prisma-erd.puml",
+    "erd": "npm run erd:puml && npm run erd:png"
   },
   "keywords": [],
   "author": "",
