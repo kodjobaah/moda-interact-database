@@ -10,7 +10,7 @@ The schema is defined using **Prisma** and is consumed by the other Moda Interac
 
 The current database model is shown below.
 
-![Moda Interact Database ERD](docs/generated/prisma-erd.png)
+![Moda Interact Database ERD](docs/generated/erd.png)
 
 The diagram is generated directly from the Prisma schema using PlantUML.
 
