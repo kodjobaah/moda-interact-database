@@ -52,7 +52,11 @@ model ShopSettings {
 model Customer {
   id String @id @default(cuid())
 
+<<<<<<< Updated upstream
   shopId String
+=======
+  shopId string
+>>>>>>> Stashed changes
   shop Shop   @relation(fields: [shopId],references: [id],onDelete: Cascade)
 
   phone String?
@@ -107,7 +111,11 @@ enum CheckoutRecoveryStatus {
 model CheckoutRecovery {
   id String @id @default(cuid())
 
+<<<<<<< Updated upstream
   shopId String
+=======
+  shopId string
+>>>>>>> Stashed changes
   shop Shop @relation(fields: [shopId],references: [id],onDelete: Cascade)
 
   checkoutToken String

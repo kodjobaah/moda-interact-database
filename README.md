@@ -96,7 +96,7 @@ Moda Interact is split across several services:
 - [moda-interact-background](https://github.com/kodjobaah/moda-interact-background)  
   Background workers, checkout recovery workflows and commerce agent.
 
-- [kwadwos-gpt](https://github.com/kodjobaah/kwadwos-gpt)  
+- [moda-interact-messaging](https://github.com/kodjobaah/moda-interact-messaging)  
   WhatsApp webhook handling and messaging integration.
 
 ## Architecture

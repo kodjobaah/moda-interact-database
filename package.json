@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "prisma:generate": "prisma generate --schema database/prisma/schema.prisma",
     "test": "echo \"Error: no test specified\" && exit 1",
     "validate": "prisma validate --schema prisma/schema.prisma",
     "format": "prisma format --schema prisma/schema.prisma",
