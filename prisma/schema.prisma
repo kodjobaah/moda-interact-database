@@ -266,6 +266,8 @@ model Subscription {
   trialEndsAt            DateTime?
   cancelAtPeriodEnd      Boolean   @default(false)
 
+  providerSubscriptionId String?
+
   lastSyncedAt           DateTime?
 
   createdAt              DateTime  @default(now())
