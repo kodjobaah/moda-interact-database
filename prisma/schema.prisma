@@ -11,7 +11,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["shopify", "commerce", "whatsapp","billing"]
+  schemas  = ["shopify", "commerce", "whatsapp","billing","public"]
 }
 
 model Session {
@@ -337,4 +337,32 @@ model Shop {
 
   @@index([status])
   @@schema("commerce")
+}
+
+model Tour {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  city        String
+  country     String
+  title       String
+  description String   @db.Text
+  image       String?  @db.Text
+  stops       Json
+
+  @@unique([city, country])
+  @@schema("public")
+}
+
+model RagSearchResults {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  answer   Json
+  prompt   Json
+  astraDoc String @default("documentskodjobaah")
+
+  @@schema("public")
 }
