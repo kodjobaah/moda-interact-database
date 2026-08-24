@@ -11,7 +11,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["shopify", "commerce", "whatsapp"]
+  schemas  = ["shopify", "commerce", "whatsapp","billing"]
 }
 
 model Session {
@@ -38,7 +38,8 @@ model Session {
 
 model ShopSettings {
   id   String @id @default(cuid())
-  shop String @unique
+  shopId String @unique
+  shop   Shop   @relation(fields: [shopId],references: [id],onDelete: Cascade)
 
   onboardingCompleted Boolean  @default(false)
   plan                String?
@@ -51,7 +52,9 @@ model ShopSettings {
 model Customer {
   id String @id @default(cuid())
 
-  shop  String
+  shopId String
+  shop Shop   @relation(fields: [shopId],references: [id],onDelete: Cascade)
+
   phone String?
   email String?
 
@@ -60,14 +63,34 @@ model Customer {
 
   shopifyCustomerId String?
 
+  phones     CustomerPhone[]
   recoveries CheckoutRecovery[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([shop, phone])
-  @@unique([shop, shopifyCustomerId])
-  @@index([shop])
+  @@unique([shopId, shopifyCustomerId])
+  
+  @@schema("commerce")
+}
+
+model CustomerPhone {
+  id String @id @default(cuid())
+
+  customerId String
+  customer   Customer @relation(fields: [customerId],references: [id],onDelete: Cascade)
+
+  phone String
+
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId, endedAt])
+  @@index([phone, endedAt])
+
   @@schema("commerce")
 }
 
@@ -84,7 +107,8 @@ enum CheckoutRecoveryStatus {
 model CheckoutRecovery {
   id String @id @default(cuid())
 
-  shop String
+  shopId String
+  shop Shop @relation(fields: [shopId],references: [id],onDelete: Cascade)
 
   checkoutToken String
   cartToken     String?
@@ -110,9 +134,8 @@ model CheckoutRecovery {
 
   conversations Conversation[]
 
-  @@unique([shop, checkoutToken])
+  @@unique([shopId, checkoutToken])
   @@index([customerId])
-  @@index([shop, status])
   @@schema("commerce")
 }
 
@@ -203,4 +226,113 @@ model ConversationMessage {
   @@index([conversationId, createdAt])
   @@index([inReplyToProviderId])
   @@schema("whatsapp")
+}
+
+model BillingPlan {
+  id              String   @id @default(cuid())
+
+  handle          String   @unique
+  name            String
+
+  entitlements    Json
+  limits          Json
+
+  active          Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  subscriptions   Subscription[]
+
+  @@schema("billing")
+}
+
+model Subscription {
+  id                     String    @id @default(cuid())
+
+  shopId                 String    @unique
+  shop                   Shop      @relation(fields: [shopId],references: [id],onDelete: Cascade)
+
+  planId                 String?
+  plan                   BillingPlan? @relation(fields: [planId],references: [id])
+
+  provider               String    @default("SHOPIFY")
+
+  planHandle             String
+  status                 String
+
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  trialEndsAt            DateTime?
+  cancelAtPeriodEnd      Boolean   @default(false)
+
+  lastSyncedAt           DateTime?
+
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@index([planHandle])
+  @@schema("billing")
+}
+
+model UsageEvent {
+  id               String    @id @default(cuid())
+
+  shopId           String
+  shop             Shop      @relation(fields: [shopId],references: [id],onDelete: Cascade)
+
+  metric           String
+  quantity         Decimal
+
+  idempotencyKey   String    @unique
+
+  sourceType       String?
+  sourceId         String?
+
+  occurredAt       DateTime  @default(now())
+  reportedAt       DateTime?
+
+  provider         String    @default("SHOPIFY")
+  providerResponse Json?
+
+  createdAt        DateTime  @default(now())
+
+  @@index([shopId, metric, occurredAt])
+  @@schema("billing")
+}
+
+enum ShopStatus {
+  ACTIVE
+  UNINSTALLED
+  SUSPENDED
+
+  @@schema("commerce")
+}
+
+model Shop {
+  id              String      @id @default(cuid())
+
+  // Shopify identity
+  domain          String      @unique
+  shopifyShopId   String?     @unique
+
+  // Installation lifecycle
+  status          ShopStatus  @default(ACTIVE)
+  installedAt     DateTime    @default(now())
+  uninstalledAt   DateTime?
+
+  // Configuration / billing
+  settings        ShopSettings?
+  subscriptions   Subscription[]
+  usageEvents     UsageEvent[]
+
+  // Commerce domain
+  customers       Customer[]
+  recoveries      CheckoutRecovery[]
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([status])
+  @@schema("commerce")
 }
