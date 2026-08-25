@@ -282,6 +282,8 @@ model UsageEvent {
 
   shopId           String
   shop             Shop      @relation(fields: [shopId],references: [id],onDelete: Cascade)
+  billingPeriodId  String?
+  billingPeriod    BillingPeriod? @relation(fields: [billingPeriodId], references: [id], onDelete: SetNull)
 
   metric           String
   quantity         Decimal
@@ -300,6 +302,23 @@ model UsageEvent {
   createdAt        DateTime  @default(now())
 
   @@index([shopId, metric, occurredAt])
+  @@index([billingPeriodId])
+  @@schema("billing")
+}
+
+model BillingPeriod {
+  id          String   @id @default(cuid())
+  shopId      String
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  periodStart DateTime
+  periodEnd   DateTime
+  status      String   @default("OPEN")
+  usageEvents UsageEvent[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([shopId, periodStart])
+  @@index([shopId, periodStart, periodEnd])
   @@schema("billing")
 }
 
@@ -327,6 +346,7 @@ model Shop {
   settings        ShopSettings?
   subscriptions   Subscription[]
   usageEvents     UsageEvent[]
+  billingPeriods  BillingPeriod[]
 
   // Commerce domain
   customers       Customer[]
@@ -366,3 +386,6 @@ model RagSearchResults {
 
   @@schema("public")
 }
+
+
+ 
