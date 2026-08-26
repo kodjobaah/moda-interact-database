@@ -1,0 +1,1 @@
+ALTER TABLE "whatsapp"."Conversation" ALTER COLUMN "checkoutRecoveryId" DROP NOT NULL;
