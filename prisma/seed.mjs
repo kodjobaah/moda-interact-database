@@ -169,8 +169,8 @@ async function main() {
     const secondMessageId = `demo-message-${recovery.id}-02`;
     const conversation = await prisma.conversation.upsert({
       where: { id: conversationId },
-      create: { id: conversationId, checkoutRecoveryId: recovery.id, type: "RECOVERY", summary: "Demo recovery conversation" },
-      update: { summary: "Demo recovery conversation" },
+      create: { id: conversationId, checkoutRecoveryId: recovery.id, type: "RECOVERY", outcome: recovery.status === "COMPLETED" ? "RECOVERED" : recovery.status === "EXPIRED" ? "EXPIRED" : recovery.status === "DETECTED" ? "NO_RESPONSE" : "IN_PROGRESS", summary: "Demo recovery conversation" },
+      update: { outcome: recovery.status === "COMPLETED" ? "RECOVERED" : recovery.status === "EXPIRED" ? "EXPIRED" : recovery.status === "DETECTED" ? "NO_RESPONSE" : "IN_PROGRESS", summary: "Demo recovery conversation" },
     });
     await prisma.conversationMessage.upsert({
       where: { id: firstMessageId },
