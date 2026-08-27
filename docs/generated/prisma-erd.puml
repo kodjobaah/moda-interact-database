@@ -43,21 +43,6 @@ enum "ShopStatus" as ShopStatus {
   UNINSTALLED
   SUSPENDED
 }
-enum "WebhookDisposition" as WebhookDisposition {
-  ACCEPTED
-  IGNORED
-  REJECTED
-  QUARANTINED
-}
-enum "WebhookOutboxDestination" as WebhookOutboxDestination {
-  CHECKOUT_EVENTS
-  ORDER_EVENTS
-}
-enum "WebhookOutboxState" as WebhookOutboxState {
-  PENDING
-  PUBLISHED
-  EXHAUSTED
-}
 entity "Session" as Session {
 + id [PK] : String 
 --
@@ -252,48 +237,6 @@ entity "BillingPeriod" as BillingPeriod {
   * updatedAt : DateTime
 }
 
-entity "ShopifyWebhookReceipt" as ShopifyWebhookReceipt {
-+ id [PK] : String 
---
-  * appKey : String
-  * deliveryId : String
-  eventId : String
-  # shopId : [FK] Shop
-  * shopDomain : String
-  * topic : String
-  apiVersion : String
-  triggeredAt : DateTime
-  triggeredAtRaw : String
-  subscriptionName : String
-  * receivedAt : DateTime
-  * disposition : WebhookDisposition
-  dispositionCode : String
-  rejectedPayload : Json
-}
-
-entity "ShopifyWebhookOutbox" as ShopifyWebhookOutbox {
-+ id [PK] : String 
---
-  # receiptId : [FK] ShopifyWebhookReceipt
-  * destination : WebhookOutboxDestination
-  * jobName : String
-  * jobId : String
-  * payload : Json
-  * delayMs : Int
-  * state : WebhookOutboxState
-  * createdAt : DateTime
-  * nextAttemptAt : DateTime
-  * publishAttempts : Int
-  lockToken : String
-  lockedBy : String
-  lockedUntil : DateTime
-  publishedAt : DateTime
-  exhaustedAt : DateTime
-  lastErrorClass : String
-  lastError : String
-  lastErrorAt : DateTime
-}
-
 entity "Shop" as Shop {
 + id [PK] : String 
 --
@@ -344,8 +287,6 @@ Subscription }o--o| BillingPlan
 UsageEvent }o--|| Shop
 UsageEvent }o--o| BillingPeriod
 BillingPeriod }o--|| Shop
-ShopifyWebhookReceipt }o--o| Shop
-ShopifyWebhookOutbox |o--|| ShopifyWebhookReceipt
 ' ManyToMany Relations
 ' enum relations
 CheckoutRecoveryStatusHistory |o--|| CheckoutRecoveryStatus
@@ -356,8 +297,5 @@ Conversation |o--|| ConversationOutcome
 ConversationMessage |o--|| MessageDirection
 ConversationMessage |o--|| MessageSenderType
 ConversationMessage |o--|| MessageStatus
-ShopifyWebhookReceipt |o--|| WebhookDisposition
-ShopifyWebhookOutbox |o--|| WebhookOutboxDestination
-ShopifyWebhookOutbox |o--|| WebhookOutboxState
 Shop |o--|| ShopStatus
 @enduml

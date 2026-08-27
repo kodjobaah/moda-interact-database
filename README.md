@@ -96,8 +96,19 @@ The seed recreates the demo shop's billing plans and dashboard data. It deletes
 existing demo-shop usage events, billing periods, recoveries, customers,
 settings, and subscriptions before inserting the demo records.
 
-The Shopify application delays checkout-recovery processing using
-`CHECKOUT_RECOVERY_DELAY_MS`. The default is 30 minutes (`1800000` ms).
+Ordinary Shopify checkout and order webhooks are not persisted as receipts or
+transactional outbox rows in this database. Those events are coordinated
+transiently by Redis/BullMQ in the application layer.
+
+`CheckoutRecovery` is created only after Shopify confirms a checkout is a real
+recovery candidate. A checkout webhook's top-level `token` is required to create
+that recovery record.
+
+Orders without an existing recovery are not retained as purchases in this
+schema.
+
+Durable persistence remains for actual recoveries, conversations, messages,
+billing, compliance, and other business-critical state.
 
 ## Generate the ERD
 
@@ -148,7 +159,7 @@ Shopify
 Webhooks
    │
    ▼
-BullMQ / Redis
+Redis / BullMQ
    │
    ▼
 Background Workers
