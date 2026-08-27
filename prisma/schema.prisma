@@ -49,6 +49,30 @@ model ShopSettings {
   @@schema("shopify")
 }
 
+model ShopBrand {
+  id String @id @default(cuid())
+
+  shopId String @unique
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  brandName String?
+
+  logoUrl      String?
+  logoAltText  String?
+  logoWidth    Int?
+  logoHeight   Int?
+
+  squareLogoUrl      String?
+  squareLogoAltText  String?
+
+  coverImageUrl String?
+
+  fetchedAt      DateTime @default(now())
+  lastRefreshedAt DateTime @updatedAt
+
+  @@schema("shopify")
+}
+
 model Customer {
   id String @id @default(cuid())
 
@@ -344,6 +368,7 @@ model Shop {
 
   // Configuration / billing
   settings        ShopSettings?
+  brand           ShopBrand?
   subscriptions   Subscription[]
   usageEvents     UsageEvent[]
   billingPeriods  BillingPeriod[]
