@@ -96,6 +96,9 @@ The seed recreates the demo shop's billing plans and dashboard data. It deletes
 existing demo-shop usage events, billing periods, recoveries, customers,
 settings, and subscriptions before inserting the demo records.
 
+The Shopify application delays checkout-recovery processing using
+`CHECKOUT_RECOVERY_DELAY_MS`. The default is 30 minutes (`1800000` ms).
+
 ## Generate the ERD
 
 The ERD is generated from the Prisma schema.

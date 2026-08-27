@@ -41,10 +41,11 @@ model ShopSettings {
   shopId String @unique
   shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  onboardingCompleted Boolean  @default(false)
-  plan                String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  onboardingCompleted  Boolean  @default(false)
+  plan                 String?
+  recoveryDelayMinutes Int      @default(30)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   @@schema("shopify")
 }
