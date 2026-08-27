@@ -398,8 +398,7 @@ enum WebhookDisposition {
 }
 
 enum WebhookOutboxDestination {
-  CHECKOUT_EVENTS
-  ORDER_EVENTS
+  SHOPIFY_COMMERCE_EVENTS
 
   @@schema("shopify")
 }
@@ -423,12 +422,11 @@ model ShopifyWebhookReceipt {
 
   shopId String?
   shop   Shop?   @relation(fields: [shopId], references: [id], onDelete: SetNull)
-
   shopDomain String
 
-  topic      String
-  apiVersion String?
-
+  providerTopic      String
+  internalEventType String?
+  apiVersion        String?
   triggeredAt    DateTime?
   triggeredAtRaw String?
 
@@ -459,11 +457,10 @@ model ShopifyWebhookOutbox {
 
   destination WebhookOutboxDestination
 
-  jobName String
-  jobId   String @unique
-  payload Json
-
-  delayMs Int @default(0)
+  contractVersion Int @default(1)
+  jobId           String @unique
+  orderingKey     String
+  envelope        Json
 
   state WebhookOutboxState @default(PENDING)
 

@@ -50,8 +50,7 @@ enum "WebhookDisposition" as WebhookDisposition {
   QUARANTINED
 }
 enum "WebhookOutboxDestination" as WebhookOutboxDestination {
-  CHECKOUT_EVENTS
-  ORDER_EVENTS
+  SHOPIFY_COMMERCE_EVENTS
 }
 enum "WebhookOutboxState" as WebhookOutboxState {
   PENDING
@@ -260,7 +259,8 @@ entity "ShopifyWebhookReceipt" as ShopifyWebhookReceipt {
   eventId : String
   # shopId : [FK] Shop
   * shopDomain : String
-  * topic : String
+  * providerTopic : String
+  internalEventType : String
   apiVersion : String
   triggeredAt : DateTime
   triggeredAtRaw : String
@@ -276,10 +276,10 @@ entity "ShopifyWebhookOutbox" as ShopifyWebhookOutbox {
 --
   # receiptId : [FK] ShopifyWebhookReceipt
   * destination : WebhookOutboxDestination
-  * jobName : String
+  * contractVersion : Int
   * jobId : String
-  * payload : Json
-  * delayMs : Int
+  * orderingKey : String
+  * envelope : Json
   * state : WebhookOutboxState
   * createdAt : DateTime
   * nextAttemptAt : DateTime

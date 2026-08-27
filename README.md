@@ -47,6 +47,37 @@ The schema currently contains the persistence model for areas including:
 - conversation messages
 - Shopify application data
 
+## Shopify Webhook Contract
+
+The durable Shopify webhook flow stores a receipt row and, for accepted deliveries, exactly one outbox row.
+
+Receipt rows keep request-level metadata only. They record the `deliveryId` retry dedupe key, the optional `eventId` correlation metadata, the shop identity, the provider topic, and the disposition that determines whether an outbox row is created.
+
+The outbox stores the versioned commerce event envelope in `ShopifyWebhookOutbox.envelope`. The current contract is:
+
+```ts
+type ShopifyWebhookJobV1<T> = {
+   schemaVersion: 1;
+   receiptId: string;
+   deliveryId: string;
+   eventId: string | null;
+   source: "shopify";
+   eventType: "checkout.observed" | "order.completed";
+   providerTopic: string;
+   tenant: {
+      shopId: string;
+      shopDomain: string;
+   };
+   occurredAt: string | null;
+   receivedAt: string;
+   traceId: string;
+   orderingKey: string;
+   payload: T;
+};
+```
+
+Webhook dispatch is immediate. Recovery timing is derived later by background processing after the webhook has been durably applied.
+
 Application repositories generate their Prisma clients from this shared schema.
 
 ## Migrations

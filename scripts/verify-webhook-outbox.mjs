@@ -4,7 +4,7 @@
 // invariants are verified here against a real Postgres instance instead.
 //
 // Usage:
-//   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/moda_interact" \
+//   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/moda_interact"
 //     node scripts/verify-webhook-outbox.mjs
 //
 // Only run this against a local/disposable database — it creates and deletes
@@ -12,8 +12,8 @@
 
 import { PrismaClient } from "@prisma/client";
 import assert from "node:assert/strict";
-import process from "node:process";
 import crypto from "node:crypto";
+import process from "node:process";
 
 const prisma = new PrismaClient();
 
@@ -38,9 +38,55 @@ async function check(name, fn) {
 async function makeShop() {
   return prisma.shop.create({
     data: {
-      domain: unique("shop") + ".myshopify.com",
+      domain: `${unique("shop")}.myshopify.com`,
     },
   });
+}
+
+async function makeReceipt({
+  appKey,
+  shop,
+  deliveryId = unique("delivery"),
+  eventId = null,
+  providerTopic = "orders/create",
+  disposition = "ACCEPTED",
+  shopId,
+  shopDomain,
+}) {
+  return prisma.shopifyWebhookReceipt.create({
+    data: {
+      appKey,
+      deliveryId,
+      eventId,
+      shopId: shopId ?? shop?.id ?? null,
+      shopDomain: shopDomain ?? shop?.domain ?? `${unique("ignored-shop")}.myshopify.com`,
+      providerTopic,
+      disposition,
+    },
+  });
+}
+
+function makeEnvelope({ receipt, shop, eventType, traceId }) {
+  return {
+    schemaVersion: 1,
+    receiptId: receipt.id,
+    deliveryId: receipt.deliveryId,
+    eventId: receipt.eventId,
+    source: "shopify",
+    eventType,
+    providerTopic: receipt.providerTopic,
+    tenant: {
+      shopId: shop.id,
+      shopDomain: shop.domain,
+    },
+    occurredAt: receipt.triggeredAtRaw ?? null,
+    receivedAt: receipt.receivedAt.toISOString(),
+    traceId,
+    orderingKey: receipt.deliveryId,
+    payload: {
+      hello: "world",
+    },
+  };
 }
 
 async function main() {
@@ -56,7 +102,7 @@ async function main() {
           deliveryId,
           shopId: shop.id,
           shopDomain: shop.domain,
-          topic: "orders/create",
+          providerTopic: "orders/create",
           disposition: "ACCEPTED",
         },
       });
@@ -68,7 +114,7 @@ async function main() {
             deliveryId,
             shopId: shop.id,
             shopDomain: shop.domain,
-            topic: "orders/create",
+            providerTopic: "orders/create",
             disposition: "ACCEPTED",
           },
         }),
@@ -89,7 +135,7 @@ async function main() {
           eventId,
           shopId: shop.id,
           shopDomain: shop.domain,
-          topic: "checkouts/update",
+          providerTopic: "checkouts/update",
           disposition: "ACCEPTED",
         },
       });
@@ -101,7 +147,7 @@ async function main() {
           eventId,
           shopId: shop.id,
           shopDomain: shop.domain,
-          topic: "checkouts/update",
+          providerTopic: "checkouts/update",
           disposition: "ACCEPTED",
         },
       });
@@ -123,7 +169,7 @@ async function main() {
           deliveryId,
           shopId: shop.id,
           shopDomain: shop.domain,
-          topic: "orders/create",
+          providerTopic: "orders/create",
           disposition: "ACCEPTED",
         },
       });
@@ -134,7 +180,7 @@ async function main() {
           deliveryId,
           shopId: shop.id,
           shopDomain: shop.domain,
-          topic: "orders/create",
+          providerTopic: "orders/create",
           disposition: "ACCEPTED",
         },
       });
@@ -148,26 +194,33 @@ async function main() {
     async () => {
       const shop = await makeShop();
 
-      const receipt = await prisma.shopifyWebhookReceipt.create({
-        data: {
-          appKey: "app-e",
-          deliveryId: unique("delivery"),
-          shopId: shop.id,
-          shopDomain: shop.domain,
-          topic: "orders/create",
-          disposition: "ACCEPTED",
-        },
+      const receipt = await makeReceipt({
+        appKey: "app-e",
+        shop,
       });
 
       const outbox = await prisma.shopifyWebhookOutbox.create({
         data: {
           receiptId: receipt.id,
-          destination: "ORDER_EVENTS",
-          jobName: "publish-order-event",
+          destination: "SHOPIFY_COMMERCE_EVENTS",
           jobId: unique("job"),
-          payload: { hello: "world" },
+          orderingKey: receipt.deliveryId,
+          envelope: makeEnvelope({
+            receipt,
+            shop,
+            eventType: "order.completed",
+            traceId: unique("trace"),
+          }),
         },
       });
+
+      const outboxCount = await prisma.shopifyWebhookOutbox.count({
+        where: { receiptId: receipt.id },
+      });
+
+      assert.equal(outboxCount, 1);
+      assert.equal(outbox.contractVersion, 1);
+      assert.equal(outbox.envelope.schemaVersion, 1);
 
       await prisma.shopifyWebhookReceipt.delete({ where: { id: receipt.id } });
 
@@ -184,15 +237,9 @@ async function main() {
     async () => {
       const shop = await makeShop();
 
-      const receipt = await prisma.shopifyWebhookReceipt.create({
-        data: {
-          appKey: "app-f",
-          deliveryId: unique("delivery"),
-          shopId: shop.id,
-          shopDomain: shop.domain,
-          topic: "orders/create",
-          disposition: "ACCEPTED",
-        },
+      const receipt = await makeReceipt({
+        appKey: "app-f",
+        shop,
       });
 
       await prisma.shop.delete({ where: { id: shop.id } });
@@ -204,13 +251,170 @@ async function main() {
       assert.notEqual(receiptAfterShopDelete, null);
       assert.equal(receiptAfterShopDelete.shopId, null);
 
-      // Clean up now that the shop FK no longer references this row.
       await prisma.shopifyWebhookReceipt.delete({ where: { id: receipt.id } });
     },
   );
 
   await check(
-    "partial index exists and targets pending rows",
+    "ignored receipts do not create outbox rows",
+    async () => {
+      const receipt = await makeReceipt({
+        appKey: "app-g",
+        disposition: "IGNORED",
+        shopId: null,
+        shopDomain: `${unique("ignored-shop")}.myshopify.com`,
+        providerTopic: "orders/create",
+      });
+
+      const outboxCount = await prisma.shopifyWebhookOutbox.count({
+        where: { receiptId: receipt.id },
+      });
+
+      assert.equal(outboxCount, 0);
+    },
+  );
+
+  await check(
+    "only SHOPIFY_COMMERCE_EVENTS is accepted",
+    async () => {
+      const rows = await prisma.$queryRawUnsafe(`
+        SELECT enumlabel
+        FROM pg_enum
+        WHERE enumtypid = 'shopify."WebhookOutboxDestination"'::regtype
+        ORDER BY enumsortorder
+      `);
+
+      assert.deepEqual(rows.map((row) => row.enumlabel), ["SHOPIFY_COMMERCE_EVENTS"]);
+    },
+  );
+
+  await check(
+    "contractVersion defaults to 1",
+    async () => {
+      const shop = await makeShop();
+      const receipt = await makeReceipt({
+        appKey: "app-h",
+        shop,
+      });
+
+      const outbox = await prisma.shopifyWebhookOutbox.create({
+        data: {
+          receiptId: receipt.id,
+          destination: "SHOPIFY_COMMERCE_EVENTS",
+          jobId: unique("job"),
+          orderingKey: receipt.deliveryId,
+          envelope: makeEnvelope({
+            receipt,
+            shop,
+            eventType: "checkout.observed",
+            traceId: unique("trace"),
+          }),
+        },
+      });
+
+      assert.equal(outbox.contractVersion, 1);
+      assert.equal(outbox.envelope.schemaVersion, 1);
+    },
+  );
+
+  await check(
+    "jobId remains unique",
+    async () => {
+      const shop = await makeShop();
+      const jobId = unique("job");
+
+      const receiptOne = await makeReceipt({
+        appKey: "app-i",
+        shop,
+      });
+
+      const receiptTwo = await makeReceipt({
+        appKey: "app-i",
+        shop,
+      });
+
+      await prisma.shopifyWebhookOutbox.create({
+        data: {
+          receiptId: receiptOne.id,
+          destination: "SHOPIFY_COMMERCE_EVENTS",
+          jobId,
+          orderingKey: receiptOne.deliveryId,
+          envelope: makeEnvelope({
+            receipt: receiptOne,
+            shop,
+            eventType: "order.completed",
+            traceId: unique("trace"),
+          }),
+        },
+      });
+
+      await assert.rejects(() =>
+        prisma.shopifyWebhookOutbox.create({
+          data: {
+            receiptId: receiptTwo.id,
+            destination: "SHOPIFY_COMMERCE_EVENTS",
+            jobId,
+            orderingKey: receiptTwo.deliveryId,
+            envelope: makeEnvelope({
+              receipt: receiptTwo,
+              shop,
+              eventType: "order.completed",
+              traceId: unique("trace"),
+            }),
+          },
+        }),
+      );
+    },
+  );
+
+  await check(
+    "orderingKey is required",
+    async () => {
+      const shop = await makeShop();
+      const receipt = await makeReceipt({
+        appKey: "app-j",
+        shop,
+      });
+
+      await assert.rejects(() =>
+        prisma.shopifyWebhookOutbox.create({
+          data: {
+            receiptId: receipt.id,
+            destination: "SHOPIFY_COMMERCE_EVENTS",
+            jobId: unique("job"),
+            envelope: makeEnvelope({
+              receipt,
+              shop,
+              eventType: "checkout.observed",
+              traceId: unique("trace"),
+            }),
+          },
+        }),
+      );
+    },
+  );
+
+  await check(
+    "delayMs and legacy queue fields do not exist",
+    async () => {
+      const columns = await prisma.$queryRawUnsafe(`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'shopify'
+          AND table_name = 'ShopifyWebhookOutbox'
+        ORDER BY column_name
+      `);
+
+      const names = columns.map((row) => row.column_name);
+
+      assert.ok(!names.includes("delayMs"));
+      assert.ok(!names.includes("jobName"));
+      assert.ok(!names.includes("payload"));
+    },
+  );
+
+  await check(
+    "pending partial index exists",
     async () => {
       const rows = await prisma.$queryRawUnsafe(`
         SELECT indexdef
@@ -220,8 +424,10 @@ async function main() {
       `);
 
       assert.equal(rows.length, 1);
-      const indexdef = rows[0].indexdef;
-      assert.match(indexdef, /WHERE \(state = 'PENDING'::"?shopify"?\."?WebhookOutboxState"?\)/i);
+      assert.match(
+        rows[0].indexdef,
+        /WHERE \(state = 'PENDING'::"?shopify"?\."?WebhookOutboxState"?\)/i,
+      );
     },
   );
 

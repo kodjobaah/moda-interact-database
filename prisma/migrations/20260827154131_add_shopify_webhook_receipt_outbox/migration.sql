@@ -2,7 +2,7 @@
 CREATE TYPE "shopify"."WebhookDisposition" AS ENUM ('ACCEPTED', 'IGNORED', 'REJECTED', 'QUARANTINED');
 
 -- CreateEnum
-CREATE TYPE "shopify"."WebhookOutboxDestination" AS ENUM ('CHECKOUT_EVENTS', 'ORDER_EVENTS');
+CREATE TYPE "shopify"."WebhookOutboxDestination" AS ENUM ('SHOPIFY_COMMERCE_EVENTS');
 
 -- CreateEnum
 CREATE TYPE "shopify"."WebhookOutboxState" AS ENUM ('PENDING', 'PUBLISHED', 'EXHAUSTED');
@@ -15,7 +15,8 @@ CREATE TABLE "shopify"."ShopifyWebhookReceipt" (
     "eventId" TEXT,
     "shopId" TEXT,
     "shopDomain" TEXT NOT NULL,
-    "topic" TEXT NOT NULL,
+  "providerTopic" TEXT NOT NULL,
+  "internalEventType" TEXT,
     "apiVersion" TEXT,
     "triggeredAt" TIMESTAMP(3),
     "triggeredAtRaw" TEXT,
@@ -33,10 +34,10 @@ CREATE TABLE "shopify"."ShopifyWebhookOutbox" (
     "id" TEXT NOT NULL,
     "receiptId" TEXT NOT NULL,
     "destination" "shopify"."WebhookOutboxDestination" NOT NULL,
-    "jobName" TEXT NOT NULL,
+  "contractVersion" INTEGER NOT NULL DEFAULT 1,
     "jobId" TEXT NOT NULL,
-    "payload" JSONB NOT NULL,
-    "delayMs" INTEGER NOT NULL DEFAULT 0,
+  "orderingKey" TEXT NOT NULL,
+  "envelope" JSONB NOT NULL,
     "state" "shopify"."WebhookOutboxState" NOT NULL DEFAULT 'PENDING',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "nextAttemptAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
