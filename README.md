@@ -61,6 +61,41 @@ This repository owns the migration history for the Moda Interact database.
 
 Application services should consume these migrations rather than maintaining independent copies of the database schema.
 
+## Local Database Workflow
+
+Start a local PostgreSQL instance and use this connection string for local
+database commands:
+
+```bash
+export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/moda_interact"
+```
+
+Deploy the existing migrations:
+
+```bash
+npm install
+npm run migrate:deploy
+```
+
+Check whether the database is up to date:
+
+```bash
+npm run status
+```
+
+The demo seed script is maintained by the Shopify application. Run it from the
+`moda-interact` repository after the database is running and migrations have
+been deployed:
+
+```bash
+cd ../moda-interact
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/moda_interact" npm run prisma:seed
+```
+
+The seed recreates the demo shop's billing plans and dashboard data. It deletes
+existing demo-shop usage events, billing periods, recoveries, customers,
+settings, and subscriptions before inserting the demo records.
+
 ## Generate the ERD
 
 The ERD is generated from the Prisma schema.
