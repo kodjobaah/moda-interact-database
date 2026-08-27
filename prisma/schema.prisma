@@ -11,7 +11,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["shopify", "commerce", "whatsapp","billing","public"]
+  schemas  = ["shopify", "commerce", "whatsapp", "billing", "public"]
 }
 
 model Session {
@@ -37,14 +37,39 @@ model Session {
 }
 
 model ShopSettings {
-  id   String @id @default(cuid())
+  id     String @id @default(cuid())
   shopId String @unique
-  shop   Shop   @relation(fields: [shopId],references: [id],onDelete: Cascade)
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  onboardingCompleted Boolean  @default(false)
-  plan                String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  onboardingCompleted  Boolean  @default(false)
+  plan                 String?
+  recoveryDelayMinutes Int      @default(30)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@schema("shopify")
+}
+
+model ShopBrand {
+  id String @id @default(cuid())
+
+  shopId String @unique
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  brandName String?
+
+  logoUrl     String?
+  logoAltText String?
+  logoWidth   Int?
+  logoHeight  Int?
+
+  squareLogoUrl     String?
+  squareLogoAltText String?
+
+  coverImageUrl String?
+
+  fetchedAt       DateTime @default(now())
+  lastRefreshedAt DateTime @updatedAt
 
   @@schema("shopify")
 }
@@ -77,7 +102,7 @@ model Customer {
   id String @id @default(cuid())
 
   shopId String
-  shop Shop   @relation(fields: [shopId],references: [id],onDelete: Cascade)
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
   phone String?
   email String?
@@ -94,7 +119,6 @@ model Customer {
   updatedAt DateTime @updatedAt
 
   @@unique([shopId, shopifyCustomerId])
-  
   @@schema("commerce")
 }
 
@@ -102,7 +126,7 @@ model CustomerPhone {
   id String @id @default(cuid())
 
   customerId String
-  customer   Customer @relation(fields: [customerId],references: [id],onDelete: Cascade)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   phone String
 
@@ -114,7 +138,6 @@ model CustomerPhone {
 
   @@index([customerId, endedAt])
   @@index([phone, endedAt])
-
   @@schema("commerce")
 }
 
@@ -125,6 +148,27 @@ enum CheckoutRecoveryStatus {
   COMPLETED
   EXPIRED
   CANCELLED
+
+  @@schema("commerce")
+}
+
+model CheckoutRecoveryStatusHistory {
+  id String @id @default(cuid())
+
+  checkoutRecoveryId String
+  checkoutRecovery   CheckoutRecovery @relation(fields: [checkoutRecoveryId], references: [id], onDelete: Cascade)
+
+  fromStatus CheckoutRecoveryStatus?
+  toStatus   CheckoutRecoveryStatus
+
+  reason   String?
+  source   String?
+  metadata Json?
+
+  occurredAt DateTime @default(now())
+
+  @@index([checkoutRecoveryId, occurredAt])
+  @@index([toStatus, occurredAt])
   @@schema("commerce")
 }
 
@@ -132,7 +176,7 @@ model CheckoutRecovery {
   id String @id @default(cuid())
 
   shopId String
-  shop Shop @relation(fields: [shopId],references: [id],onDelete: Cascade)
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
   checkoutToken String
   cartToken     String?
@@ -145,7 +189,7 @@ model CheckoutRecovery {
   currency    String?
   totalPrice  Decimal?
   checkoutUrl String?
-  lineItems Json?
+  lineItems   Json?
 
   detectedAt    DateTime  @default(now())
   messageSentAt DateTime?
@@ -156,7 +200,8 @@ model CheckoutRecovery {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  conversations Conversation[]
+  conversation  Conversation?
+  statusHistory CheckoutRecoveryStatusHistory[]
 
   @@unique([shopId, checkoutToken])
   @@index([customerId])
@@ -172,13 +217,24 @@ enum ConversationType {
   @@schema("whatsapp")
 }
 
+enum ConversationOutcome {
+  IN_PROGRESS
+  RECOVERED
+  NO_RESPONSE
+  DECLINED
+  EXPIRED
+
+  @@schema("whatsapp")
+}
+
 model Conversation {
   id String @id @default(cuid())
 
-  checkoutRecoveryId String
-  checkoutRecovery   CheckoutRecovery @relation(fields: [checkoutRecoveryId], references: [id], onDelete: Cascade)
+  checkoutRecoveryId String?
+  checkoutRecovery   CheckoutRecovery? @relation(fields: [checkoutRecoveryId], references: [id], onDelete: Cascade)
 
-  type ConversationType
+  type    ConversationType
+  outcome ConversationOutcome @default(IN_PROGRESS)
 
   inboundVersion       Int @default(0)
   lastProcessedVersion Int @default(0)
@@ -193,7 +249,7 @@ model Conversation {
 
   messages ConversationMessage[]
 
-  @@unique([checkoutRecoveryId, type])
+  @@unique([checkoutRecoveryId])
   @@index([checkoutRecoveryId])
   @@index([lastMessageAt])
   @@schema("whatsapp")
@@ -214,6 +270,7 @@ enum MessageSenderType {
 
   @@schema("whatsapp")
 }
+
 enum MessageStatus {
   PENDING
   SENT
@@ -223,6 +280,7 @@ enum MessageStatus {
 
   @@schema("whatsapp")
 }
+
 model ConversationMessage {
   id String @id @default(cuid())
 
@@ -237,15 +295,15 @@ model ConversationMessage {
 
   direction  MessageDirection
   senderType MessageSenderType
-  status MessageStatus @default(PENDING)
+  status     MessageStatus     @default(PENDING)
 
   content String
 
   createdAt DateTime @default(now())
 
-  sentAt               DateTime?
-  deliveredAt          DateTime?
-  readAt               DateTime?
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
 
   @@index([conversationId, createdAt])
   @@index([inReplyToProviderId])
@@ -253,77 +311,77 @@ model ConversationMessage {
 }
 
 model BillingPlan {
-  id              String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  handle          String   @unique
-  name            String
+  handle String @unique
+  name   String
 
-  entitlements    Json
-  limits          Json
+  entitlements Json
+  limits       Json
 
-  active          Boolean  @default(true)
+  active Boolean @default(true)
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  subscriptions   Subscription[]
+  subscriptions Subscription[]
 
   @@schema("billing")
 }
 
 model Subscription {
-  id                     String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  shopId                 String    @unique
-  shop                   Shop      @relation(fields: [shopId],references: [id],onDelete: Cascade)
+  shopId String @unique
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  planId                 String?
-  plan                   BillingPlan? @relation(fields: [planId],references: [id])
+  planId String?
+  plan   BillingPlan? @relation(fields: [planId], references: [id])
 
-  provider               String    @default("SHOPIFY")
+  provider String @default("SHOPIFY")
 
-  planHandle             String
-  status                 String
+  planHandle String
+  status     String
 
-  currentPeriodStart     DateTime?
-  currentPeriodEnd       DateTime?
-  trialEndsAt            DateTime?
-  cancelAtPeriodEnd      Boolean   @default(false)
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  trialEndsAt        DateTime?
+  cancelAtPeriodEnd  Boolean   @default(false)
 
   providerSubscriptionId String?
 
-  lastSyncedAt           DateTime?
+  lastSyncedAt DateTime?
 
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([planHandle])
   @@schema("billing")
 }
 
 model UsageEvent {
-  id               String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  shopId           String
-  shop             Shop      @relation(fields: [shopId],references: [id],onDelete: Cascade)
-  billingPeriodId  String?
-  billingPeriod    BillingPeriod? @relation(fields: [billingPeriodId], references: [id], onDelete: SetNull)
+  shopId          String
+  shop            Shop           @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  billingPeriodId String?
+  billingPeriod   BillingPeriod? @relation(fields: [billingPeriodId], references: [id], onDelete: SetNull)
 
-  metric           String
-  quantity         Decimal
+  metric   String
+  quantity Decimal
 
-  idempotencyKey   String    @unique
+  idempotencyKey String @unique
 
-  sourceType       String?
-  sourceId         String?
+  sourceType String?
+  sourceId   String?
 
-  occurredAt       DateTime  @default(now())
-  reportedAt       DateTime?
+  occurredAt DateTime  @default(now())
+  reportedAt DateTime?
 
-  provider         String    @default("SHOPIFY")
+  provider         String @default("SHOPIFY")
   providerResponse Json?
 
-  createdAt        DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([shopId, metric, occurredAt])
   @@index([billingPeriodId])
@@ -331,15 +389,15 @@ model UsageEvent {
 }
 
 model BillingPeriod {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   shopId      String
-  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shop        Shop         @relation(fields: [shopId], references: [id], onDelete: Cascade)
   periodStart DateTime
   periodEnd   DateTime
-  status      String   @default("OPEN")
+  status      String       @default("OPEN")
   usageEvents UsageEvent[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   @@unique([shopId, periodStart])
   @@index([shopId, periodStart, periodEnd])
@@ -354,46 +412,148 @@ enum ShopStatus {
   @@schema("commerce")
 }
 
+enum WebhookDisposition {
+  ACCEPTED
+  IGNORED
+  REJECTED
+  QUARANTINED
+
+  @@schema("shopify")
+}
+
+enum WebhookOutboxDestination {
+  CHECKOUT_EVENTS
+  ORDER_EVENTS
+
+  @@schema("shopify")
+}
+
+enum WebhookOutboxState {
+  PENDING
+  PUBLISHED
+  EXHAUSTED
+
+  @@schema("shopify")
+}
+
+model ShopifyWebhookReceipt {
+  id String @id @default(cuid())
+
+  appKey     String
+  deliveryId String
+
+  // Correlation metadata only — NOT a dedupe key (must not be unique).
+  eventId String?
+
+  shopId String?
+  shop   Shop?   @relation(fields: [shopId], references: [id], onDelete: SetNull)
+
+  shopDomain String
+
+  topic      String
+  apiVersion String?
+
+  triggeredAt    DateTime?
+  triggeredAtRaw String?
+
+  subscriptionName String?
+
+  receivedAt DateTime @default(now())
+
+  disposition     WebhookDisposition
+  dispositionCode String?
+
+  // Retained only for rejected/quarantined receipts to aid diagnosis; never HMACs/credentials.
+  rejectedPayload Json?
+
+  outbox ShopifyWebhookOutbox?
+
+  @@unique([appKey, deliveryId])
+  @@index([shopDomain, receivedAt])
+  @@index([eventId])
+  @@index([shopId, receivedAt])
+  @@schema("shopify")
+}
+
+model ShopifyWebhookOutbox {
+  id String @id @default(cuid())
+
+  receiptId String                @unique
+  receipt   ShopifyWebhookReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  destination WebhookOutboxDestination
+
+  jobName String
+  jobId   String @unique
+  payload Json
+
+  delayMs Int @default(0)
+
+  state WebhookOutboxState @default(PENDING)
+
+  createdAt     DateTime @default(now())
+  nextAttemptAt DateTime @default(now())
+
+  publishAttempts Int @default(0)
+
+  lockToken   String?
+  lockedBy    String?
+  lockedUntil DateTime?
+
+  publishedAt DateTime?
+  exhaustedAt DateTime?
+
+  lastErrorClass String?
+  lastError      String?
+  lastErrorAt    DateTime?
+
+  @@index([state, nextAttemptAt, lockedUntil])
+  @@schema("shopify")
+}
+
 model Shop {
-  id              String      @id @default(cuid())
+  id String @id @default(cuid())
 
   // Shopify identity
-  domain          String      @unique
-  shopifyShopId   String?     @unique
+  domain        String  @unique
+  shopifyShopId String? @unique
 
   // Installation lifecycle
-  status          ShopStatus  @default(ACTIVE)
-  installedAt     DateTime    @default(now())
-  uninstalledAt   DateTime?
+  status        ShopStatus @default(ACTIVE)
+  installedAt   DateTime   @default(now())
+  uninstalledAt DateTime?
 
   // Configuration / billing
-  settings        ShopSettings?
-  brand           ShopBrand?
-  subscriptions   Subscription[]
-  usageEvents     UsageEvent[]
-  billingPeriods  BillingPeriod[]
+  settings       ShopSettings?
+  brand          ShopBrand?
+  subscriptions  Subscription[]
+  usageEvents    UsageEvent[]
+  billingPeriods BillingPeriod[]
 
   // Commerce domain
-  customers       Customer[]
-  recoveries      CheckoutRecovery[]
+  customers  Customer[]
+  recoveries CheckoutRecovery[]
 
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  // Shopify domain
+  webhookReceipts ShopifyWebhookReceipt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@schema("commerce")
 }
 
 model Tour {
-  id          String   @id @default(uuid())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   city        String
   country     String
   title       String
-  description String   @db.Text
-  image       String?  @db.Text
+  description String  @db.Text
+  image       String? @db.Text
   stops       Json
 
   @@unique([city, country])
@@ -411,6 +571,3 @@ model RagSearchResults {
 
   @@schema("public")
 }
-
-
- 
