@@ -14,6 +14,13 @@ enum "ConversationType" as ConversationType {
   PRODUCT_SUPPORT
   POST_PURCHASE
 }
+enum "ConversationOutcome" as ConversationOutcome {
+  IN_PROGRESS
+  RECOVERED
+  NO_RESPONSE
+  DECLINED
+  EXPIRED
+}
 enum "MessageDirection" as MessageDirection {
   INBOUND
   OUTBOUND
@@ -30,6 +37,26 @@ enum "MessageStatus" as MessageStatus {
   DELIVERED
   READ
   FAILED
+}
+enum "ShopStatus" as ShopStatus {
+  ACTIVE
+  UNINSTALLED
+  SUSPENDED
+}
+enum "WebhookDisposition" as WebhookDisposition {
+  ACCEPTED
+  IGNORED
+  REJECTED
+  QUARANTINED
+}
+enum "WebhookOutboxDestination" as WebhookOutboxDestination {
+  CHECKOUT_EVENTS
+  ORDER_EVENTS
+}
+enum "WebhookOutboxState" as WebhookOutboxState {
+  PENDING
+  PUBLISHED
+  EXHAUSTED
 }
 entity "Session" as Session {
 + id [PK] : String 
@@ -55,17 +82,34 @@ entity "Session" as Session {
 entity "ShopSettings" as ShopSettings {
 + id [PK] : String 
 --
-  * shop : String
+  # shopId : [FK] Shop
   * onboardingCompleted : Boolean
   plan : String
+  * recoveryDelayMinutes : Int
   * createdAt : DateTime
   * updatedAt : DateTime
+}
+
+entity "ShopBrand" as ShopBrand {
++ id [PK] : String 
+--
+  # shopId : [FK] Shop
+  brandName : String
+  logoUrl : String
+  logoAltText : String
+  logoWidth : Int
+  logoHeight : Int
+  squareLogoUrl : String
+  squareLogoAltText : String
+  coverImageUrl : String
+  * fetchedAt : DateTime
+  * lastRefreshedAt : DateTime
 }
 
 entity "Customer" as Customer {
 + id [PK] : String 
 --
-  * shop : String
+  # shopId : [FK] Shop
   phone : String
   email : String
   firstName : String
@@ -75,10 +119,33 @@ entity "Customer" as Customer {
   * updatedAt : DateTime
 }
 
+entity "CustomerPhone" as CustomerPhone {
++ id [PK] : String 
+--
+  # customerId : [FK] Customer
+  * phone : String
+  * startedAt : DateTime
+  endedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CheckoutRecoveryStatusHistory" as CheckoutRecoveryStatusHistory {
++ id [PK] : String 
+--
+  # checkoutRecoveryId : [FK] CheckoutRecovery
+  fromStatus : CheckoutRecoveryStatus
+  * toStatus : CheckoutRecoveryStatus
+  reason : String
+  source : String
+  metadata : Json
+  * occurredAt : DateTime
+}
+
 entity "CheckoutRecovery" as CheckoutRecovery {
 + id [PK] : String 
 --
-  * shop : String
+  # shopId : [FK] Shop
   * checkoutToken : String
   cartToken : String
   # customerId : [FK] Customer
@@ -101,6 +168,7 @@ entity "Conversation" as Conversation {
 --
   # checkoutRecoveryId : [FK] CheckoutRecovery
   * type : ConversationType
+  * outcome : ConversationOutcome
   * inboundVersion : Int
   * lastProcessedVersion : Int
   summary : String
@@ -126,15 +194,170 @@ entity "ConversationMessage" as ConversationMessage {
   readAt : DateTime
 }
 
+entity "BillingPlan" as BillingPlan {
++ id [PK] : String 
+--
+  * handle : String
+  * name : String
+  * entitlements : Json
+  * limits : Json
+  * active : Boolean
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "Subscription" as Subscription {
++ id [PK] : String 
+--
+  # shopId : [FK] Shop
+  # planId : [FK] BillingPlan
+  * provider : String
+  * planHandle : String
+  * status : String
+  currentPeriodStart : DateTime
+  currentPeriodEnd : DateTime
+  trialEndsAt : DateTime
+  * cancelAtPeriodEnd : Boolean
+  providerSubscriptionId : String
+  lastSyncedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "UsageEvent" as UsageEvent {
++ id [PK] : String 
+--
+  # shopId : [FK] Shop
+  # billingPeriodId : [FK] BillingPeriod
+  * metric : String
+  * quantity : Decimal
+  * idempotencyKey : String
+  sourceType : String
+  sourceId : String
+  * occurredAt : DateTime
+  reportedAt : DateTime
+  * provider : String
+  providerResponse : Json
+  * createdAt : DateTime
+}
+
+entity "BillingPeriod" as BillingPeriod {
++ id [PK] : String 
+--
+  # shopId : [FK] Shop
+  * periodStart : DateTime
+  * periodEnd : DateTime
+  * status : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "ShopifyWebhookReceipt" as ShopifyWebhookReceipt {
++ id [PK] : String 
+--
+  * appKey : String
+  * deliveryId : String
+  eventId : String
+  # shopId : [FK] Shop
+  * shopDomain : String
+  * topic : String
+  apiVersion : String
+  triggeredAt : DateTime
+  triggeredAtRaw : String
+  subscriptionName : String
+  * receivedAt : DateTime
+  * disposition : WebhookDisposition
+  dispositionCode : String
+  rejectedPayload : Json
+}
+
+entity "ShopifyWebhookOutbox" as ShopifyWebhookOutbox {
++ id [PK] : String 
+--
+  # receiptId : [FK] ShopifyWebhookReceipt
+  * destination : WebhookOutboxDestination
+  * jobName : String
+  * jobId : String
+  * payload : Json
+  * delayMs : Int
+  * state : WebhookOutboxState
+  * createdAt : DateTime
+  * nextAttemptAt : DateTime
+  * publishAttempts : Int
+  lockToken : String
+  lockedBy : String
+  lockedUntil : DateTime
+  publishedAt : DateTime
+  exhaustedAt : DateTime
+  lastErrorClass : String
+  lastError : String
+  lastErrorAt : DateTime
+}
+
+entity "Shop" as Shop {
++ id [PK] : String 
+--
+  * domain : String
+  shopifyShopId : String
+  * status : ShopStatus
+  * installedAt : DateTime
+  uninstalledAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "Tour" as Tour {
++ id [PK] : String 
+--
+  * createdAt : DateTime
+  * updatedAt : DateTime
+  * city : String
+  * country : String
+  * title : String
+  * description : String
+  image : String
+  * stops : Json
+}
+
+entity "RagSearchResults" as RagSearchResults {
++ id [PK] : String 
+--
+  * createdAt : DateTime
+  * updatedAt : DateTime
+  * answer : Json
+  * prompt : Json
+  * astraDoc : String
+}
+
 ' Relations
+ShopSettings |o--|| Shop
+ShopBrand |o--|| Shop
+Customer }o--|| Shop
+CustomerPhone }o--|| Customer
+CheckoutRecoveryStatusHistory }o--|| CheckoutRecovery
+CheckoutRecovery }o--|| Shop
 CheckoutRecovery }o--o| Customer
-Conversation }o--|| CheckoutRecovery
+Conversation |o--o| CheckoutRecovery
 ConversationMessage }o--|| Conversation
+Subscription |o--|| Shop
+Subscription }o--o| BillingPlan
+UsageEvent }o--|| Shop
+UsageEvent }o--o| BillingPeriod
+BillingPeriod }o--|| Shop
+ShopifyWebhookReceipt }o--o| Shop
+ShopifyWebhookOutbox |o--|| ShopifyWebhookReceipt
 ' ManyToMany Relations
 ' enum relations
+CheckoutRecoveryStatusHistory |o--|| CheckoutRecoveryStatus
+CheckoutRecoveryStatusHistory |o--|| CheckoutRecoveryStatus
 CheckoutRecovery |o--|| CheckoutRecoveryStatus
 Conversation |o--|| ConversationType
+Conversation |o--|| ConversationOutcome
 ConversationMessage |o--|| MessageDirection
 ConversationMessage |o--|| MessageSenderType
 ConversationMessage |o--|| MessageStatus
+ShopifyWebhookReceipt |o--|| WebhookDisposition
+ShopifyWebhookOutbox |o--|| WebhookOutboxDestination
+ShopifyWebhookOutbox |o--|| WebhookOutboxState
+Shop |o--|| ShopStatus
 @enduml
