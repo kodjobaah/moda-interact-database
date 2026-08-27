@@ -388,6 +388,105 @@ enum ShopStatus {
   @@schema("commerce")
 }
 
+enum WebhookDisposition {
+  ACCEPTED
+  IGNORED
+  REJECTED
+  QUARANTINED
+
+  @@schema("shopify")
+}
+
+enum WebhookOutboxDestination {
+  CHECKOUT_EVENTS
+  ORDER_EVENTS
+
+  @@schema("shopify")
+}
+
+enum WebhookOutboxState {
+  PENDING
+  PUBLISHED
+  EXHAUSTED
+
+  @@schema("shopify")
+}
+
+model ShopifyWebhookReceipt {
+  id String @id @default(cuid())
+
+  appKey     String
+  deliveryId String
+
+  // Correlation metadata only — NOT a dedupe key (must not be unique).
+  eventId String?
+
+  shopId String?
+  shop   Shop?   @relation(fields: [shopId], references: [id], onDelete: SetNull)
+
+  shopDomain String
+
+  topic      String
+  apiVersion String?
+
+  triggeredAt    DateTime?
+  triggeredAtRaw String?
+
+  subscriptionName String?
+
+  receivedAt DateTime @default(now())
+
+  disposition     WebhookDisposition
+  dispositionCode String?
+
+  // Retained only for rejected/quarantined receipts to aid diagnosis; never HMACs/credentials.
+  rejectedPayload Json?
+
+  outbox ShopifyWebhookOutbox?
+
+  @@unique([appKey, deliveryId])
+  @@index([shopDomain, receivedAt])
+  @@index([eventId])
+  @@index([shopId, receivedAt])
+  @@schema("shopify")
+}
+
+model ShopifyWebhookOutbox {
+  id String @id @default(cuid())
+
+  receiptId String                @unique
+  receipt   ShopifyWebhookReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  destination WebhookOutboxDestination
+
+  jobName String
+  jobId   String @unique
+  payload Json
+
+  delayMs Int @default(0)
+
+  state WebhookOutboxState @default(PENDING)
+
+  createdAt     DateTime @default(now())
+  nextAttemptAt DateTime @default(now())
+
+  publishAttempts Int @default(0)
+
+  lockToken   String?
+  lockedBy    String?
+  lockedUntil DateTime?
+
+  publishedAt DateTime?
+  exhaustedAt DateTime?
+
+  lastErrorClass String?
+  lastError      String?
+  lastErrorAt    DateTime?
+
+  @@index([state, nextAttemptAt, lockedUntil])
+  @@schema("shopify")
+}
+
 model Shop {
   id String @id @default(cuid())
 
@@ -410,6 +509,9 @@ model Shop {
   // Commerce domain
   customers  Customer[]
   recoveries CheckoutRecovery[]
+
+  // Shopify domain
+  webhookReceipts ShopifyWebhookReceipt[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
