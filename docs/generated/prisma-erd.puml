@@ -43,6 +43,7 @@ enum "ShopStatus" as ShopStatus {
   UNINSTALLED
   SUSPENDED
 }
+<<<<<<< HEAD
 enum "WebhookDisposition" as WebhookDisposition {
   ACCEPTED
   IGNORED
@@ -57,6 +58,8 @@ enum "WebhookOutboxState" as WebhookOutboxState {
   PUBLISHED
   EXHAUSTED
 }
+=======
+>>>>>>> 6763cc2441f1e4e869d6497fe2ff3ea4e89a9a9d
 entity "Session" as Session {
 + id [PK] : String 
 --
@@ -251,6 +254,7 @@ entity "BillingPeriod" as BillingPeriod {
   * updatedAt : DateTime
 }
 
+<<<<<<< HEAD
 entity "ShopifyWebhookReceipt" as ShopifyWebhookReceipt {
 + id [PK] : String 
 --
@@ -294,6 +298,8 @@ entity "ShopifyWebhookOutbox" as ShopifyWebhookOutbox {
   lastErrorAt : DateTime
 }
 
+=======
+>>>>>>> 6763cc2441f1e4e869d6497fe2ff3ea4e89a9a9d
 entity "Shop" as Shop {
 + id [PK] : String 
 --
@@ -344,8 +350,6 @@ Subscription }o--o| BillingPlan
 UsageEvent }o--|| Shop
 UsageEvent }o--o| BillingPeriod
 BillingPeriod }o--|| Shop
-ShopifyWebhookReceipt }o--o| Shop
-ShopifyWebhookOutbox |o--|| ShopifyWebhookReceipt
 ' ManyToMany Relations
 ' enum relations
 CheckoutRecoveryStatusHistory |o--|| CheckoutRecoveryStatus
@@ -356,8 +360,5 @@ Conversation |o--|| ConversationOutcome
 ConversationMessage |o--|| MessageDirection
 ConversationMessage |o--|| MessageSenderType
 ConversationMessage |o--|| MessageStatus
-ShopifyWebhookReceipt |o--|| WebhookDisposition
-ShopifyWebhookOutbox |o--|| WebhookOutboxDestination
-ShopifyWebhookOutbox |o--|| WebhookOutboxState
 Shop |o--|| ShopStatus
 @enduml

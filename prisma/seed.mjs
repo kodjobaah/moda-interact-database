@@ -167,6 +167,7 @@ async function main() {
     const conversationId = `demo-conversation-${recovery.id}`;
     const firstMessageId = `demo-message-${recovery.id}-01`;
     const secondMessageId = `demo-message-${recovery.id}-02`;
+    const thirdMessageId = `demo-message-${recovery.id}-03`;
     const conversation = await prisma.conversation.upsert({
       where: { id: conversationId },
       create: { id: conversationId, checkoutRecoveryId: recovery.id, type: "RECOVERY", outcome: recovery.status === "COMPLETED" ? "RECOVERED" : recovery.status === "EXPIRED" ? "EXPIRED" : recovery.status === "DETECTED" ? "NO_RESPONSE" : "IN_PROGRESS", summary: "Demo recovery conversation" },
@@ -181,6 +182,11 @@ async function main() {
       where: { id: secondMessageId },
       create: { id: secondMessageId, conversationId: conversation.id, direction: "OUTBOUND", senderType: "AUTOMATION", status: "DELIVERED", content: "Your checkout link is ready whenever you are.", createdAt: new Date(new Date(recovery.detectedAt).getTime() + 15 * 60 * 1000), sentAt: new Date(new Date(recovery.detectedAt).getTime() + 15 * 60 * 1000), deliveredAt: new Date(new Date(recovery.detectedAt).getTime() + 15 * 60 * 1000) },
       update: { conversationId: conversation.id, status: "DELIVERED" },
+    });
+    await prisma.conversationMessage.upsert({
+      where: { id: thirdMessageId },
+      create: { id: thirdMessageId, conversationId: conversation.id, direction: "INBOUND", senderType: "CUSTOMER", status: "READ", content: "Thanks, I would like to complete this order.", createdAt: new Date(new Date(recovery.detectedAt).getTime() + 30 * 60 * 1000), sentAt: new Date(new Date(recovery.detectedAt).getTime() + 30 * 60 * 1000), readAt: new Date(new Date(recovery.detectedAt).getTime() + 30 * 60 * 1000) },
+      update: { conversationId: conversation.id, status: "READ" },
     });
     const usageEvents = [
       { metric: "checkout_recovery", idempotencyKey: `checkout-recovery:${recovery.id}`, sourceType: "CheckoutRecovery", sourceId: recovery.id },

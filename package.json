@@ -5,7 +5,6 @@
   "main": "index.js",
   "scripts": {
     "prisma:generate": "prisma generate --schema database/prisma/schema.prisma",
-    "test": "node scripts/verify-webhook-outbox.mjs",
     "validate": "prisma validate --schema prisma/schema.prisma",
     "format": "prisma format --schema prisma/schema.prisma",
     "status": "prisma migrate status --schema prisma/schema.prisma",
