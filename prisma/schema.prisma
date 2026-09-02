@@ -445,3 +445,27 @@ model RagSearchResults {
 
   @@schema("public")
 }
+
+enum PlatformAdminRole {
+  ADMIN
+  SUPER_ADMIN
+
+  @@schema("public")
+}
+
+model PlatformAdmin {
+  id              String            @id @default(cuid())
+  provider        String            @default("google")
+  providerSubject String?
+  email           String            @unique
+  displayName     String?
+  role            PlatformAdminRole @default(ADMIN)
+  active          Boolean           @default(true)
+  lastLoginAt     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([provider, providerSubject])
+  @@index([active, role])
+  @@schema("public")
+}

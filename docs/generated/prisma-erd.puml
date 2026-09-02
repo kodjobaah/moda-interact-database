@@ -43,23 +43,10 @@ enum "ShopStatus" as ShopStatus {
   UNINSTALLED
   SUSPENDED
 }
-<<<<<<< HEAD
-enum "WebhookDisposition" as WebhookDisposition {
-  ACCEPTED
-  IGNORED
-  REJECTED
-  QUARANTINED
+enum "PlatformAdminRole" as PlatformAdminRole {
+  ADMIN
+  SUPER_ADMIN
 }
-enum "WebhookOutboxDestination" as WebhookOutboxDestination {
-  SHOPIFY_COMMERCE_EVENTS
-}
-enum "WebhookOutboxState" as WebhookOutboxState {
-  PENDING
-  PUBLISHED
-  EXHAUSTED
-}
-=======
->>>>>>> 6763cc2441f1e4e869d6497fe2ff3ea4e89a9a9d
 entity "Session" as Session {
 + id [PK] : String 
 --
@@ -254,52 +241,6 @@ entity "BillingPeriod" as BillingPeriod {
   * updatedAt : DateTime
 }
 
-<<<<<<< HEAD
-entity "ShopifyWebhookReceipt" as ShopifyWebhookReceipt {
-+ id [PK] : String 
---
-  * appKey : String
-  * deliveryId : String
-  eventId : String
-  # shopId : [FK] Shop
-  * shopDomain : String
-  * providerTopic : String
-  internalEventType : String
-  apiVersion : String
-  triggeredAt : DateTime
-  triggeredAtRaw : String
-  subscriptionName : String
-  * receivedAt : DateTime
-  * disposition : WebhookDisposition
-  dispositionCode : String
-  rejectedPayload : Json
-}
-
-entity "ShopifyWebhookOutbox" as ShopifyWebhookOutbox {
-+ id [PK] : String 
---
-  # receiptId : [FK] ShopifyWebhookReceipt
-  * destination : WebhookOutboxDestination
-  * contractVersion : Int
-  * jobId : String
-  * orderingKey : String
-  * envelope : Json
-  * state : WebhookOutboxState
-  * createdAt : DateTime
-  * nextAttemptAt : DateTime
-  * publishAttempts : Int
-  lockToken : String
-  lockedBy : String
-  lockedUntil : DateTime
-  publishedAt : DateTime
-  exhaustedAt : DateTime
-  lastErrorClass : String
-  lastError : String
-  lastErrorAt : DateTime
-}
-
-=======
->>>>>>> 6763cc2441f1e4e869d6497fe2ff3ea4e89a9a9d
 entity "Shop" as Shop {
 + id [PK] : String 
 --
@@ -335,6 +276,20 @@ entity "RagSearchResults" as RagSearchResults {
   * astraDoc : String
 }
 
+entity "PlatformAdmin" as PlatformAdmin {
++ id [PK] : String
+--
+  * provider : String
+  providerSubject : String
+  * email : String
+  displayName : String
+  * role : PlatformAdminRole
+  * active : Boolean
+  lastLoginAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 ' Relations
 ShopSettings |o--|| Shop
 ShopBrand |o--|| Shop
@@ -361,4 +316,5 @@ ConversationMessage |o--|| MessageDirection
 ConversationMessage |o--|| MessageSenderType
 ConversationMessage |o--|| MessageStatus
 Shop |o--|| ShopStatus
+PlatformAdmin |o--|| PlatformAdminRole
 @enduml
