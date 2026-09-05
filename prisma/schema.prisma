@@ -44,6 +44,9 @@ model ShopSettings {
   onboardingCompleted  Boolean  @default(false)
   plan                 String?
   recoveryDelayMinutes Int      @default(30)
+  defaultLanguageTag   String?
+  defaultTimeZone      String?
+  defaultCountryCode   String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -193,6 +196,16 @@ enum ConversationType {
   @@schema("whatsapp")
 }
 
+enum LanguageSource {
+  CUSTOMER_EXPLICIT
+  DETECTED
+  SHOPIFY
+  MERCHANT_DEFAULT
+  PLATFORM_DEFAULT
+
+  @@schema("whatsapp")
+}
+
 enum ConversationOutcome {
   IN_PROGRESS
   RECOVERED
@@ -211,6 +224,12 @@ model Conversation {
 
   type    ConversationType
   outcome ConversationOutcome @default(IN_PROGRESS)
+
+  languageTag   String?
+  languageSource LanguageSource?
+  countryCode   String?
+  currencyCode  String?
+  timeZone      String?
 
   inboundVersion       Int @default(0)
   lastProcessedVersion Int @default(0)
@@ -406,6 +425,7 @@ model Shop {
   subscriptions  Subscription[]
   usageEvents    UsageEvent[]
   billingPeriods BillingPeriod[]
+  whatsappTemplateVariants WhatsAppTemplateVariant[]
 
   // Commerce domain
   customers  Customer[]
@@ -416,6 +436,43 @@ model Shop {
 
   @@index([status])
   @@schema("commerce")
+}
+
+enum WhatsAppTemplateStatus {
+  APPROVED
+  IN_APPEAL
+  PENDING
+  REJECTED
+  PENDING_DELETION
+  DELETED
+  DISABLED
+  PAUSED
+  LIMIT_EXCEEDED
+
+  @@schema("whatsapp")
+}
+
+model WhatsAppTemplateVariant {
+  id String @id @default(cuid())
+
+  shopId String
+  shop   Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  providerAccountId    String
+  purpose              String
+  languageTag          String
+  providerLanguageCode String
+  providerTemplateName String
+  providerTemplateId   String?
+  status               WhatsAppTemplateStatus
+  enabled              Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([shopId, providerAccountId, purpose, providerTemplateName, providerLanguageCode], map: "WhatsAppTemplateVariant_identity_key")
+  @@index([shopId, providerAccountId, purpose, languageTag, enabled, status])
+  @@schema("whatsapp")
 }
 
 model Tour {

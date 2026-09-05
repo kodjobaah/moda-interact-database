@@ -14,6 +14,13 @@ enum "ConversationType" as ConversationType {
   PRODUCT_SUPPORT
   POST_PURCHASE
 }
+enum "LanguageSource" as LanguageSource {
+  CUSTOMER_EXPLICIT
+  DETECTED
+  SHOPIFY
+  MERCHANT_DEFAULT
+  PLATFORM_DEFAULT
+}
 enum "ConversationOutcome" as ConversationOutcome {
   IN_PROGRESS
   RECOVERED
@@ -42,6 +49,17 @@ enum "ShopStatus" as ShopStatus {
   ACTIVE
   UNINSTALLED
   SUSPENDED
+}
+enum "WhatsAppTemplateStatus" as WhatsAppTemplateStatus {
+  APPROVED
+  IN_APPEAL
+  PENDING
+  REJECTED
+  PENDING_DELETION
+  DELETED
+  DISABLED
+  PAUSED
+  LIMIT_EXCEEDED
 }
 enum "PlatformAdminRole" as PlatformAdminRole {
   ADMIN
@@ -75,6 +93,9 @@ entity "ShopSettings" as ShopSettings {
   * onboardingCompleted : Boolean
   plan : String
   * recoveryDelayMinutes : Int
+  defaultLanguageTag : String
+  defaultTimeZone : String
+  defaultCountryCode : String
   * createdAt : DateTime
   * updatedAt : DateTime
 }
@@ -158,6 +179,11 @@ entity "Conversation" as Conversation {
   # checkoutRecoveryId : [FK] CheckoutRecovery
   * type : ConversationType
   * outcome : ConversationOutcome
+  languageTag : String
+  languageSource : LanguageSource
+  countryCode : String
+  currencyCode : String
+  timeZone : String
   * inboundVersion : Int
   * lastProcessedVersion : Int
   summary : String
@@ -253,6 +279,22 @@ entity "Shop" as Shop {
   * updatedAt : DateTime
 }
 
+entity "WhatsAppTemplateVariant" as WhatsAppTemplateVariant {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  * providerAccountId : String
+  * purpose : String
+  * languageTag : String
+  * providerLanguageCode : String
+  * providerTemplateName : String
+  providerTemplateId : String
+  * status : WhatsAppTemplateStatus
+  * enabled : Boolean
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 entity "Tour" as Tour {
 + id [PK] : String 
 --
@@ -305,6 +347,7 @@ Subscription }o--o| BillingPlan
 UsageEvent }o--|| Shop
 UsageEvent }o--o| BillingPeriod
 BillingPeriod }o--|| Shop
+WhatsAppTemplateVariant }o--|| Shop
 ' ManyToMany Relations
 ' enum relations
 CheckoutRecoveryStatusHistory |o--|| CheckoutRecoveryStatus
@@ -312,9 +355,11 @@ CheckoutRecoveryStatusHistory |o--|| CheckoutRecoveryStatus
 CheckoutRecovery |o--|| CheckoutRecoveryStatus
 Conversation |o--|| ConversationType
 Conversation |o--|| ConversationOutcome
+Conversation |o--|| LanguageSource
 ConversationMessage |o--|| MessageDirection
 ConversationMessage |o--|| MessageSenderType
 ConversationMessage |o--|| MessageStatus
 Shop |o--|| ShopStatus
+WhatsAppTemplateVariant |o--|| WhatsAppTemplateStatus
 PlatformAdmin |o--|| PlatformAdminRole
 @enduml
