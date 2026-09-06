@@ -65,8 +65,18 @@ enum "PlatformAdminRole" as PlatformAdminRole {
   ADMIN
   SUPER_ADMIN
 }
+enum "MerchantSupportMessageKind" as MerchantSupportMessageKind {
+  ADMINISTRATIVE
+  SYSTEM
+  MERCHANT
+}
+enum "MerchantSupportMessageState" as MerchantSupportMessageState {
+  PROCESSING
+  AVAILABLE
+  FAILED
+}
 entity "Session" as Session {
-+ id [PK] : String 
++ id [PK] : String
 --
   * shop : String
   * state : String
@@ -87,7 +97,7 @@ entity "Session" as Session {
 }
 
 entity "ShopSettings" as ShopSettings {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   * onboardingCompleted : Boolean
@@ -101,7 +111,7 @@ entity "ShopSettings" as ShopSettings {
 }
 
 entity "ShopBrand" as ShopBrand {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   brandName : String
@@ -117,7 +127,7 @@ entity "ShopBrand" as ShopBrand {
 }
 
 entity "Customer" as Customer {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   phone : String
@@ -130,7 +140,7 @@ entity "Customer" as Customer {
 }
 
 entity "CustomerPhone" as CustomerPhone {
-+ id [PK] : String 
++ id [PK] : String
 --
   # customerId : [FK] Customer
   * phone : String
@@ -141,7 +151,7 @@ entity "CustomerPhone" as CustomerPhone {
 }
 
 entity "CheckoutRecoveryStatusHistory" as CheckoutRecoveryStatusHistory {
-+ id [PK] : String 
++ id [PK] : String
 --
   # checkoutRecoveryId : [FK] CheckoutRecovery
   fromStatus : CheckoutRecoveryStatus
@@ -153,7 +163,7 @@ entity "CheckoutRecoveryStatusHistory" as CheckoutRecoveryStatusHistory {
 }
 
 entity "CheckoutRecovery" as CheckoutRecovery {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   * checkoutToken : String
@@ -174,7 +184,7 @@ entity "CheckoutRecovery" as CheckoutRecovery {
 }
 
 entity "Conversation" as Conversation {
-+ id [PK] : String 
++ id [PK] : String
 --
   # checkoutRecoveryId : [FK] CheckoutRecovery
   * type : ConversationType
@@ -194,7 +204,7 @@ entity "Conversation" as Conversation {
 }
 
 entity "ConversationMessage" as ConversationMessage {
-+ id [PK] : String 
++ id [PK] : String
 --
   # conversationId : [FK] Conversation
   providerMessageId : String
@@ -210,7 +220,7 @@ entity "ConversationMessage" as ConversationMessage {
 }
 
 entity "BillingPlan" as BillingPlan {
-+ id [PK] : String 
++ id [PK] : String
 --
   * handle : String
   * name : String
@@ -222,7 +232,7 @@ entity "BillingPlan" as BillingPlan {
 }
 
 entity "Subscription" as Subscription {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # planId : [FK] BillingPlan
@@ -240,7 +250,7 @@ entity "Subscription" as Subscription {
 }
 
 entity "UsageEvent" as UsageEvent {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # billingPeriodId : [FK] BillingPeriod
@@ -257,7 +267,7 @@ entity "UsageEvent" as UsageEvent {
 }
 
 entity "BillingPeriod" as BillingPeriod {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   * periodStart : DateTime
@@ -268,7 +278,7 @@ entity "BillingPeriod" as BillingPeriod {
 }
 
 entity "Shop" as Shop {
-+ id [PK] : String 
++ id [PK] : String
 --
   * domain : String
   shopifyShopId : String
@@ -296,7 +306,7 @@ entity "WhatsAppTemplateVariant" as WhatsAppTemplateVariant {
 }
 
 entity "Tour" as Tour {
-+ id [PK] : String 
++ id [PK] : String
 --
   * createdAt : DateTime
   * updatedAt : DateTime
@@ -309,7 +319,7 @@ entity "Tour" as Tour {
 }
 
 entity "RagSearchResults" as RagSearchResults {
-+ id [PK] : String 
++ id [PK] : String
 --
   * createdAt : DateTime
   * updatedAt : DateTime
@@ -332,6 +342,42 @@ entity "PlatformAdmin" as PlatformAdmin {
   * updatedAt : DateTime
 }
 
+entity "MerchantSupportThread" as MerchantSupportThread {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  lastMessageAt : DateTime
+  lastMerchantMessageAt : DateTime
+  lastAdministrativeMessageAt : DateTime
+  * needsAdminResponse : Boolean
+  * merchantMessageVersion : Int
+  # assignedPlatformAdminId : [FK] PlatformAdmin
+  assignedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantSupportMessage" as MerchantSupportMessage {
++ id [PK] : String
+--
+  # threadId : [FK] MerchantSupportThread
+  * kind : MerchantSupportMessageKind
+  * state : MerchantSupportMessageState
+  * originalBody : String
+  * sourceLanguageTag : String
+  displayLanguageTag : String
+  # platformAdminId : [FK] PlatformAdmin
+  shopifyUserId : String
+  systemCode : String
+  systemVersion : String
+  sourceKey : String
+  availableAt : DateTime
+  readAt : DateTime
+  respondsThroughMerchantVersion : Int
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 ' Relations
 ShopSettings |o--|| Shop
 ShopBrand |o--|| Shop
@@ -348,6 +394,10 @@ UsageEvent }o--|| Shop
 UsageEvent }o--o| BillingPeriod
 BillingPeriod }o--|| Shop
 WhatsAppTemplateVariant }o--|| Shop
+MerchantSupportThread |o--|| Shop
+MerchantSupportThread }o--o| PlatformAdmin
+MerchantSupportMessage }o--|| MerchantSupportThread
+MerchantSupportMessage }o--o| PlatformAdmin
 ' ManyToMany Relations
 ' enum relations
 CheckoutRecoveryStatusHistory |o--|| CheckoutRecoveryStatus
@@ -362,4 +412,6 @@ ConversationMessage |o--|| MessageStatus
 Shop |o--|| ShopStatus
 WhatsAppTemplateVariant |o--|| WhatsAppTemplateStatus
 PlatformAdmin |o--|| PlatformAdminRole
+MerchantSupportMessage |o--|| MerchantSupportMessageKind
+MerchantSupportMessage |o--|| MerchantSupportMessageState
 @enduml
