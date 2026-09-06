@@ -75,6 +75,37 @@ enum "MerchantSupportMessageState" as MerchantSupportMessageState {
   AVAILABLE
   FAILED
 }
+enum "MerchantTranslationDirection" as MerchantTranslationDirection {
+  MERCHANT_TO_ADMIN
+  ADMIN_TO_MERCHANT
+  SYSTEM_TO_MERCHANT
+}
+enum "MerchantMessageTranslationStatus" as MerchantMessageTranslationStatus {
+  PENDING
+  AVAILABLE
+  FAILED
+}
+enum "MerchantTranslationBatchStatus" as MerchantTranslationBatchStatus {
+  READY
+  SUBMITTING
+  SUBMISSION_UNKNOWN
+  SUBMITTED
+  PROVIDER_COMPLETED
+  COMPLETED
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+enum "MerchantTranslationReconciliationScope" as MerchantTranslationReconciliationScope {
+  TRANSLATION
+  FAILED_TRANSLATIONS
+}
+enum "MerchantTranslationReconciliationStatus" as MerchantTranslationReconciliationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
 entity "Session" as Session {
 + id [PK] : String
 --
@@ -378,6 +409,70 @@ entity "MerchantSupportMessage" as MerchantSupportMessage {
   * updatedAt : DateTime
 }
 
+entity "MerchantMessageTranslation" as MerchantMessageTranslation {
++ id [PK] : String
+--
+  # messageId : [FK] MerchantSupportMessage
+  * direction : MerchantTranslationDirection
+  * sourceLanguageTag : String
+  * targetLanguageTag : String
+  * status : MerchantMessageTranslationStatus
+  translatedBody : String
+  failureCode : String
+  * retryCount : Int
+  nextAttemptAt : DateTime
+  # currentBatchId : [FK] MerchantTranslationBatch
+  completedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantTranslationBatch" as MerchantTranslationBatch {
++ id [PK] : String
+--
+  * provider : String
+  * model : String
+  * status : MerchantTranslationBatchStatus
+  providerBatchId : String
+  inputFileId : String
+  outputFileId : String
+  errorFileId : String
+  submissionStartedAt : DateTime
+  lastSubmitAttemptAt : DateTime
+  * submitAttemptCount : Int
+  nextSubmitAt : DateTime
+  submittedAt : DateTime
+  lastPolledAt : DateTime
+  nextPollAt : DateTime
+  * pollSequence : Int
+  completedAt : DateTime
+  failureCode : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantTranslationBatchItem" as MerchantTranslationBatchItem {
++ id [PK] : String
+--
+  # batchId : [FK] MerchantTranslationBatch
+  # translationId : [FK] MerchantMessageTranslation
+  * providerCustomId : String
+  * createdAt : DateTime
+}
+
+entity "MerchantTranslationReconciliationRequest" as MerchantTranslationReconciliationRequest {
++ id [PK] : String
+--
+  # requestedByPlatformAdminId : [FK] PlatformAdmin
+  * scope : MerchantTranslationReconciliationScope
+  translationId : String
+  * status : MerchantTranslationReconciliationStatus
+  failureCode : String
+  * requestedAt : DateTime
+  startedAt : DateTime
+  completedAt : DateTime
+}
+
 ' Relations
 ShopSettings |o--|| Shop
 ShopBrand |o--|| Shop
@@ -398,6 +493,11 @@ MerchantSupportThread |o--|| Shop
 MerchantSupportThread }o--o| PlatformAdmin
 MerchantSupportMessage }o--|| MerchantSupportThread
 MerchantSupportMessage }o--o| PlatformAdmin
+MerchantMessageTranslation }o--|| MerchantSupportMessage
+MerchantMessageTranslation }o--o| MerchantTranslationBatch
+MerchantTranslationBatchItem }o--|| MerchantTranslationBatch
+MerchantTranslationBatchItem }o--|| MerchantMessageTranslation
+MerchantTranslationReconciliationRequest }o--|| PlatformAdmin
 ' ManyToMany Relations
 ' enum relations
 CheckoutRecoveryStatusHistory |o--|| CheckoutRecoveryStatus
@@ -414,4 +514,9 @@ WhatsAppTemplateVariant |o--|| WhatsAppTemplateStatus
 PlatformAdmin |o--|| PlatformAdminRole
 MerchantSupportMessage |o--|| MerchantSupportMessageKind
 MerchantSupportMessage |o--|| MerchantSupportMessageState
+MerchantMessageTranslation |o--|| MerchantTranslationDirection
+MerchantMessageTranslation |o--|| MerchantMessageTranslationStatus
+MerchantTranslationBatch |o--|| MerchantTranslationBatchStatus
+MerchantTranslationReconciliationRequest |o--|| MerchantTranslationReconciliationScope
+MerchantTranslationReconciliationRequest |o--|| MerchantTranslationReconciliationStatus
 @enduml

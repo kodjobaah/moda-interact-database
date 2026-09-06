@@ -523,8 +523,9 @@ model PlatformAdmin {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  assignedMerchantSupportThreads MerchantSupportThread[]
-  merchantSupportMessages        MerchantSupportMessage[]
+  assignedMerchantSupportThreads            MerchantSupportThread[]
+  merchantSupportMessages                   MerchantSupportMessage[]
+  merchantTranslationReconciliationRequests MerchantTranslationReconciliationRequest[]
 
   @@unique([provider, providerSubject])
   @@index([active, role])
@@ -599,7 +600,150 @@ model MerchantSupportMessage {
   createdAt                      DateTime  @default(now())
   updatedAt                      DateTime  @updatedAt
 
+  translations MerchantMessageTranslation[]
+
   @@index([threadId, createdAt])
   @@index([platformAdminId])
+  @@schema("support")
+}
+
+enum MerchantTranslationDirection {
+  MERCHANT_TO_ADMIN
+  ADMIN_TO_MERCHANT
+  SYSTEM_TO_MERCHANT
+
+  @@schema("support")
+}
+
+enum MerchantMessageTranslationStatus {
+  PENDING
+  AVAILABLE
+  FAILED
+
+  @@schema("support")
+}
+
+enum MerchantTranslationBatchStatus {
+  READY
+  SUBMITTING
+  SUBMISSION_UNKNOWN
+  SUBMITTED
+  PROVIDER_COMPLETED
+  COMPLETED
+  FAILED
+  EXPIRED
+  CANCELLED
+
+  @@schema("support")
+}
+
+enum MerchantTranslationReconciliationScope {
+  TRANSLATION
+  FAILED_TRANSLATIONS
+
+  @@schema("support")
+}
+
+enum MerchantTranslationReconciliationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+
+  @@schema("support")
+}
+
+model MerchantMessageTranslation {
+  id String @id @default(cuid())
+
+  messageId String
+  message   MerchantSupportMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  direction         MerchantTranslationDirection
+  sourceLanguageTag String
+  targetLanguageTag String
+  status            MerchantMessageTranslationStatus
+  translatedBody    String?                          @db.Text
+  failureCode       String?
+  retryCount        Int                              @default(0)
+  nextAttemptAt     DateTime?
+
+  currentBatchId String?
+  currentBatch   MerchantTranslationBatch? @relation("CurrentTranslationBatch", fields: [currentBatchId], references: [id], onDelete: SetNull)
+  completedAt    DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  batchItems MerchantTranslationBatchItem[]
+
+  @@unique([messageId, targetLanguageTag])
+  @@index([status, currentBatchId, nextAttemptAt, createdAt])
+  @@schema("support")
+}
+
+model MerchantTranslationBatch {
+  id String @id @default(cuid())
+
+  provider String
+  model    String
+  status   MerchantTranslationBatchStatus
+
+  providerBatchId String?
+  inputFileId     String?
+  outputFileId    String?
+  errorFileId     String?
+
+  submissionStartedAt DateTime?
+  lastSubmitAttemptAt DateTime?
+  submitAttemptCount  Int       @default(0)
+  nextSubmitAt        DateTime?
+  submittedAt         DateTime?
+  lastPolledAt        DateTime?
+  nextPollAt          DateTime?
+  pollSequence        Int       @default(0)
+  completedAt         DateTime?
+  failureCode         String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  currentTranslations MerchantMessageTranslation[]   @relation("CurrentTranslationBatch")
+  items               MerchantTranslationBatchItem[]
+
+  @@unique([provider, providerBatchId])
+  @@index([status, nextSubmitAt, createdAt])
+  @@index([status, nextPollAt, createdAt])
+  @@schema("support")
+}
+
+model MerchantTranslationBatchItem {
+  id String @id @default(cuid())
+
+  batchId          String
+  batch            MerchantTranslationBatch   @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  translationId    String
+  translation      MerchantMessageTranslation @relation(fields: [translationId], references: [id], onDelete: Cascade)
+  providerCustomId String                     @unique
+  createdAt        DateTime                   @default(now())
+
+  @@unique([batchId, translationId])
+  @@index([translationId, createdAt])
+  @@schema("support")
+}
+
+model MerchantTranslationReconciliationRequest {
+  id String @id @default(cuid())
+
+  requestedByPlatformAdminId String
+  requestedByPlatformAdmin   PlatformAdmin                           @relation(fields: [requestedByPlatformAdminId], references: [id])
+  scope                      MerchantTranslationReconciliationScope
+  translationId              String?
+  status                     MerchantTranslationReconciliationStatus
+  failureCode                String?
+  requestedAt                DateTime                                @default(now())
+  startedAt                  DateTime?
+  completedAt                DateTime?
+
+  @@index([status, requestedAt])
+  @@index([translationId, status])
   @@schema("support")
 }
