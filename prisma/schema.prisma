@@ -338,6 +338,54 @@ enum BillingPeriodStatus {
   @@schema("billing")
 }
 
+enum EntitlementCounter {
+  FREE_RECOVERY_LIFETIME
+
+  @@schema("billing")
+}
+
+enum UsageReservationStatus {
+  RESERVED
+  COMMITTED
+  RELEASED
+  AMBIGUOUS
+
+  @@schema("billing")
+}
+
+enum UsageMetric {
+  RECOVERY_CONVERSATION
+  OUTBOUND_AUTOMATED_MESSAGE
+  DELIVERED_WHATSAPP_MESSAGE
+
+  @@schema("billing")
+}
+
+enum ShopifyReportState {
+  NOT_APPLICABLE
+  PENDING
+  IN_FLIGHT
+  RETRYABLE
+  REPORTED
+  NEEDS_ATTENTION
+
+  @@schema("billing")
+}
+
+enum BillingAuditAction {
+  PLAN_CATALOG_CHANGED
+  PLATFORM_POLICY_CHANGED
+  SHOP_OVERRIDE_CHANGED
+  SHOP_OVERRIDE_EXPIRED
+  FREE_ALLOWANCE_ADJUSTED
+  AUTOMATION_PAUSED
+  AUTOMATION_RESUMED
+  BILLING_EVENT_RETRY
+  BILLING_CORRECTION_CREATED
+
+  @@schema("billing")
+}
+
 model BillingPlan {
   id String @id @default(cuid())
 
@@ -423,24 +471,168 @@ model UsageEvent {
   billingPeriodId String?
   billingPeriod   BillingPeriod? @relation(fields: [billingPeriodId], references: [id], onDelete: SetNull)
 
-  metric   String
+  metric   UsageMetric
   quantity Decimal
 
   idempotencyKey String @unique
 
+  correctionOfUsageEventId String?
+  correctionOfUsageEvent   UsageEvent?       @relation("UsageEventCorrection", fields: [correctionOfUsageEventId], references: [id], onDelete: SetNull)
+  corrections              UsageEvent[]      @relation("UsageEventCorrection")
+  committedReservation     UsageReservation? @relation("CommittedReservation")
+
   sourceType String?
   sourceId   String?
 
-  occurredAt DateTime  @default(now())
-  reportedAt DateTime?
+  occurredAt DateTime @default(now())
 
-  provider         String @default("SHOPIFY")
-  providerResponse Json?
+  shopifyReportState      ShopifyReportState @default(NOT_APPLICABLE)
+  shopifyEventHandle      String?
+  shopifyIdempotencyKey   String?            @unique
+  reportAttemptCount      Int                @default(0)
+  nextReportAt            DateTime?
+  lastReportAttemptAt     DateTime?
+  reportedAt              DateTime?
+  providerErrorCode       String?            @db.VarChar(128)
+  providerResponseSummary String?            @db.VarChar(2000)
+
+  provider String @default("SHOPIFY")
 
   createdAt DateTime @default(now())
 
+  @@index([shopId, billingPeriodId, occurredAt])
   @@index([shopId, metric, occurredAt])
+  @@index([shopifyReportState, nextReportAt, occurredAt])
+  @@index([shopifyReportState, lastReportAttemptAt])
+  @@index([correctionOfUsageEventId])
   @@index([billingPeriodId])
+  @@schema("billing")
+}
+
+model ShopEntitlementCounter {
+  id String @id @default(cuid())
+
+  shopId            String
+  shop              Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  counter           EntitlementCounter
+  committedQuantity Int                @default(0)
+  reservedQuantity  Int                @default(0)
+  version           Int                @default(0)
+
+  reservations UsageReservation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([shopId, counter])
+  @@index([shopId])
+  @@schema("billing")
+}
+
+model UsageReservation {
+  id String @id @default(cuid())
+
+  shopId    String
+  shop      Shop                   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  counterId String
+  counter   ShopEntitlementCounter @relation(fields: [counterId], references: [id], onDelete: Cascade)
+
+  sourceKey String                 @unique
+  quantity  Int
+  status    UsageReservationStatus @default(RESERVED)
+  expiresAt DateTime?
+
+  committedUsageEventId String?     @unique
+  committedUsageEvent   UsageEvent? @relation("CommittedReservation", fields: [committedUsageEventId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shopId, status])
+  @@index([status, expiresAt])
+  @@schema("billing")
+}
+
+model PlatformBillingPolicy {
+  id String @id @default("default")
+
+  globalPauseNewRecoveries     Boolean @default(false)
+  globalPauseAutomatedWhatsapp Boolean @default(false)
+  absoluteOutboundHardLimit    Int
+  defaultWarningPercent        Int
+  version                      Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("billing")
+}
+
+model ShopBillingPolicyOverride {
+  id String @id @default(cuid())
+
+  shopId String @unique
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  outboundSoftLimit      Int?
+  outboundHardLimit      Int?
+  pauseNewRecoveries     Boolean?
+  pauseAutomatedWhatsapp Boolean?
+  recoverySafetyCeiling  Int?
+  reason                 String    @db.VarChar(1000)
+  expiresAt              DateTime?
+
+  updatedByPlatformAdminId String?
+  updatedByPlatformAdmin   PlatformAdmin? @relation(fields: [updatedByPlatformAdminId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([expiresAt])
+  @@index([shopId, expiresAt])
+  @@index([updatedByPlatformAdminId])
+  @@schema("billing")
+}
+
+model BillingAllowanceAdjustment {
+  id String @id @default(cuid())
+
+  shopId   String
+  shop     Shop               @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  counter  EntitlementCounter @default(FREE_RECOVERY_LIFETIME)
+  quantity Int
+  reason   String             @db.VarChar(1000)
+
+  platformAdminId String
+  platformAdmin   PlatformAdmin @relation(fields: [platformAdminId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([shopId, counter, createdAt])
+  @@index([platformAdminId, createdAt])
+  @@schema("billing")
+}
+
+model BillingAuditEvent {
+  id String @id @default(cuid())
+
+  action BillingAuditAction
+  shopId String?
+  shop   Shop?              @relation(fields: [shopId], references: [id], onDelete: SetNull)
+
+  platformAdminId String
+  platformAdmin   PlatformAdmin @relation(fields: [platformAdminId], references: [id], onDelete: Restrict)
+
+  reason            String?  @db.VarChar(1000)
+  beforeValue       Json?
+  afterValue        Json?
+  relatedEntityType String?  @db.VarChar(128)
+  relatedEntityId   String?  @db.VarChar(256)
+  createdAt         DateTime @default(now())
+
+  @@index([shopId, createdAt])
+  @@index([platformAdminId, createdAt])
+  @@index([action, createdAt])
   @@schema("billing")
 }
 
@@ -487,6 +679,11 @@ model Shop {
   subscription             Subscription?
   usageEvents              UsageEvent[]
   billingPeriods           BillingPeriod[]
+  entitlementCounters      ShopEntitlementCounter[]
+  usageReservations        UsageReservation[]
+  billingPolicyOverride    ShopBillingPolicyOverride?
+  allowanceAdjustments     BillingAllowanceAdjustment[]
+  billingAuditEvents       BillingAuditEvent[]
   whatsappTemplateVariants WhatsAppTemplateVariant[]
   merchantSupportThread    MerchantSupportThread?
 
@@ -588,6 +785,9 @@ model PlatformAdmin {
   assignedMerchantSupportThreads            MerchantSupportThread[]
   merchantSupportMessages                   MerchantSupportMessage[]
   merchantTranslationReconciliationRequests MerchantTranslationReconciliationRequest[]
+  shopBillingPolicyOverrides                ShopBillingPolicyOverride[]
+  billingAllowanceAdjustments               BillingAllowanceAdjustment[]
+  billingAuditEvents                        BillingAuditEvent[]
 
   @@unique([provider, providerSubject])
   @@index([active, role])

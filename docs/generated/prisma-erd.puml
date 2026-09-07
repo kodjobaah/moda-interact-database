@@ -66,6 +66,39 @@ enum "BillingPeriodStatus" as BillingPeriodStatus {
   OPEN
   CLOSED
 }
+enum "EntitlementCounter" as EntitlementCounter {
+  FREE_RECOVERY_LIFETIME
+}
+enum "UsageReservationStatus" as UsageReservationStatus {
+  RESERVED
+  COMMITTED
+  RELEASED
+  AMBIGUOUS
+}
+enum "UsageMetric" as UsageMetric {
+  RECOVERY_CONVERSATION
+  OUTBOUND_AUTOMATED_MESSAGE
+  DELIVERED_WHATSAPP_MESSAGE
+}
+enum "ShopifyReportState" as ShopifyReportState {
+  NOT_APPLICABLE
+  PENDING
+  IN_FLIGHT
+  RETRYABLE
+  REPORTED
+  NEEDS_ATTENTION
+}
+enum "BillingAuditAction" as BillingAuditAction {
+  PLAN_CATALOG_CHANGED
+  PLATFORM_POLICY_CHANGED
+  SHOP_OVERRIDE_CHANGED
+  SHOP_OVERRIDE_EXPIRED
+  FREE_ALLOWANCE_ADJUSTED
+  AUTOMATION_PAUSED
+  AUTOMATION_RESUMED
+  BILLING_EVENT_RETRY
+  BILLING_CORRECTION_CREATED
+}
 enum "ShopStatus" as ShopStatus {
   ACTIVE
   UNINSTALLED
@@ -323,15 +356,102 @@ entity "UsageEvent" as UsageEvent {
 --
   # shopId : [FK] Shop
   # billingPeriodId : [FK] BillingPeriod
-  * metric : String
+  * metric : UsageMetric
   * quantity : Decimal
   * idempotencyKey : String
+  # correctionOfUsageEventId : [FK] UsageEvent
   sourceType : String
   sourceId : String
   * occurredAt : DateTime
+  * shopifyReportState : ShopifyReportState
+  shopifyEventHandle : String
+  shopifyIdempotencyKey : String
+  * reportAttemptCount : Int
+  nextReportAt : DateTime
+  lastReportAttemptAt : DateTime
   reportedAt : DateTime
+  providerErrorCode : String
+  providerResponseSummary : String
   * provider : String
-  providerResponse : Json
+  * createdAt : DateTime
+}
+
+entity "ShopEntitlementCounter" as ShopEntitlementCounter {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  * counter : EntitlementCounter
+  * committedQuantity : Int
+  * reservedQuantity : Int
+  * version : Int
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "UsageReservation" as UsageReservation {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # counterId : [FK] ShopEntitlementCounter
+  * sourceKey : String
+  * quantity : Int
+  * status : UsageReservationStatus
+  expiresAt : DateTime
+  # committedUsageEventId : [FK] UsageEvent
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "PlatformBillingPolicy" as PlatformBillingPolicy {
++ id [PK] : String
+--
+  * globalPauseNewRecoveries : Boolean
+  * globalPauseAutomatedWhatsapp : Boolean
+  * absoluteOutboundHardLimit : Int
+  * defaultWarningPercent : Int
+  * version : Int
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "ShopBillingPolicyOverride" as ShopBillingPolicyOverride {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  outboundSoftLimit : Int
+  outboundHardLimit : Int
+  pauseNewRecoveries : Boolean
+  pauseAutomatedWhatsapp : Boolean
+  recoverySafetyCeiling : Int
+  * reason : String
+  expiresAt : DateTime
+  # updatedByPlatformAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "BillingAllowanceAdjustment" as BillingAllowanceAdjustment {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  * counter : EntitlementCounter
+  * quantity : Int
+  * reason : String
+  # platformAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+}
+
+entity "BillingAuditEvent" as BillingAuditEvent {
++ id [PK] : String
+--
+  * action : BillingAuditAction
+  # shopId : [FK] Shop
+  # platformAdminId : [FK] PlatformAdmin
+  reason : String
+  beforeValue : Json
+  afterValue : Json
+  relatedEntityType : String
+  relatedEntityId : String
   * createdAt : DateTime
 }
 
@@ -528,6 +648,17 @@ Subscription }o--o| BillingPeriod
 Subscription }o--o| BillingPlan
 UsageEvent }o--|| Shop
 UsageEvent }o--o| BillingPeriod
+UsageEvent }o--o| UsageEvent
+ShopEntitlementCounter }o--|| Shop
+UsageReservation }o--|| Shop
+UsageReservation }o--|| ShopEntitlementCounter
+UsageReservation |o--o| UsageEvent
+ShopBillingPolicyOverride |o--|| Shop
+ShopBillingPolicyOverride }o--o| PlatformAdmin
+BillingAllowanceAdjustment }o--|| Shop
+BillingAllowanceAdjustment }o--|| PlatformAdmin
+BillingAuditEvent }o--o| Shop
+BillingAuditEvent }o--|| PlatformAdmin
 BillingPeriod }o--|| Shop
 WhatsAppTemplateVariant }o--|| Shop
 MerchantSupportThread |o--|| Shop
@@ -553,6 +684,12 @@ ConversationMessage |o--|| MessageStatus
 BillingPlan |o--|| BillingPlanKind
 BillingPlanFeature |o--|| BillingPlanFeatureIdentifier
 Subscription |o--|| SubscriptionProjectionStatus
+UsageEvent |o--|| UsageMetric
+UsageEvent |o--|| ShopifyReportState
+ShopEntitlementCounter |o--|| EntitlementCounter
+UsageReservation |o--|| UsageReservationStatus
+BillingAllowanceAdjustment |o--|| EntitlementCounter
+BillingAuditEvent |o--|| BillingAuditAction
 BillingPeriod |o--|| BillingPeriodStatus
 Shop |o--|| ShopStatus
 WhatsAppTemplateVariant |o--|| WhatsAppTemplateStatus

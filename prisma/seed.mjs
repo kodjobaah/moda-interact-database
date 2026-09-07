@@ -141,6 +141,8 @@ async function main() {
   });
 
   if (existingShop) {
+    await prisma.usageReservation.deleteMany({ where: { shopId: existingShop.id } });
+    await prisma.shopEntitlementCounter.deleteMany({ where: { shopId: existingShop.id } });
     await prisma.usageEvent.deleteMany({ where: { shopId: existingShop.id } });
     await prisma.subscription.deleteMany({ where: { shopId: existingShop.id } });
     await prisma.billingPeriod.deleteMany({ where: { shopId: existingShop.id } });
@@ -221,18 +223,26 @@ async function main() {
       update: { conversationId: conversation.id, status: "READ" },
     });
     const usageEvents = [
-      { metric: "checkout_recovery", idempotencyKey: `checkout-recovery:${recovery.id}`, sourceType: "CheckoutRecovery", sourceId: recovery.id },
-      { metric: "conversation", idempotencyKey: `conversation:${conversationId}`, sourceType: "Conversation", sourceId: conversationId },
-      { metric: "agent_message", idempotencyKey: `agent-message:${firstMessageId}`, sourceType: "ConversationMessage", sourceId: firstMessageId },
-      { metric: "whatsapp_message", idempotencyKey: `whatsapp-message:${secondMessageId}`, sourceType: "ConversationMessage", sourceId: secondMessageId },
+      {
+        metric: "RECOVERY_CONVERSATION",
+        idempotencyKey: `recovery-conversation:${recovery.id}`,
+        shopifyIdempotencyKey: `shopify-recovery:${recovery.id}`,
+        shopifyReportState: recovery.status === "COMPLETED" ? "REPORTED" : "PENDING",
+        shopifyEventHandle: growthPlan.shopifyUsageEventHandle,
+        sourceType: "CheckoutRecovery",
+        sourceId: recovery.id,
+      },
+      { metric: "OUTBOUND_AUTOMATED_MESSAGE", idempotencyKey: `agent-message:${firstMessageId}`, sourceType: "ConversationMessage", sourceId: firstMessageId },
+      { metric: "OUTBOUND_AUTOMATED_MESSAGE", idempotencyKey: `whatsapp-message:${secondMessageId}`, sourceType: "ConversationMessage", sourceId: secondMessageId },
+      { metric: "DELIVERED_WHATSAPP_MESSAGE", idempotencyKey: `delivered-whatsapp:${secondMessageId}`, sourceType: "ConversationMessage", sourceId: secondMessageId },
     ];
 
     for (const event of usageEvents) {
       const billingPeriod = recovery.status === "COMPLETED" ? pastPeriods[recoveryIndex % pastPeriods.length] : currentPeriod;
       await prisma.usageEvent.upsert({
         where: { idempotencyKey: event.idempotencyKey },
-        create: { shopId: shop.id, billingPeriodId: billingPeriod.id, metric: event.metric, quantity: 1, idempotencyKey: event.idempotencyKey, sourceType: event.sourceType, sourceId: event.sourceId, occurredAt: new Date(recovery.detectedAt), reportedAt: recovery.status === "COMPLETED" ? new Date(new Date(recovery.detectedAt).getTime() + 24 * 60 * 60 * 1000) : null },
-        update: { billingPeriodId: billingPeriod.id, metric: event.metric, quantity: 1, sourceType: event.sourceType, sourceId: event.sourceId, occurredAt: new Date(recovery.detectedAt), reportedAt: recovery.status === "COMPLETED" ? new Date(new Date(recovery.detectedAt).getTime() + 24 * 60 * 60 * 1000) : null },
+        create: { shopId: shop.id, billingPeriodId: billingPeriod.id, metric: event.metric, quantity: 1, idempotencyKey: event.idempotencyKey, shopifyIdempotencyKey: event.shopifyIdempotencyKey ?? null, shopifyEventHandle: event.shopifyEventHandle ?? null, shopifyReportState: event.shopifyReportState ?? "NOT_APPLICABLE", sourceType: event.sourceType, sourceId: event.sourceId, occurredAt: new Date(recovery.detectedAt), reportedAt: event.shopifyReportState === "REPORTED" ? new Date(new Date(recovery.detectedAt).getTime() + 24 * 60 * 60 * 1000) : null },
+        update: { billingPeriodId: billingPeriod.id, metric: event.metric, quantity: 1, shopifyIdempotencyKey: event.shopifyIdempotencyKey ?? null, shopifyEventHandle: event.shopifyEventHandle ?? null, shopifyReportState: event.shopifyReportState ?? "NOT_APPLICABLE", sourceType: event.sourceType, sourceId: event.sourceId, occurredAt: new Date(recovery.detectedAt), reportedAt: event.shopifyReportState === "REPORTED" ? new Date(new Date(recovery.detectedAt).getTime() + 24 * 60 * 60 * 1000) : null },
       });
     }
   }
