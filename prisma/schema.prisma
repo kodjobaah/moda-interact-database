@@ -305,22 +305,73 @@ model ConversationMessage {
   @@schema("whatsapp")
 }
 
+enum BillingPlanKind {
+  FREE
+  PAID_METERED
+
+  @@schema("billing")
+}
+
+enum BillingPlanFeatureIdentifier {
+  CHECKOUT_RECOVERY
+  AI_CONVERSATIONS
+  PRODUCT_SEARCH
+  ORDER_SUPPORT
+
+  @@schema("billing")
+}
+
+enum SubscriptionProjectionStatus {
+  ACTIVE
+  TRIALING
+  NO_CONTRACT
+  UNMAPPED
+  SYNC_ERROR
+
+  @@schema("billing")
+}
+
+enum BillingPeriodStatus {
+  OPEN
+  CLOSED
+
+  @@schema("billing")
+}
+
 model BillingPlan {
   id String @id @default(cuid())
 
-  handle String @unique
-  name   String
+  shopifyPlanHandle String          @unique
+  name              String
+  kind              BillingPlanKind
+  active            Boolean         @default(true)
 
-  entitlements Json
-  limits       Json
+  shopifyUsageEventHandle           String?
+  freeLifetimeConversationAllowance Int?
+  defaultOutboundSoftLimit          Int
+  defaultOutboundHardLimit          Int
+  terminalMessageReservedSlots      Int     @default(1)
 
-  active Boolean @default(true)
+  features             BillingPlanFeature[]
+  subscriptions        Subscription[]
+  pendingSubscriptions Subscription[]       @relation("PendingSubscriptionPlan")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  subscriptions Subscription[]
+  @@index([active])
+  @@schema("billing")
+}
 
+model BillingPlanFeature {
+  id String @id @default(cuid())
+
+  planId  String
+  plan    BillingPlan                  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  feature BillingPlanFeatureIdentifier
+  enabled Boolean                      @default(true)
+
+  @@unique([planId, feature])
   @@schema("billing")
 }
 
@@ -331,12 +382,13 @@ model Subscription {
   shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
   planId String?
-  plan   BillingPlan? @relation(fields: [planId], references: [id])
+  plan   BillingPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
 
-  provider String @default("SHOPIFY")
+  observedShopifyPlanHandle String?
+  status                    SubscriptionProjectionStatus
 
-  planHandle String
-  status     String
+  billingPeriodId String?
+  billingPeriod   BillingPeriod? @relation(fields: [billingPeriodId], references: [id], onDelete: SetNull)
 
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
@@ -345,12 +397,21 @@ model Subscription {
 
   providerSubscriptionId String?
 
-  lastSyncedAt DateTime?
+  lastSyncedAt      DateTime?
+  lastSyncErrorCode String?
+  lastSyncErrorAt   DateTime?
+
+  pendingShopifyPlanHandle String?
+  pendingPlanId            String?
+  pendingPlan              BillingPlan? @relation("PendingSubscriptionPlan", fields: [pendingPlanId], references: [id], onDelete: SetNull)
+  pendingEffectiveAt       DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([planHandle])
+  @@index([observedShopifyPlanHandle])
+  @@index([status])
+  @@index([billingPeriodId])
   @@schema("billing")
 }
 
@@ -384,17 +445,18 @@ model UsageEvent {
 }
 
 model BillingPeriod {
-  id          String       @id @default(cuid())
-  shopId      String
-  shop        Shop         @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  periodStart DateTime
-  periodEnd   DateTime
-  status      String       @default("OPEN")
-  usageEvents UsageEvent[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id            String              @id @default(cuid())
+  shopId        String
+  shop          Shop                @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  periodStart   DateTime
+  periodEnd     DateTime
+  status        BillingPeriodStatus @default(OPEN)
+  subscriptions Subscription[]
+  usageEvents   UsageEvent[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
-  @@unique([shopId, periodStart])
+  @@unique([shopId, periodStart, periodEnd])
   @@index([shopId, periodStart, periodEnd])
   @@schema("billing")
 }
@@ -422,7 +484,7 @@ model Shop {
   // Configuration / billing
   settings                 ShopSettings?
   brand                    ShopBrand?
-  subscriptions            Subscription[]
+  subscription             Subscription?
   usageEvents              UsageEvent[]
   billingPeriods           BillingPeriod[]
   whatsappTemplateVariants WhatsAppTemplateVariant[]

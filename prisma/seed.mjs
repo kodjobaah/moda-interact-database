@@ -5,56 +5,59 @@ const prisma = new PrismaClient();
 
 const plans = [
   {
-    handle: "starter",
+    shopifyPlanHandle: "starter",
     name: "Starter",
-
-    entitlements: {
-      checkout_recovery: true,
-      product_search: true,
-      ai_conversations: true,
-      order_support: false,
-    },
-
-    limits: {
-      monthly_conversations: 500,
-      monthly_recoveries: 1000,
-      monthly_messages: 5000,
+    kind: "FREE",
+    shopifyUsageEventHandle: null,
+    freeLifetimeConversationAllowance: 5,
+    defaultOutboundSoftLimit: 100,
+    defaultOutboundHardLimit: 200,
+    terminalMessageReservedSlots: 1,
+    features: {
+      create: [
+        { feature: "CHECKOUT_RECOVERY", enabled: true },
+        { feature: "PRODUCT_SEARCH", enabled: true },
+        { feature: "AI_CONVERSATIONS", enabled: true },
+        { feature: "ORDER_SUPPORT", enabled: false },
+      ],
     },
   },
 
   {
-    handle: "growth",
+    shopifyPlanHandle: "growth",
     name: "Growth",
-
-    entitlements: {
-      checkout_recovery: true,
-      product_search: true,
-      ai_conversations: true,
-      order_support: true,
-    },
-
-    limits: {
-      monthly_conversations: 5000,
-      monthly_recoveries: 10000,
-      monthly_messages: 50000,
+    kind: "PAID_METERED",
+    shopifyUsageEventHandle: "growth-recovery-conversation",
+    freeLifetimeConversationAllowance: null,
+    defaultOutboundSoftLimit: 1000,
+    defaultOutboundHardLimit: 2000,
+    terminalMessageReservedSlots: 1,
+    features: {
+      create: [
+        { feature: "CHECKOUT_RECOVERY", enabled: true },
+        { feature: "PRODUCT_SEARCH", enabled: true },
+        { feature: "AI_CONVERSATIONS", enabled: true },
+        { feature: "ORDER_SUPPORT", enabled: true },
+      ],
     },
   },
 
   {
-    handle: "pro",
+    shopifyPlanHandle: "pro",
     name: "Pro",
-
-    entitlements: {
-      checkout_recovery: true,
-      product_search: true,
-      ai_conversations: true,
-      order_support: true,
-    },
-
-    limits: {
-      monthly_conversations: null,
-      monthly_recoveries: null,
-      monthly_messages: null,
+    kind: "PAID_METERED",
+    shopifyUsageEventHandle: "pro-recovery-conversation",
+    freeLifetimeConversationAllowance: null,
+    defaultOutboundSoftLimit: 5000,
+    defaultOutboundHardLimit: 10000,
+    terminalMessageReservedSlots: 1,
+    features: {
+      create: [
+        { feature: "CHECKOUT_RECOVERY", enabled: true },
+        { feature: "PRODUCT_SEARCH", enabled: true },
+        { feature: "AI_CONVERSATIONS", enabled: true },
+        { feature: "ORDER_SUPPORT", enabled: true },
+      ],
     },
   },
 ];
@@ -92,7 +95,7 @@ async function main() {
   for (const plan of plans) {
     await prisma.billingPlan.upsert({
       where: {
-        handle: plan.handle,
+        shopifyPlanHandle: plan.shopifyPlanHandle,
       },
 
       create: {
@@ -102,13 +105,21 @@ async function main() {
 
       update: {
         name: plan.name,
-        entitlements: plan.entitlements,
-        limits: plan.limits,
+        kind: plan.kind,
+        shopifyUsageEventHandle: plan.shopifyUsageEventHandle,
+        freeLifetimeConversationAllowance: plan.freeLifetimeConversationAllowance,
+        defaultOutboundSoftLimit: plan.defaultOutboundSoftLimit,
+        defaultOutboundHardLimit: plan.defaultOutboundHardLimit,
+        terminalMessageReservedSlots: plan.terminalMessageReservedSlots,
+        features: {
+          deleteMany: {},
+          create: plan.features.create,
+        },
         active: true,
       },
     });
 
-    console.log(`✓ ${plan.handle}`);
+    console.log(`✓ ${plan.shopifyPlanHandle}`);
   }
 
   console.log("Billing plans seeded.");
@@ -131,11 +142,11 @@ async function main() {
 
   if (existingShop) {
     await prisma.usageEvent.deleteMany({ where: { shopId: existingShop.id } });
+    await prisma.subscription.deleteMany({ where: { shopId: existingShop.id } });
     await prisma.billingPeriod.deleteMany({ where: { shopId: existingShop.id } });
     await prisma.checkoutRecovery.deleteMany({ where: { shopId: existingShop.id } });
     await prisma.customer.deleteMany({ where: { shopId: existingShop.id } });
     await prisma.shopSettings.deleteMany({ where: { shopId: existingShop.id } });
-    await prisma.subscription.deleteMany({ where: { shopId: existingShop.id } });
     console.log(`Cleared existing demo data for ${demoShopDomain}.`);
   }
 
@@ -146,10 +157,31 @@ async function main() {
     ["demo-billing-period-june", "2026-06-01T00:00:00Z", "2026-07-01T00:00:00Z"],
     ["demo-billing-period-may", "2026-05-01T00:00:00Z", "2026-06-01T00:00:00Z"],
     ["demo-billing-period-april", "2026-04-01T00:00:00Z", "2026-05-01T00:00:00Z"],
-  ].map(([id, periodStart, periodEnd]) => prisma.billingPeriod.create({ data: { id, shopId: shop.id, periodStart: new Date(periodStart), periodEnd: new Date(periodEnd), status: "PAID" } })));
-  const growthPlan = await prisma.billingPlan.findUniqueOrThrow({ where: { handle: "growth" } });
+  ].map(([id, periodStart, periodEnd]) => prisma.billingPeriod.create({ data: { id, shopId: shop.id, periodStart: new Date(periodStart), periodEnd: new Date(periodEnd), status: "CLOSED" } })));
+  const growthPlan = await prisma.billingPlan.findUniqueOrThrow({ where: { shopifyPlanHandle: "growth" } });
   await prisma.shopSettings.upsert({ where: { shopId: shop.id }, create: { shopId: shop.id, onboardingCompleted: true, plan: "growth" }, update: { onboardingCompleted: true, plan: "growth" } });
-  await prisma.subscription.upsert({ where: { shopId: shop.id }, create: { shopId: shop.id, planId: growthPlan.id, planHandle: "growth", status: "ACTIVE" }, update: { planId: growthPlan.id, planHandle: "growth", status: "ACTIVE" } });
+  await prisma.subscription.upsert({
+    where: { shopId: shop.id },
+    create: {
+      shopId: shop.id,
+      planId: growthPlan.id,
+      observedShopifyPlanHandle: "growth",
+      status: "ACTIVE",
+      billingPeriodId: currentPeriod.id,
+      currentPeriodStart: currentPeriod.periodStart,
+      currentPeriodEnd: currentPeriod.periodEnd,
+      cancelAtPeriodEnd: false,
+    },
+    update: {
+      planId: growthPlan.id,
+      observedShopifyPlanHandle: "growth",
+      status: "ACTIVE",
+      billingPeriodId: currentPeriod.id,
+      currentPeriodStart: currentPeriod.periodStart,
+      currentPeriodEnd: currentPeriod.periodEnd,
+      cancelAtPeriodEnd: false,
+    },
+  });
 
   for (const [recoveryIndex, recovery] of seededRecoveries.entries()) {
     const customerKey = recovery.customerKey ?? recovery.id;

@@ -45,6 +45,27 @@ enum "MessageStatus" as MessageStatus {
   READ
   FAILED
 }
+enum "BillingPlanKind" as BillingPlanKind {
+  FREE
+  PAID_METERED
+}
+enum "BillingPlanFeatureIdentifier" as BillingPlanFeatureIdentifier {
+  CHECKOUT_RECOVERY
+  AI_CONVERSATIONS
+  PRODUCT_SEARCH
+  ORDER_SUPPORT
+}
+enum "SubscriptionProjectionStatus" as SubscriptionProjectionStatus {
+  ACTIVE
+  TRIALING
+  NO_CONTRACT
+  UNMAPPED
+  SYNC_ERROR
+}
+enum "BillingPeriodStatus" as BillingPeriodStatus {
+  OPEN
+  CLOSED
+}
 enum "ShopStatus" as ShopStatus {
   ACTIVE
   UNINSTALLED
@@ -253,13 +274,25 @@ entity "ConversationMessage" as ConversationMessage {
 entity "BillingPlan" as BillingPlan {
 + id [PK] : String
 --
-  * handle : String
+  * shopifyPlanHandle : String
   * name : String
-  * entitlements : Json
-  * limits : Json
+  * kind : BillingPlanKind
   * active : Boolean
+  shopifyUsageEventHandle : String
+  freeLifetimeConversationAllowance : Int
+  * defaultOutboundSoftLimit : Int
+  * defaultOutboundHardLimit : Int
+  * terminalMessageReservedSlots : Int
   * createdAt : DateTime
   * updatedAt : DateTime
+}
+
+entity "BillingPlanFeature" as BillingPlanFeature {
++ id [PK] : String
+--
+  # planId : [FK] BillingPlan
+  * feature : BillingPlanFeatureIdentifier
+  * enabled : Boolean
 }
 
 entity "Subscription" as Subscription {
@@ -267,15 +300,20 @@ entity "Subscription" as Subscription {
 --
   # shopId : [FK] Shop
   # planId : [FK] BillingPlan
-  * provider : String
-  * planHandle : String
-  * status : String
+  observedShopifyPlanHandle : String
+  * status : SubscriptionProjectionStatus
+  # billingPeriodId : [FK] BillingPeriod
   currentPeriodStart : DateTime
   currentPeriodEnd : DateTime
   trialEndsAt : DateTime
   * cancelAtPeriodEnd : Boolean
   providerSubscriptionId : String
   lastSyncedAt : DateTime
+  lastSyncErrorCode : String
+  lastSyncErrorAt : DateTime
+  pendingShopifyPlanHandle : String
+  # pendingPlanId : [FK] BillingPlan
+  pendingEffectiveAt : DateTime
   * createdAt : DateTime
   * updatedAt : DateTime
 }
@@ -303,7 +341,7 @@ entity "BillingPeriod" as BillingPeriod {
   # shopId : [FK] Shop
   * periodStart : DateTime
   * periodEnd : DateTime
-  * status : String
+  * status : BillingPeriodStatus
   * createdAt : DateTime
   * updatedAt : DateTime
 }
@@ -483,7 +521,10 @@ CheckoutRecovery }o--|| Shop
 CheckoutRecovery }o--o| Customer
 Conversation |o--o| CheckoutRecovery
 ConversationMessage }o--|| Conversation
+BillingPlanFeature }o--|| BillingPlan
 Subscription |o--|| Shop
+Subscription }o--o| BillingPlan
+Subscription }o--o| BillingPeriod
 Subscription }o--o| BillingPlan
 UsageEvent }o--|| Shop
 UsageEvent }o--o| BillingPeriod
@@ -509,6 +550,10 @@ Conversation |o--|| LanguageSource
 ConversationMessage |o--|| MessageDirection
 ConversationMessage |o--|| MessageSenderType
 ConversationMessage |o--|| MessageStatus
+BillingPlan |o--|| BillingPlanKind
+BillingPlanFeature |o--|| BillingPlanFeatureIdentifier
+Subscription |o--|| SubscriptionProjectionStatus
+BillingPeriod |o--|| BillingPeriodStatus
 Shop |o--|| ShopStatus
 WhatsAppTemplateVariant |o--|| WhatsAppTemplateStatus
 PlatformAdmin |o--|| PlatformAdminRole
