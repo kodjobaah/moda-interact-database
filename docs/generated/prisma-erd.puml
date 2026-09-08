@@ -292,6 +292,9 @@ entity "Conversation" as Conversation {
   timeZone : String
   * inboundVersion : Int
   * lastProcessedVersion : Int
+  pendingTurnStartedAt : DateTime
+  processingInboundVersion : Int
+  processingStartedAt : DateTime
   summary : String
   lastInboundAt : DateTime
   lastMessageAt : DateTime

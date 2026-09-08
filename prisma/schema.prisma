@@ -238,8 +238,11 @@ model Conversation {
   currencyCode   String?
   timeZone       String?
 
-  inboundVersion       Int @default(0)
-  lastProcessedVersion Int @default(0)
+  inboundVersion           Int       @default(0)
+  lastProcessedVersion     Int       @default(0)
+  pendingTurnStartedAt     DateTime?
+  processingInboundVersion Int?
+  processingStartedAt      DateTime?
 
   summary String?
 
@@ -256,6 +259,7 @@ model Conversation {
   @@index([shopId, customerId, type, outcome])
   @@index([customerId, lastMessageAt])
   @@index([lastMessageAt])
+  @@index([processingStartedAt])
   @@schema("whatsapp")
 }
 

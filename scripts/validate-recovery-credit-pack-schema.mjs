@@ -30,6 +30,12 @@ assert.match(schema, /model BillingPlan\s*\{[\s\S]*?shopifyUsageEventHandle\s+St
 assert.match(schema, /freeLifetimeConversationAllowance\s+Int\?/);
 assert.match(schema, /recoveryCreditPackEnabled\s+Boolean\s+@default\(false\)[\s\S]*?recoveryCreditsPerPack\s+Int\?/);
 
+const conversationModel = schema.match(/model Conversation\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+assert.match(conversationModel, /pendingTurnStartedAt\s+DateTime\?/);
+assert.match(conversationModel, /processingInboundVersion\s+Int\?/);
+assert.match(conversationModel, /processingStartedAt\s+DateTime\?/);
+assert.match(conversationModel, /@@index\(\[processingStartedAt\]\)/);
+
 assert.match(migration, /CREATE UNIQUE INDEX "RecoveryCreditPurchase_usageEventId_key"/);
 assert.match(migration, /CONSTRAINT "RecoveryCreditPurchase_pkey" PRIMARY KEY \("id"\)/);
 assert.doesNotMatch(migration, /UNIQUE INDEX [^\n]*RecoveryCreditPurchase[^\n]*shopId/);
@@ -42,5 +48,15 @@ assert.match(migration, /NULLIF\(BTRIM\("shopifyRecoveryCreditPackEventHandle"\)
 assert.match(migration, /"kind" = 'PAID_METERED'[\s\S]*?"includedRecoveryConversationAllowance" IS NOT NULL[\s\S]*?"includedRecoveryConversationAllowance" >= 0/);
 assert.match(migration, /"shopifyUsageEventHandle" IS NULL OR "shopifyRecoveryCreditPackEventHandle" IS NULL/);
 assert.match(migration, /"shopifyUsageEventHandle" <> "shopifyRecoveryCreditPackEventHandle"/);
+
+const turnMigration = await readFile(
+  "prisma/migrations/20260908103000_add_conversation_turn_coalescing_state/migration.sql",
+  "utf8",
+);
+assert.match(turnMigration, /ALTER TABLE "whatsapp"\."Conversation"[\s\S]*?"pendingTurnStartedAt" TIMESTAMP\(3\)/);
+assert.match(turnMigration, /"processingInboundVersion" INTEGER/);
+assert.match(turnMigration, /"processingStartedAt" TIMESTAMP\(3\)/);
+assert.match(turnMigration, /Conversation_processingStartedAt_idx/);
+assert.doesNotMatch(turnMigration, /DROP TABLE|DROP COLUMN/);
 
 console.log("Recovery credit pack schema assertions passed.");
