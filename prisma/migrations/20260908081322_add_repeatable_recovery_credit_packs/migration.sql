@@ -17,7 +17,7 @@ ADD COLUMN     "shopifyRecoveryCreditPackEventHandle" TEXT;
 ALTER TABLE "billing"."BillingPlan"
 ADD CONSTRAINT "BillingPlan_recovery_credit_pack_config"
 CHECK (
-    (NOT "recoveryCreditPackEnabled" OR "recoveryCreditsPerPack" > 0)
+    (NOT "recoveryCreditPackEnabled" OR ("recoveryCreditsPerPack" IS NOT NULL AND "recoveryCreditsPerPack" > 0))
     AND (NOT "recoveryCreditPackEnabled" OR NULLIF(BTRIM("shopifyRecoveryCreditPackEventHandle"), '') IS NOT NULL)
     AND (NOT ("kind" = 'PAID_METERED' AND "recoveryCreditPackEnabled") OR ("includedRecoveryConversationAllowance" IS NOT NULL AND "includedRecoveryConversationAllowance" >= 0))
     AND ("shopifyUsageEventHandle" IS NULL OR "shopifyRecoveryCreditPackEventHandle" IS NULL OR "shopifyUsageEventHandle" <> "shopifyRecoveryCreditPackEventHandle")
