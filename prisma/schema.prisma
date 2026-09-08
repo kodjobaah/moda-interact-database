@@ -91,8 +91,9 @@ model Customer {
 
   shopifyCustomerId String?
 
-  phones     CustomerPhone[]
-  recoveries CheckoutRecovery[]
+  phones                  CustomerPhone[]
+  recoveries              CheckoutRecovery[]
+  standaloneConversations Conversation[]     @relation("StandaloneConversationCustomer")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -219,8 +220,14 @@ enum ConversationOutcome {
 model Conversation {
   id String @id @default(cuid())
 
+  shopId     String?
+  shop       Shop?     @relation("StandaloneConversationShop", fields: [shopId], references: [id], onDelete: Cascade)
+  customerId String?
+  customer   Customer? @relation("StandaloneConversationCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+
   checkoutRecoveryId String?
   checkoutRecovery   CheckoutRecovery? @relation(fields: [checkoutRecoveryId], references: [id], onDelete: Cascade)
+  standaloneScopeKey String?           @unique @db.VarChar(255)
 
   type    ConversationType
   outcome ConversationOutcome @default(IN_PROGRESS)
@@ -246,6 +253,8 @@ model Conversation {
 
   @@unique([checkoutRecoveryId])
   @@index([checkoutRecoveryId])
+  @@index([shopId, customerId, type, outcome])
+  @@index([customerId, lastMessageAt])
   @@index([lastMessageAt])
   @@schema("whatsapp")
 }
@@ -340,6 +349,7 @@ enum BillingPeriodStatus {
 
 enum EntitlementCounter {
   FREE_RECOVERY_LIFETIME
+  PURCHASED_RECOVERY_CREDITS
 
   @@schema("billing")
 }
@@ -357,6 +367,16 @@ enum UsageMetric {
   RECOVERY_CONVERSATION
   OUTBOUND_AUTOMATED_MESSAGE
   DELIVERED_WHATSAPP_MESSAGE
+  RECOVERY_CREDIT_PACK_PURCHASE
+
+  @@schema("billing")
+}
+
+enum RecoveryCreditPurchaseStatus {
+  PENDING_BILLING
+  ACTIVE
+  NEEDS_ATTENTION
+  CANCELLED
 
   @@schema("billing")
 }
@@ -394,15 +414,20 @@ model BillingPlan {
   kind              BillingPlanKind
   active            Boolean         @default(true)
 
-  shopifyUsageEventHandle           String?
-  freeLifetimeConversationAllowance Int?
-  defaultOutboundSoftLimit          Int
-  defaultOutboundHardLimit          Int
-  terminalMessageReservedSlots      Int     @default(1)
+  shopifyUsageEventHandle               String?
+  freeLifetimeConversationAllowance     Int?
+  includedRecoveryConversationAllowance Int?
+  recoveryCreditPackEnabled             Boolean @default(false)
+  recoveryCreditsPerPack                Int?
+  shopifyRecoveryCreditPackEventHandle  String?
+  defaultOutboundSoftLimit              Int
+  defaultOutboundHardLimit              Int
+  terminalMessageReservedSlots          Int     @default(1)
 
-  features             BillingPlanFeature[]
-  subscriptions        Subscription[]
-  pendingSubscriptions Subscription[]       @relation("PendingSubscriptionPlan")
+  features                BillingPlanFeature[]
+  subscriptions           Subscription[]
+  pendingSubscriptions    Subscription[]           @relation("PendingSubscriptionPlan")
+  recoveryCreditPurchases RecoveryCreditPurchase[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -498,6 +523,8 @@ model UsageEvent {
 
   provider String @default("SHOPIFY")
 
+  recoveryCreditPurchase RecoveryCreditPurchase?
+
   createdAt DateTime @default(now())
 
   @@index([shopId, billingPeriodId, occurredAt])
@@ -515,6 +542,7 @@ model ShopEntitlementCounter {
   shopId            String
   shop              Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
   counter           EntitlementCounter
+  grantedQuantity   Int                @default(0)
   committedQuantity Int                @default(0)
   reservedQuantity  Int                @default(0)
   version           Int                @default(0)
@@ -526,6 +554,33 @@ model ShopEntitlementCounter {
 
   @@unique([shopId, counter])
   @@index([shopId])
+  @@schema("billing")
+}
+
+model RecoveryCreditPurchase {
+  id String @id
+
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  planId String?
+  plan   BillingPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  shopifyPlanHandleSnapshot  String
+  shopifyEventHandleSnapshot String
+  creditsGranted             Int
+
+  status RecoveryCreditPurchaseStatus @default(PENDING_BILLING)
+
+  usageEventId String     @unique
+  usageEvent   UsageEvent @relation(fields: [usageEventId], references: [id], onDelete: Restrict)
+
+  activatedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([shopId, status, createdAt])
+  @@index([planId, createdAt])
   @@schema("billing")
 }
 
@@ -684,12 +739,14 @@ model Shop {
   billingPolicyOverride    ShopBillingPolicyOverride?
   allowanceAdjustments     BillingAllowanceAdjustment[]
   billingAuditEvents       BillingAuditEvent[]
+  recoveryCreditPurchases  RecoveryCreditPurchase[]
   whatsappTemplateVariants WhatsAppTemplateVariant[]
   merchantSupportThread    MerchantSupportThread?
 
   // Commerce domain
-  customers  Customer[]
-  recoveries CheckoutRecovery[]
+  customers               Customer[]
+  recoveries              CheckoutRecovery[]
+  standaloneConversations Conversation[]     @relation("StandaloneConversationShop")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

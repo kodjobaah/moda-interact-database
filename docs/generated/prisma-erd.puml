@@ -68,6 +68,7 @@ enum "BillingPeriodStatus" as BillingPeriodStatus {
 }
 enum "EntitlementCounter" as EntitlementCounter {
   FREE_RECOVERY_LIFETIME
+  PURCHASED_RECOVERY_CREDITS
 }
 enum "UsageReservationStatus" as UsageReservationStatus {
   RESERVED
@@ -79,6 +80,13 @@ enum "UsageMetric" as UsageMetric {
   RECOVERY_CONVERSATION
   OUTBOUND_AUTOMATED_MESSAGE
   DELIVERED_WHATSAPP_MESSAGE
+  RECOVERY_CREDIT_PACK_PURCHASE
+}
+enum "RecoveryCreditPurchaseStatus" as RecoveryCreditPurchaseStatus {
+  PENDING_BILLING
+  ACTIVE
+  NEEDS_ATTENTION
+  CANCELLED
 }
 enum "ShopifyReportState" as ShopifyReportState {
   NOT_APPLICABLE
@@ -271,7 +279,10 @@ entity "CheckoutRecovery" as CheckoutRecovery {
 entity "Conversation" as Conversation {
 + id [PK] : String
 --
+  # shopId : [FK] Shop
+  # customerId : [FK] Customer
   # checkoutRecoveryId : [FK] CheckoutRecovery
+  standaloneScopeKey : String
   * type : ConversationType
   * outcome : ConversationOutcome
   languageTag : String
@@ -313,6 +324,10 @@ entity "BillingPlan" as BillingPlan {
   * active : Boolean
   shopifyUsageEventHandle : String
   freeLifetimeConversationAllowance : Int
+  includedRecoveryConversationAllowance : Int
+  * recoveryCreditPackEnabled : Boolean
+  recoveryCreditsPerPack : Int
+  shopifyRecoveryCreditPackEventHandle : String
   * defaultOutboundSoftLimit : Int
   * defaultOutboundHardLimit : Int
   * terminalMessageReservedSlots : Int
@@ -381,9 +396,25 @@ entity "ShopEntitlementCounter" as ShopEntitlementCounter {
 --
   # shopId : [FK] Shop
   * counter : EntitlementCounter
+  * grantedQuantity : Int
   * committedQuantity : Int
   * reservedQuantity : Int
   * version : Int
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "RecoveryCreditPurchase" as RecoveryCreditPurchase {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # planId : [FK] BillingPlan
+  * shopifyPlanHandleSnapshot : String
+  * shopifyEventHandleSnapshot : String
+  * creditsGranted : Int
+  * status : RecoveryCreditPurchaseStatus
+  # usageEventId : [FK] UsageEvent
+  activatedAt : DateTime
   * createdAt : DateTime
   * updatedAt : DateTime
 }
@@ -639,6 +670,8 @@ CustomerPhone }o--|| Customer
 CheckoutRecoveryStatusHistory }o--|| CheckoutRecovery
 CheckoutRecovery }o--|| Shop
 CheckoutRecovery }o--o| Customer
+Conversation }o--o| Shop
+Conversation }o--o| Customer
 Conversation |o--o| CheckoutRecovery
 ConversationMessage }o--|| Conversation
 BillingPlanFeature }o--|| BillingPlan
@@ -650,6 +683,9 @@ UsageEvent }o--|| Shop
 UsageEvent }o--o| BillingPeriod
 UsageEvent }o--o| UsageEvent
 ShopEntitlementCounter }o--|| Shop
+RecoveryCreditPurchase }o--|| Shop
+RecoveryCreditPurchase }o--o| BillingPlan
+RecoveryCreditPurchase |o--|| UsageEvent
 UsageReservation }o--|| Shop
 UsageReservation }o--|| ShopEntitlementCounter
 UsageReservation |o--o| UsageEvent
@@ -687,6 +723,7 @@ Subscription |o--|| SubscriptionProjectionStatus
 UsageEvent |o--|| UsageMetric
 UsageEvent |o--|| ShopifyReportState
 ShopEntitlementCounter |o--|| EntitlementCounter
+RecoveryCreditPurchase |o--|| RecoveryCreditPurchaseStatus
 UsageReservation |o--|| UsageReservationStatus
 BillingAllowanceAdjustment |o--|| EntitlementCounter
 BillingAuditEvent |o--|| BillingAuditAction
