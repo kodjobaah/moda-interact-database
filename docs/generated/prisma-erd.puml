@@ -87,6 +87,45 @@ enum "RecoveryCreditPurchaseStatus" as RecoveryCreditPurchaseStatus {
   ACTIVE
   NEEDS_ATTENTION
   CANCELLED
+  REFUNDED
+}
+enum "BillingLifecycleRequestSource" as BillingLifecycleRequestSource {
+  MERCHANT_UI
+  MERCHANT_SUPPORT
+  ADMIN
+}
+enum "SubscriptionCancellationMode" as SubscriptionCancellationMode {
+  END_OF_CYCLE
+  IMMEDIATE_NO_PRORATION
+  IMMEDIATE_PRORATED
+  IMMEDIATE_SKIP_FINAL_USAGE
+}
+enum "SubscriptionCancellationStatus" as SubscriptionCancellationStatus {
+  REQUESTED
+  APPROVED
+  PROCESSING
+  RETRYABLE
+  PROVIDER_ACCEPTED
+  COMPLETED
+  REJECTED
+  WITHDRAWN
+  NEEDS_ATTENTION
+}
+enum "RecoveryCreditRefundSettlementMode" as RecoveryCreditRefundSettlementMode {
+  CURRENT_CYCLE_APP_EVENT_CORRECTION
+  PARTNER_DASHBOARD_REFUND
+}
+enum "RecoveryCreditRefundStatus" as RecoveryCreditRefundStatus {
+  REQUESTED
+  APPROVED
+  PROCESSING
+  PROVIDER_PENDING
+  PROVIDER_ACTION_REQUIRED
+  PROVIDER_CONFIRMED
+  COMPLETED
+  REJECTED
+  WITHDRAWN
+  NEEDS_ATTENTION
 }
 enum "ShopifyReportState" as ShopifyReportState {
   NOT_APPLICABLE
@@ -106,6 +145,8 @@ enum "BillingAuditAction" as BillingAuditAction {
   AUTOMATION_RESUMED
   BILLING_EVENT_RETRY
   BILLING_CORRECTION_CREATED
+  SUBSCRIPTION_CANCELLATION
+  RECOVERY_CREDIT_REFUND
 }
 enum "ShopStatus" as ShopStatus {
   ACTIVE
@@ -402,6 +443,7 @@ entity "ShopEntitlementCounter" as ShopEntitlementCounter {
   * grantedQuantity : Int
   * committedQuantity : Int
   * reservedQuantity : Int
+  * refundingQuantity : Int
   * version : Int
   * createdAt : DateTime
   * updatedAt : DateTime
@@ -601,6 +643,71 @@ entity "MerchantSupportMessage" as MerchantSupportMessage {
   * updatedAt : DateTime
 }
 
+entity "SubscriptionCancellationRequest" as SubscriptionCancellationRequest {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  * source : BillingLifecycleRequestSource
+  # sourceMessageId : [FK] MerchantSupportMessage
+  requestedByShopifyUserId : String
+  * providerSubscriptionIdSnapshot : String
+  * planHandleSnapshot : String
+  currentPeriodEndSnapshot : DateTime
+  * mode : SubscriptionCancellationMode
+  * status : SubscriptionCancellationStatus
+  * requestKey : String
+  reason : String
+  # approvedByPlatformAdminId : [FK] PlatformAdmin
+  approvedAt : DateTime
+  * version : Int
+  * attemptCount : Int
+  nextAttemptAt : DateTime
+  lastAttemptAt : DateTime
+  processingStartedAt : DateTime
+  providerAcceptedAt : DateTime
+  providerErrorCode : String
+  providerResponseSummary : String
+  completedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "RecoveryCreditRefund" as RecoveryCreditRefund {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # purchaseId : [FK] RecoveryCreditPurchase
+  * source : BillingLifecycleRequestSource
+  # sourceMessageId : [FK] MerchantSupportMessage
+  requestedByShopifyUserId : String
+  * originalUsageEventIdSnapshot : String
+  billingPeriodIdSnapshot : String
+  * planHandleSnapshot : String
+  * eventHandleSnapshot : String
+  * creditsSnapshot : Int
+  settlementMode : RecoveryCreditRefundSettlementMode
+  * status : RecoveryCreditRefundStatus
+  * requestKey : String
+  reason : String
+  # approvedByPlatformAdminId : [FK] PlatformAdmin
+  approvedAt : DateTime
+  holdAppliedAt : DateTime
+  # correctionUsageEventId : [FK] UsageEvent
+  providerReference : String
+  # providerConfirmedByPlatformAdminId : [FK] PlatformAdmin
+  providerConfirmedAt : DateTime
+  * version : Int
+  * attemptCount : Int
+  nextAttemptAt : DateTime
+  lastAttemptAt : DateTime
+  processingStartedAt : DateTime
+  providerErrorCode : String
+  providerResponseSummary : String
+  completedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 entity "MerchantMessageTranslation" as MerchantMessageTranslation {
 + id [PK] : String
 --
@@ -704,6 +811,15 @@ MerchantSupportThread |o--|| Shop
 MerchantSupportThread }o--o| PlatformAdmin
 MerchantSupportMessage }o--|| MerchantSupportThread
 MerchantSupportMessage }o--o| PlatformAdmin
+SubscriptionCancellationRequest }o--|| Shop
+SubscriptionCancellationRequest }o--o| MerchantSupportMessage
+SubscriptionCancellationRequest }o--o| PlatformAdmin
+RecoveryCreditRefund }o--|| Shop
+RecoveryCreditRefund |o--|| RecoveryCreditPurchase
+RecoveryCreditRefund }o--o| MerchantSupportMessage
+RecoveryCreditRefund }o--o| PlatformAdmin
+RecoveryCreditRefund |o--o| UsageEvent
+RecoveryCreditRefund }o--o| PlatformAdmin
 MerchantMessageTranslation }o--|| MerchantSupportMessage
 MerchantMessageTranslation }o--o| MerchantTranslationBatch
 MerchantTranslationBatchItem }o--|| MerchantTranslationBatch
@@ -736,6 +852,12 @@ WhatsAppTemplateVariant |o--|| WhatsAppTemplateStatus
 PlatformAdmin |o--|| PlatformAdminRole
 MerchantSupportMessage |o--|| MerchantSupportMessageKind
 MerchantSupportMessage |o--|| MerchantSupportMessageState
+SubscriptionCancellationRequest |o--|| BillingLifecycleRequestSource
+SubscriptionCancellationRequest |o--|| SubscriptionCancellationMode
+SubscriptionCancellationRequest |o--|| SubscriptionCancellationStatus
+RecoveryCreditRefund |o--|| BillingLifecycleRequestSource
+RecoveryCreditRefund |o--|| RecoveryCreditRefundSettlementMode
+RecoveryCreditRefund |o--|| RecoveryCreditRefundStatus
 MerchantMessageTranslation |o--|| MerchantTranslationDirection
 MerchantMessageTranslation |o--|| MerchantMessageTranslationStatus
 MerchantTranslationBatch |o--|| MerchantTranslationBatchStatus

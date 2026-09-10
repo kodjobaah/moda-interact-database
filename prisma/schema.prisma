@@ -381,6 +381,60 @@ enum RecoveryCreditPurchaseStatus {
   ACTIVE
   NEEDS_ATTENTION
   CANCELLED
+  REFUNDED
+
+  @@schema("billing")
+}
+
+enum BillingLifecycleRequestSource {
+  MERCHANT_UI
+  MERCHANT_SUPPORT
+  ADMIN
+
+  @@schema("billing")
+}
+
+enum SubscriptionCancellationMode {
+  END_OF_CYCLE
+  IMMEDIATE_NO_PRORATION
+  IMMEDIATE_PRORATED
+  IMMEDIATE_SKIP_FINAL_USAGE
+
+  @@schema("billing")
+}
+
+enum SubscriptionCancellationStatus {
+  REQUESTED
+  APPROVED
+  PROCESSING
+  RETRYABLE
+  PROVIDER_ACCEPTED
+  COMPLETED
+  REJECTED
+  WITHDRAWN
+  NEEDS_ATTENTION
+
+  @@schema("billing")
+}
+
+enum RecoveryCreditRefundSettlementMode {
+  CURRENT_CYCLE_APP_EVENT_CORRECTION
+  PARTNER_DASHBOARD_REFUND
+
+  @@schema("billing")
+}
+
+enum RecoveryCreditRefundStatus {
+  REQUESTED
+  APPROVED
+  PROCESSING
+  PROVIDER_PENDING
+  PROVIDER_ACTION_REQUIRED
+  PROVIDER_CONFIRMED
+  COMPLETED
+  REJECTED
+  WITHDRAWN
+  NEEDS_ATTENTION
 
   @@schema("billing")
 }
@@ -406,6 +460,8 @@ enum BillingAuditAction {
   AUTOMATION_RESUMED
   BILLING_EVENT_RETRY
   BILLING_CORRECTION_CREATED
+  SUBSCRIPTION_CANCELLATION
+  RECOVERY_CREDIT_REFUND
 
   @@schema("billing")
 }
@@ -527,7 +583,8 @@ model UsageEvent {
 
   provider String @default("SHOPIFY")
 
-  recoveryCreditPurchase RecoveryCreditPurchase?
+  recoveryCreditPurchase              RecoveryCreditPurchase?
+  recoveryCreditRefundCorrectionEvent RecoveryCreditRefund?   @relation("RecoveryCreditRefundCorrectionEvent")
 
   createdAt DateTime @default(now())
 
@@ -549,6 +606,7 @@ model ShopEntitlementCounter {
   grantedQuantity   Int                @default(0)
   committedQuantity Int                @default(0)
   reservedQuantity  Int                @default(0)
+  refundingQuantity Int                @default(0)
   version           Int                @default(0)
 
   reservations UsageReservation[]
@@ -582,6 +640,8 @@ model RecoveryCreditPurchase {
   activatedAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  refund RecoveryCreditRefund?
 
   @@index([shopId, status, createdAt])
   @@index([planId, createdAt])
@@ -733,19 +793,21 @@ model Shop {
   uninstalledAt DateTime?
 
   // Configuration / billing
-  settings                 ShopSettings?
-  brand                    ShopBrand?
-  subscription             Subscription?
-  usageEvents              UsageEvent[]
-  billingPeriods           BillingPeriod[]
-  entitlementCounters      ShopEntitlementCounter[]
-  usageReservations        UsageReservation[]
-  billingPolicyOverride    ShopBillingPolicyOverride?
-  allowanceAdjustments     BillingAllowanceAdjustment[]
-  billingAuditEvents       BillingAuditEvent[]
-  recoveryCreditPurchases  RecoveryCreditPurchase[]
-  whatsappTemplateVariants WhatsAppTemplateVariant[]
-  merchantSupportThread    MerchantSupportThread?
+  settings                         ShopSettings?
+  brand                            ShopBrand?
+  subscription                     Subscription?
+  usageEvents                      UsageEvent[]
+  billingPeriods                   BillingPeriod[]
+  entitlementCounters              ShopEntitlementCounter[]
+  usageReservations                UsageReservation[]
+  billingPolicyOverride            ShopBillingPolicyOverride?
+  allowanceAdjustments             BillingAllowanceAdjustment[]
+  billingAuditEvents               BillingAuditEvent[]
+  recoveryCreditPurchases          RecoveryCreditPurchase[]
+  subscriptionCancellationRequests SubscriptionCancellationRequest[]
+  recoveryCreditRefunds            RecoveryCreditRefund[]
+  whatsappTemplateVariants         WhatsAppTemplateVariant[]
+  merchantSupportThread            MerchantSupportThread?
 
   // Commerce domain
   customers               Customer[]
@@ -849,6 +911,9 @@ model PlatformAdmin {
   shopBillingPolicyOverrides                ShopBillingPolicyOverride[]
   billingAllowanceAdjustments               BillingAllowanceAdjustment[]
   billingAuditEvents                        BillingAuditEvent[]
+  approvedSubscriptionCancellations         SubscriptionCancellationRequest[]          @relation("ApprovedSubscriptionCancellations")
+  approvedRecoveryCreditRefunds             RecoveryCreditRefund[]                     @relation("ApprovedRecoveryCreditRefunds")
+  confirmedRecoveryCreditRefunds            RecoveryCreditRefund[]                     @relation("ConfirmedRecoveryCreditRefunds")
 
   @@unique([provider, providerSubject])
   @@index([active, role])
@@ -923,11 +988,127 @@ model MerchantSupportMessage {
   createdAt                      DateTime  @default(now())
   updatedAt                      DateTime  @updatedAt
 
-  translations MerchantMessageTranslation[]
+  translations                           MerchantMessageTranslation[]
+  subscriptionCancellationSourceRequests SubscriptionCancellationRequest[] @relation("SubscriptionCancellationSourceMessage")
+  recoveryCreditRefundSourceRequests     RecoveryCreditRefund[]            @relation("RecoveryCreditRefundSourceMessage")
 
   @@index([threadId, createdAt])
   @@index([platformAdminId])
   @@schema("support")
+}
+
+model SubscriptionCancellationRequest {
+  id String @id @default(cuid())
+
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  source BillingLifecycleRequestSource
+
+  sourceMessageId String?
+  sourceMessage   MerchantSupportMessage? @relation("SubscriptionCancellationSourceMessage", fields: [sourceMessageId], references: [id], onDelete: SetNull)
+
+  requestedByShopifyUserId String?
+
+  providerSubscriptionIdSnapshot String
+  planHandleSnapshot             String
+  currentPeriodEndSnapshot       DateTime?
+
+  mode   SubscriptionCancellationMode   @default(END_OF_CYCLE)
+  status SubscriptionCancellationStatus @default(REQUESTED)
+
+  requestKey String  @unique @db.VarChar(255)
+  reason     String? @db.VarChar(1000)
+
+  approvedByPlatformAdminId String?
+  approvedByPlatformAdmin   PlatformAdmin? @relation("ApprovedSubscriptionCancellations", fields: [approvedByPlatformAdminId], references: [id], onDelete: SetNull)
+  approvedAt                DateTime?
+
+  version             Int       @default(0)
+  attemptCount        Int       @default(0)
+  nextAttemptAt       DateTime?
+  lastAttemptAt       DateTime?
+  processingStartedAt DateTime?
+
+  providerAcceptedAt      DateTime?
+  providerErrorCode       String?   @db.VarChar(128)
+  providerResponseSummary String?   @db.VarChar(2000)
+
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shopId, status, createdAt])
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([sourceMessageId])
+  @@index([approvedByPlatformAdminId, createdAt])
+  @@schema("billing")
+}
+
+model RecoveryCreditRefund {
+  id String @id @default(cuid())
+
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  purchaseId String                 @unique
+  purchase   RecoveryCreditPurchase @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+
+  source BillingLifecycleRequestSource
+
+  sourceMessageId String?
+  sourceMessage   MerchantSupportMessage? @relation("RecoveryCreditRefundSourceMessage", fields: [sourceMessageId], references: [id], onDelete: SetNull)
+
+  requestedByShopifyUserId String?
+
+  originalUsageEventIdSnapshot String
+  billingPeriodIdSnapshot      String?
+  planHandleSnapshot           String
+  eventHandleSnapshot          String
+  creditsSnapshot              Int
+
+  settlementMode RecoveryCreditRefundSettlementMode?
+  status         RecoveryCreditRefundStatus          @default(REQUESTED)
+
+  requestKey String  @unique @db.VarChar(255)
+  reason     String? @db.VarChar(1000)
+
+  approvedByPlatformAdminId String?
+  approvedByPlatformAdmin   PlatformAdmin? @relation("ApprovedRecoveryCreditRefunds", fields: [approvedByPlatformAdminId], references: [id], onDelete: SetNull)
+  approvedAt                DateTime?
+
+  holdAppliedAt DateTime?
+
+  correctionUsageEventId String?     @unique
+  correctionUsageEvent   UsageEvent? @relation("RecoveryCreditRefundCorrectionEvent", fields: [correctionUsageEventId], references: [id], onDelete: Restrict)
+
+  providerReference String? @db.VarChar(512)
+
+  providerConfirmedByPlatformAdminId String?
+  providerConfirmedByPlatformAdmin   PlatformAdmin? @relation("ConfirmedRecoveryCreditRefunds", fields: [providerConfirmedByPlatformAdminId], references: [id], onDelete: SetNull)
+  providerConfirmedAt                DateTime?
+
+  version             Int       @default(0)
+  attemptCount        Int       @default(0)
+  nextAttemptAt       DateTime?
+  lastAttemptAt       DateTime?
+  processingStartedAt DateTime?
+
+  providerErrorCode       String? @db.VarChar(128)
+  providerResponseSummary String? @db.VarChar(2000)
+
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shopId, status, createdAt])
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([sourceMessageId])
+  @@index([approvedByPlatformAdminId, createdAt])
+  @@index([providerConfirmedByPlatformAdminId, createdAt])
+  @@schema("billing")
 }
 
 enum MerchantTranslationDirection {
