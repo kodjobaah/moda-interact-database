@@ -10,6 +10,11 @@ const migration = await readFile(
 const model = (name) => schema.match(new RegExp(`model ${name}\\s*\\{[\\s\\S]*?\\n\\}`))?.[0] ?? "";
 const enumBlock = (name) => schema.match(new RegExp(`enum ${name}\\s*\\{[\\s\\S]*?\\n\\}`))?.[0] ?? "";
 const includesAll = (value, entries) => entries.forEach((entry) => assert.ok(value.includes(entry), `Expected ${entry}`));
+const enumValues = (name) => {
+  const block = enumBlock(name);
+  return [...block.matchAll(/^\s{2}([A-Z][A-Z0-9_]*)\s*$/gm)].map((match) => match[1]);
+};
+const assertExactEnum = (name, expected) => assert.deepEqual(enumValues(name), expected, `${name} values differ`);
 
 includesAll(schema, [
   "Subscription",
@@ -23,14 +28,14 @@ includesAll(schema, [
 ]);
 
 assert.match(enumBlock("RecoveryCreditPurchaseStatus"), /REFUNDED/);
-includesAll(enumBlock("BillingLifecycleRequestSource"), ["MERCHANT_UI", "MERCHANT_SUPPORT", "ADMIN"]);
-includesAll(enumBlock("SubscriptionCancellationMode"), [
+assertExactEnum("BillingLifecycleRequestSource", ["MERCHANT_UI", "MERCHANT_SUPPORT", "ADMIN"]);
+assertExactEnum("SubscriptionCancellationMode", [
   "END_OF_CYCLE",
   "IMMEDIATE_NO_PRORATION",
   "IMMEDIATE_PRORATED",
   "IMMEDIATE_SKIP_FINAL_USAGE",
 ]);
-includesAll(enumBlock("SubscriptionCancellationStatus"), [
+assertExactEnum("SubscriptionCancellationStatus", [
   "REQUESTED",
   "APPROVED",
   "PROCESSING",
@@ -41,11 +46,11 @@ includesAll(enumBlock("SubscriptionCancellationStatus"), [
   "WITHDRAWN",
   "NEEDS_ATTENTION",
 ]);
-includesAll(enumBlock("RecoveryCreditRefundSettlementMode"), [
+assertExactEnum("RecoveryCreditRefundSettlementMode", [
   "CURRENT_CYCLE_APP_EVENT_CORRECTION",
   "PARTNER_DASHBOARD_REFUND",
 ]);
-includesAll(enumBlock("RecoveryCreditRefundStatus"), [
+assertExactEnum("RecoveryCreditRefundStatus", [
   "REQUESTED",
   "APPROVED",
   "PROCESSING",
@@ -77,11 +82,14 @@ assert.match(refund, /@@index\(\[approvedByPlatformAdminId, createdAt\]\)/);
 assert.match(refund, /@@index\(\[providerConfirmedByPlatformAdminId, createdAt\]\)/);
 
 includesAll(migration, [
-  'CREATE TYPE "billing"."BillingLifecycleRequestSource"',
-  'CREATE TYPE "billing"."SubscriptionCancellationMode"',
-  'CREATE TYPE "billing"."SubscriptionCancellationStatus"',
-  'CREATE TYPE "billing"."RecoveryCreditRefundSettlementMode"',
-  'CREATE TYPE "billing"."RecoveryCreditRefundStatus"',
+  `ALTER TYPE "billing"."RecoveryCreditPurchaseStatus" ADD VALUE 'REFUNDED'`,
+  `ALTER TYPE "billing"."BillingAuditAction" ADD VALUE 'SUBSCRIPTION_CANCELLATION'`,
+  `ALTER TYPE "billing"."BillingAuditAction" ADD VALUE 'RECOVERY_CREDIT_REFUND'`,
+  `CREATE TYPE "billing"."BillingLifecycleRequestSource" AS ENUM ('MERCHANT_UI', 'MERCHANT_SUPPORT', 'ADMIN')`,
+  `CREATE TYPE "billing"."SubscriptionCancellationMode" AS ENUM ('END_OF_CYCLE', 'IMMEDIATE_NO_PRORATION', 'IMMEDIATE_PRORATED', 'IMMEDIATE_SKIP_FINAL_USAGE')`,
+  `CREATE TYPE "billing"."SubscriptionCancellationStatus" AS ENUM ('REQUESTED', 'APPROVED', 'PROCESSING', 'RETRYABLE', 'PROVIDER_ACCEPTED', 'COMPLETED', 'REJECTED', 'WITHDRAWN', 'NEEDS_ATTENTION')`,
+  `CREATE TYPE "billing"."RecoveryCreditRefundSettlementMode" AS ENUM ('CURRENT_CYCLE_APP_EVENT_CORRECTION', 'PARTNER_DASHBOARD_REFUND')`,
+  `CREATE TYPE "billing"."RecoveryCreditRefundStatus" AS ENUM ('REQUESTED', 'APPROVED', 'PROCESSING', 'PROVIDER_PENDING', 'PROVIDER_ACTION_REQUIRED', 'PROVIDER_CONFIRMED', 'COMPLETED', 'REJECTED', 'WITHDRAWN', 'NEEDS_ATTENTION')`,
   'ADD COLUMN "refundingQuantity" INTEGER NOT NULL DEFAULT 0',
   'CREATE TABLE "billing"."SubscriptionCancellationRequest"',
   'CREATE TABLE "billing"."RecoveryCreditRefund"',
