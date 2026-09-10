@@ -20,7 +20,7 @@ assert.match(schema, /model RecoveryCreditPurchase\s*\{/);
 assert.match(schema, /id String @id[\s\S]*?creditsGranted\s+Int/);
 assert.match(schema, /usageEventId String\s+@unique/);
 assert.match(schema, /recoveryCreditPurchases RecoveryCreditPurchase\[\]/);
-assert.match(schema, /recoveryCreditPurchase RecoveryCreditPurchase\?/);
+assert.match(schema, /recoveryCreditPurchase\s+RecoveryCreditPurchase\?/);
 assert.match(schema, /enum EntitlementCounter[\s\S]*?FREE_RECOVERY_LIFETIME[\s\S]*?PURCHASED_RECOVERY_CREDITS/);
 assert.match(schema, /model ShopEntitlementCounter\s*\{[\s\S]*?grantedQuantity\s+Int\s+@default\(0\)/);
 assert.match(purchaseModel, /id String @id/);
