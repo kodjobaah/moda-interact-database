@@ -538,6 +538,7 @@ model Subscription {
   pendingPlanId            String?
   pendingPlan              BillingPlan? @relation("PendingSubscriptionPlan", fields: [pendingPlanId], references: [id], onDelete: SetNull)
   pendingEffectiveAt       DateTime?
+  nextReconcileAt          DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -545,6 +546,7 @@ model Subscription {
   @@index([observedShopifyPlanHandle])
   @@index([status])
   @@index([billingPeriodId])
+  @@index([nextReconcileAt])
   @@schema("billing")
 }
 

@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { Prisma } from "@prisma/client";
 
 const schema = await readFile("prisma/schema.prisma", "utf8");
 const migration = await readFile(
   "prisma/migrations/20260910030000_add_billing_lifecycle_operations/migration.sql",
+  "utf8",
+);
+const reconciliationMigration = await readFile(
+  "prisma/migrations/20260911000000_add_subscription_reconciliation_schedule/migration.sql",
   "utf8",
 );
 
@@ -67,6 +72,17 @@ includesAll(enumBlock("BillingAuditAction"), ["SUBSCRIPTION_CANCELLATION", "RECO
 assert.match(model("ShopEntitlementCounter"), /refundingQuantity\s+Int\s+@default\(0\)/);
 const cancellation = model("SubscriptionCancellationRequest");
 const refund = model("RecoveryCreditRefund");
+const subscription = model("Subscription");
+assert.match(subscription, /nextReconcileAt\s+DateTime\?/);
+assert.match(subscription, /@@index\(\[nextReconcileAt\]\)/);
+const generatedReconcileField = Prisma.dmmf.datamodel.models
+  .find(({ name }) => name === "Subscription")
+  ?.fields.find(({ name }) => name === "nextReconcileAt");
+assert.equal(generatedReconcileField?.kind, "scalar");
+assert.equal(generatedReconcileField?.type, "DateTime");
+assert.equal(generatedReconcileField?.isRequired, false);
+assert.equal(generatedReconcileField?.isList, false);
+assert.deepEqual(enumValues("SubscriptionProjectionStatus"), ["ACTIVE", "TRIALING", "NO_CONTRACT", "UNMAPPED", "SYNC_ERROR"]);
 assert.match(cancellation, /requestKey\s+String\s+@unique\s+@db\.VarChar\(255\)/);
 assert.match(cancellation, /@@index\(\[shopId, status, createdAt\]\)/);
 assert.match(cancellation, /@@index\(\[status, nextAttemptAt, createdAt\]\)/);
@@ -97,6 +113,10 @@ includesAll(migration, [
   'RecoveryCreditRefund_correctionUsageEventId_key',
   'SubscriptionCancellationRequest_requestKey_key',
   'RecoveryCreditRefund_requestKey_key',
+]);
+includesAll(reconciliationMigration, [
+  'ALTER TABLE "billing"."Subscription" ADD COLUMN "nextReconcileAt" TIMESTAMP(3)',
+  'CREATE INDEX "Subscription_nextReconcileAt_idx" ON "billing"."Subscription"("nextReconcileAt")',
 ]);
 
 console.log("Billing lifecycle schema assertions passed.");
