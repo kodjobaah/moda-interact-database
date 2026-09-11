@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { Prisma } from "@prisma/client";
+import {
+  Prisma,
+  ProviderSubscriptionLifecycleState,
+  SubscriptionProjectionStatus,
+} from "@prisma/client";
 
 const schema = await readFile("prisma/schema.prisma", "utf8");
 const migration = await readFile(
@@ -87,7 +91,16 @@ assert.equal(generatedReconcileField?.type, "DateTime");
 assert.equal(generatedReconcileField?.isRequired, false);
 assert.equal(generatedReconcileField?.isList, false);
 assert.deepEqual(enumValues("SubscriptionProjectionStatus"), ["ACTIVE", "TRIALING", "NO_CONTRACT", "UNMAPPED", "SYNC_ERROR", "FROZEN"]);
+assert.equal(SubscriptionProjectionStatus.FROZEN, "FROZEN");
 assertExactEnum("ProviderSubscriptionLifecycleState", [
+  "CREATED",
+  "UPDATED",
+  "CANCELLATION_SCHEDULED",
+  "CANCELED",
+  "FROZEN",
+  "UNFROZEN",
+]);
+assert.deepEqual(Object.values(ProviderSubscriptionLifecycleState), [
   "CREATED",
   "UPDATED",
   "CANCELLATION_SCHEDULED",
