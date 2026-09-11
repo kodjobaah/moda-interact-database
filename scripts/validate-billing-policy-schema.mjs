@@ -45,6 +45,8 @@ assert.match(schema, /enum EntitlementCounter\s*\{[\s\S]*FREE_RECOVERY_LIFETIME[
 assert.match(schema, /enum BillingAuditAction\s*\{[\s\S]*PROMOTIONAL_CREDITS_GRANTED/);
 assert.match(schema, /enum PromotionalCreditGrantType\s*\{[\s\S]*CAMPAIGN[\s\S]*BETA_TESTER[\s\S]*GOODWILL[\s\S]*SUPPORT[\s\S]*INTERNAL_TEST[\s\S]*OTHER/);
 assert.match(schema, /model PromotionalCreditGrant\s*\{[\s\S]*quantity\s+Int[\s\S]*reason\s+String\s+@db\.VarChar\(1000\)[\s\S]*campaignReference\s+String\?[\s\S]*requestKey\s+String\s+@unique[\s\S]*platformAdminId\s+String/);
+assert.match(schema, /model PromotionalCreditGrant\s*\{[\s\S]*shop\s+Shop\s+@relation\([^)]*onDelete:\s*Restrict\)/);
+assert.match(schema, /model PromotionalCreditGrant\s*\{[\s\S]*platformAdmin\s+PlatformAdmin\s+@relation\([^)]*onDelete:\s*Restrict\)/);
 assert.match(schema, /promotionalCreditGrants\s+PromotionalCreditGrant\[\]/);
 assert.match(promotionalMigration, /CREATE TYPE "billing"\."PromotionalCreditGrantType"/);
 assert.match(promotionalMigration, /ALTER TYPE "billing"\."EntitlementCounter" ADD VALUE 'PROMOTIONAL_RECOVERY_CREDITS'/);
@@ -55,6 +57,8 @@ assert.match(promotionalMigration, /PromotionalCreditGrant_requestKey_key/);
 assert.match(promotionalMigration, /PromotionalCreditGrant_shopId_createdAt_idx/);
 assert.match(promotionalMigration, /PromotionalCreditGrant_campaignReference_createdAt_idx/);
 assert.match(promotionalMigration, /PromotionalCreditGrant_platformAdminId_createdAt_idx/);
+assert.match(promotionalMigration, /PromotionalCreditGrant_shopId_fkey[\s\S]*ON DELETE RESTRICT/);
+assert.match(promotionalMigration, /PromotionalCreditGrant_platformAdminId_fkey[\s\S]*ON DELETE RESTRICT/);
 assert.doesNotMatch(promotionalMigration, /INSERT INTO/);
 assert.doesNotMatch(promotionalMigration, /BillingAllowanceAdjustment|FREE_RECOVERY_LIFETIME|PURCHASED_RECOVERY_CREDITS|BillingPeriod|Subscription/);
 
