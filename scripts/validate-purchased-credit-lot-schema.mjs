@@ -128,7 +128,8 @@ assert.equal(legacyRefunds.filter(({ status }) => status === "COMPLETED").reduce
 assert.equal(legacyRefunds.filter(({ status, holdAppliedAt }) => holdAppliedAt && !["REJECTED", "WITHDRAWN", "COMPLETED"].includes(status)).reduce((sum, row) => sum + row.creditsSnapshot, 0), 2);
 
 const reconcileAggregate = (purchases, aggregate) => {
-  const reconstructed = purchases.reduce((totals, purchase) => ({
+  const grantBearingPurchases = purchases.filter(({ status }) => ["ACTIVE", "REFUNDED"].includes(status));
+  const reconstructed = grantBearingPurchases.reduce((totals, purchase) => ({
     granted: totals.granted + purchase.creditsGranted - purchase.refundedQuantity,
     committed: totals.committed + purchase.committedQuantity,
     reserved: totals.reserved + purchase.reservedQuantity,
@@ -137,10 +138,12 @@ const reconcileAggregate = (purchases, aggregate) => {
   assert.deepEqual(reconstructed, aggregate);
 };
 reconcileAggregate([
-  { creditsGranted: 8, refundedQuantity: 2, committedQuantity: 2, reservedQuantity: 3, refundingQuantity: 1 },
+  { status: "ACTIVE", creditsGranted: 8, refundedQuantity: 2, committedQuantity: 2, reservedQuantity: 3, refundingQuantity: 1 },
+  { status: "NEEDS_ATTENTION", creditsGranted: 20, refundedQuantity: 0, committedQuantity: 9, reservedQuantity: 8, refundingQuantity: 7 },
 ], { granted: 6, committed: 2, reserved: 3, refunding: 1 });
 assert.throws(() => reconcileAggregate([
-  { creditsGranted: 8, refundedQuantity: 2, committedQuantity: 2, reservedQuantity: 3, refundingQuantity: 1 },
+  { status: "ACTIVE", creditsGranted: 8, refundedQuantity: 2, committedQuantity: 2, reservedQuantity: 3, refundingQuantity: 1 },
+  { status: "NEEDS_ATTENTION", creditsGranted: 20, refundedQuantity: 0, committedQuantity: 9, reservedQuantity: 8, refundingQuantity: 7 },
 ], { granted: 8, committed: 2, reserved: 3, refunding: 1 }), assert.AssertionError);
 
 console.log("Purchased credit lot schema assertions passed.");
