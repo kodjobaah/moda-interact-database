@@ -78,6 +78,12 @@ enum "BillingPeriodStatus" as BillingPeriodStatus {
   OPEN
   CLOSED
 }
+enum "BillingPeriodCloseReason" as BillingPeriodCloseReason {
+  RENEWED_SAME_PLAN
+  PLAN_CHANGED
+  CONTRACT_ENDED
+  MIGRATION_RECONCILED
+}
 enum "EntitlementCounter" as EntitlementCounter {
   FREE_RECOVERY_LIFETIME
   PURCHASED_RECOVERY_CREDITS
@@ -91,6 +97,9 @@ enum "UsageReservationStatus" as UsageReservationStatus {
   COMMITTED
   RELEASED
   AMBIGUOUS
+}
+enum "UsageReservationReleaseReason" as UsageReservationReleaseReason {
+  PERIOD_CLOSED
 }
 enum "UsageMetric" as UsageMetric {
   RECOVERY_CONVERSATION
@@ -529,6 +538,7 @@ entity "UsageReservation" as UsageReservation {
   * sourceKey : String
   * quantity : Int
   * status : UsageReservationStatus
+  releaseReason : UsageReservationReleaseReason
   expiresAt : DateTime
   # committedUsageEventId : [FK] UsageEvent
   * createdAt : DateTime
@@ -606,9 +616,17 @@ entity "BillingPeriod" as BillingPeriod {
 + id [PK] : String 
 --
   # shopId : [FK] Shop
+  # subscriptionId : [FK] Subscription
+  # planId : [FK] BillingPlan
+  shopifyPlanHandleSnapshot : String
+  planNameSnapshot : String
+  planKindSnapshot : BillingPlanKind
+  includedRecoveryCreditsGranted : Int
   * periodStart : DateTime
   * periodEnd : DateTime
   * status : BillingPeriodStatus
+  closedAt : DateTime
+  closeReason : BillingPeriodCloseReason
   * createdAt : DateTime
   * updatedAt : DateTime
 }
@@ -890,6 +908,8 @@ PromotionalCreditGrant }o--|| PlatformAdmin
 BillingAuditEvent }o--o| Shop
 BillingAuditEvent }o--|| PlatformAdmin
 BillingPeriod }o--|| Shop
+BillingPeriod }o--|| Subscription
+BillingPeriod }o--o| BillingPlan
 WhatsAppTemplateVariant }o--|| Shop
 MerchantSupportThread |o--|| Shop
 MerchantSupportThread }o--o| PlatformAdmin
@@ -931,10 +951,13 @@ ShopEntitlementCounter |o--|| EntitlementCounter
 BillingPeriodEntitlementCounter |o--|| BillingPeriodEntitlementCounterKind
 RecoveryCreditPurchase |o--|| RecoveryCreditPurchaseStatus
 UsageReservation |o--|| UsageReservationStatus
+UsageReservation |o--|| UsageReservationReleaseReason
 BillingAllowanceAdjustment |o--|| EntitlementCounter
 PromotionalCreditGrant |o--|| PromotionalCreditGrantType
 BillingAuditEvent |o--|| BillingAuditAction
+BillingPeriod |o--|| BillingPlanKind
 BillingPeriod |o--|| BillingPeriodStatus
+BillingPeriod |o--|| BillingPeriodCloseReason
 Shop |o--|| ShopStatus
 WhatsAppTemplateVariant |o--|| WhatsAppTemplateStatus
 PlatformAdmin |o--|| PlatformAdminRole

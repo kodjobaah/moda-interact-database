@@ -373,6 +373,15 @@ enum BillingPeriodStatus {
   @@schema("billing")
 }
 
+enum BillingPeriodCloseReason {
+  RENEWED_SAME_PLAN
+  PLAN_CHANGED
+  CONTRACT_ENDED
+  MIGRATION_RECONCILED
+
+  @@schema("billing")
+}
+
 enum EntitlementCounter {
   FREE_RECOVERY_LIFETIME
   PURCHASED_RECOVERY_CREDITS
@@ -392,6 +401,12 @@ enum UsageReservationStatus {
   COMMITTED
   RELEASED
   AMBIGUOUS
+
+  @@schema("billing")
+}
+
+enum UsageReservationReleaseReason {
+  PERIOD_CLOSED
 
   @@schema("billing")
 }
@@ -525,6 +540,7 @@ model BillingPlan {
   features                BillingPlanFeature[]
   subscriptions           Subscription[]
   pendingSubscriptions    Subscription[]           @relation("PendingSubscriptionPlan")
+  billingPeriods          BillingPeriod[]          @relation("BillingPeriodPlan")
   recoveryCreditPurchases RecoveryCreditPurchase[]
 
   createdAt DateTime @default(now())
@@ -559,7 +575,8 @@ model Subscription {
   status                    SubscriptionProjectionStatus
 
   billingPeriodId String?
-  billingPeriod   BillingPeriod? @relation(fields: [billingPeriodId], references: [id], onDelete: SetNull)
+  billingPeriod   BillingPeriod?  @relation("CurrentSubscriptionBillingPeriod", fields: [billingPeriodId], references: [id], onDelete: SetNull)
+  billingPeriods  BillingPeriod[] @relation("SubscriptionBillingPeriods")
 
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
@@ -739,10 +756,11 @@ model UsageReservation {
   purchasedCreditPurchaseId String?
   purchasedCreditPurchase   RecoveryCreditPurchase? @relation(fields: [purchasedCreditPurchaseId], references: [id], onDelete: SetNull)
 
-  sourceKey String                 @unique
-  quantity  Int
-  status    UsageReservationStatus @default(RESERVED)
-  expiresAt DateTime?
+  sourceKey     String                         @unique
+  quantity      Int
+  status        UsageReservationStatus         @default(RESERVED)
+  releaseReason UsageReservationReleaseReason?
+  expiresAt     DateTime?
 
   committedUsageEventId String?     @unique
   committedUsageEvent   UsageEvent? @relation("CommittedReservation", fields: [committedUsageEventId], references: [id], onDelete: SetNull)
@@ -874,20 +892,31 @@ model BillingAuditEvent {
 }
 
 model BillingPeriod {
-  id                  String                            @id @default(cuid())
-  shopId              String
-  shop                Shop                              @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  periodStart         DateTime
-  periodEnd           DateTime
-  status              BillingPeriodStatus               @default(OPEN)
-  subscriptions       Subscription[]
-  usageEvents         UsageEvent[]
-  entitlementCounters BillingPeriodEntitlementCounter[]
-  createdAt           DateTime                          @default(now())
-  updatedAt           DateTime                          @updatedAt
+  id                             String                            @id @default(cuid())
+  shopId                         String
+  shop                           Shop                              @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  subscriptionId                 String
+  subscription                   Subscription                      @relation("SubscriptionBillingPeriods", fields: [subscriptionId], references: [id], onDelete: Restrict)
+  currentForSubscriptions        Subscription[]                    @relation("CurrentSubscriptionBillingPeriod")
+  planId                         String?
+  plan                           BillingPlan?                      @relation("BillingPeriodPlan", fields: [planId], references: [id], onDelete: SetNull)
+  shopifyPlanHandleSnapshot      String?
+  planNameSnapshot               String?
+  planKindSnapshot               BillingPlanKind?
+  includedRecoveryCreditsGranted Int?
+  periodStart                    DateTime
+  periodEnd                      DateTime
+  status                         BillingPeriodStatus               @default(OPEN)
+  closedAt                       DateTime?
+  closeReason                    BillingPeriodCloseReason?
+  usageEvents                    UsageEvent[]
+  entitlementCounters            BillingPeriodEntitlementCounter[]
+  createdAt                      DateTime                          @default(now())
+  updatedAt                      DateTime                          @updatedAt
 
   @@unique([shopId, periodStart, periodEnd])
   @@index([shopId, periodStart, periodEnd])
+  @@index([subscriptionId, periodStart, periodEnd])
   @@schema("billing")
 }
 
