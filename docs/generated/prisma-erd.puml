@@ -64,6 +64,15 @@ enum "SubscriptionProjectionStatus" as SubscriptionProjectionStatus {
   NO_CONTRACT
   UNMAPPED
   SYNC_ERROR
+  FROZEN
+}
+enum "ProviderSubscriptionLifecycleState" as ProviderSubscriptionLifecycleState {
+  CREATED
+  UPDATED
+  CANCELLATION_SCHEDULED
+  CANCELED
+  FROZEN
+  UNFROZEN
 }
 enum "BillingPeriodStatus" as BillingPeriodStatus {
   OPEN
@@ -416,6 +425,9 @@ entity "Subscription" as Subscription {
   # pendingPlanId : [FK] BillingPlan
   pendingEffectiveAt : DateTime
   nextReconcileAt : DateTime
+  lastProviderLifecycleState : ProviderSubscriptionLifecycleState
+  lastProviderLifecycleEventId : String
+  lastProviderLifecycleEventAt : DateTime
   * createdAt : DateTime
   * updatedAt : DateTime
 }
@@ -865,6 +877,7 @@ ConversationMessage |o--|| MessageStatus
 BillingPlan |o--|| BillingPlanKind
 BillingPlanFeature |o--|| BillingPlanFeatureIdentifier
 Subscription |o--|| SubscriptionProjectionStatus
+Subscription |o--|| ProviderSubscriptionLifecycleState
 UsageEvent |o--|| UsageMetric
 UsageEvent |o--|| ShopifyReportState
 ShopEntitlementCounter |o--|| EntitlementCounter
