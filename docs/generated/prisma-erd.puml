@@ -8,6 +8,9 @@ enum "CheckoutRecoveryStatus" as CheckoutRecoveryStatus {
   EXPIRED
   CANCELLED
 }
+enum "RecoveryAdmissionBlockReason" as RecoveryAdmissionBlockReason {
+  RECOVERY_CAPACITY_EXHAUSTED
+}
 enum "ConversationType" as ConversationType {
   RECOVERY
   PRODUCT_DISCOVERY
@@ -313,6 +316,8 @@ entity "CheckoutRecovery" as CheckoutRecovery {
   engagedAt : DateTime
   completedAt : DateTime
   expiredAt : DateTime
+  admissionBlockedAt : DateTime
+  admissionBlockReason : RecoveryAdmissionBlockReason
   * createdAt : DateTime
   * updatedAt : DateTime
 }
@@ -830,6 +835,7 @@ MerchantTranslationReconciliationRequest }o--|| PlatformAdmin
 CheckoutRecoveryStatusHistory |o--|| CheckoutRecoveryStatus
 CheckoutRecoveryStatusHistory |o--|| CheckoutRecoveryStatus
 CheckoutRecovery |o--|| CheckoutRecoveryStatus
+CheckoutRecovery |o--|| RecoveryAdmissionBlockReason
 Conversation |o--|| ConversationType
 Conversation |o--|| ConversationOutcome
 Conversation |o--|| LanguageSource
