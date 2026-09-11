@@ -25,4 +25,12 @@ assert.match(migration, /ON CONFLICT \("shopId", "counter"\) DO NOTHING/);
 assert.doesNotMatch(migration, /BillingPeriod|billingPeriod/i);
 assert.match(migration, /"version" = counter\."version" \+ 1/);
 
+const existingCounterUpdate = migration.match(
+  /UPDATE "billing"\."ShopEntitlementCounter"[\s\S]*$/,
+)?.[0] ?? "";
+assert.match(existingCounterUpdate, /"grantedQuantity" = 5/);
+assert.match(existingCounterUpdate, /counter\."grantedQuantity" = 0/);
+assert.doesNotMatch(existingCounterUpdate, /"committedQuantity"\s*=|"reservedQuantity"\s*=|"refundingQuantity"\s*=/);
+assert.doesNotMatch(migration, /BillingPlan|billingPlan|planId|planKind|PAID_METERED/);
+
 console.log("Billing policy schema assertions passed.");
