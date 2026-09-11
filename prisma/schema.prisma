@@ -446,6 +446,13 @@ enum RecoveryCreditRefundSettlementMode {
   @@schema("billing")
 }
 
+enum RecoveryCreditProviderActionKind {
+  REFUND
+  CREDIT
+
+  @@schema("billing")
+}
+
 enum RecoveryCreditRefundStatus {
   REQUESTED
   APPROVED
@@ -660,6 +667,11 @@ model RecoveryCreditPurchase {
   shopifyPlanHandleSnapshot  String
   shopifyEventHandleSnapshot String
   creditsGranted             Int
+  committedQuantity          Int    @default(0)
+  reservedQuantity           Int    @default(0)
+  refundingQuantity          Int    @default(0)
+  refundedQuantity           Int    @default(0)
+  version                    Int    @default(0)
 
   status RecoveryCreditPurchaseStatus @default(PENDING_BILLING)
 
@@ -670,9 +682,11 @@ model RecoveryCreditPurchase {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  refund RecoveryCreditRefund?
+  refunds               RecoveryCreditRefund[]
+  purchasedReservations UsageReservation[]
 
   @@index([shopId, status, createdAt])
+  @@index([shopId, status, activatedAt, createdAt, id])
   @@index([planId, createdAt])
   @@schema("billing")
 }
@@ -684,6 +698,9 @@ model UsageReservation {
   shop      Shop                   @relation(fields: [shopId], references: [id], onDelete: Cascade)
   counterId String
   counter   ShopEntitlementCounter @relation(fields: [counterId], references: [id], onDelete: Cascade)
+
+  purchasedCreditPurchaseId String?
+  purchasedCreditPurchase   RecoveryCreditPurchase? @relation(fields: [purchasedCreditPurchaseId], references: [id], onDelete: SetNull)
 
   sourceKey String                 @unique
   quantity  Int
@@ -698,6 +715,7 @@ model UsageReservation {
 
   @@index([shopId, status])
   @@index([status, expiresAt])
+  @@index([purchasedCreditPurchaseId, status])
   @@schema("billing")
 }
 
@@ -1082,7 +1100,7 @@ model RecoveryCreditRefund {
   shopId String
   shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  purchaseId String                 @unique
+  purchaseId String
   purchase   RecoveryCreditPurchase @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
 
   source BillingLifecycleRequestSource
@@ -1092,11 +1110,15 @@ model RecoveryCreditRefund {
 
   requestedByShopifyUserId String?
 
-  originalUsageEventIdSnapshot String
-  billingPeriodIdSnapshot      String?
-  planHandleSnapshot           String
-  eventHandleSnapshot          String
-  creditsSnapshot              Int
+  originalUsageEventIdSnapshot   String
+  billingPeriodIdSnapshot        String?
+  planHandleSnapshot             String
+  eventHandleSnapshot            String
+  creditsSnapshot                Int
+  purchaseCreditsGrantedSnapshot Int
+  creditsRequested               Int
+  creditsApproved                Int?
+  creditsRefunded                Int?
 
   settlementMode RecoveryCreditRefundSettlementMode?
   status         RecoveryCreditRefundStatus          @default(REQUESTED)
@@ -1113,7 +1135,10 @@ model RecoveryCreditRefund {
   correctionUsageEventId String?     @unique
   correctionUsageEvent   UsageEvent? @relation("RecoveryCreditRefundCorrectionEvent", fields: [correctionUsageEventId], references: [id], onDelete: Restrict)
 
-  providerReference String? @db.VarChar(512)
+  providerReference  String?                           @db.VarChar(512)
+  providerActionKind RecoveryCreditProviderActionKind?
+  providerAmount     Decimal?                          @db.Decimal(20, 2)
+  providerCurrency   String?                           @db.VarChar(3)
 
   providerConfirmedByPlatformAdminId String?
   providerConfirmedByPlatformAdmin   PlatformAdmin? @relation("ConfirmedRecoveryCreditRefunds", fields: [providerConfirmedByPlatformAdminId], references: [id], onDelete: SetNull)
@@ -1134,6 +1159,7 @@ model RecoveryCreditRefund {
   updatedAt DateTime @updatedAt
 
   @@index([shopId, status, createdAt])
+  @@index([purchaseId, status, createdAt])
   @@index([status, nextAttemptAt, createdAt])
   @@index([sourceMessageId])
   @@index([approvedByPlatformAdminId, createdAt])
