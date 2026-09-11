@@ -248,7 +248,7 @@ enum "MerchantTranslationReconciliationStatus" as MerchantTranslationReconciliat
   FAILED
 }
 entity "Session" as Session {
-+ id [PK] : String
++ id [PK] : String 
 --
   * shop : String
   * state : String
@@ -269,7 +269,7 @@ entity "Session" as Session {
 }
 
 entity "ShopSettings" as ShopSettings {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   * onboardingCompleted : Boolean
@@ -494,7 +494,7 @@ entity "ShopEntitlementCounter" as ShopEntitlementCounter {
 }
 
 entity "BillingPeriodEntitlementCounter" as BillingPeriodEntitlementCounter {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   # billingPeriodId : [FK] BillingPeriod
@@ -586,7 +586,7 @@ entity "BillingAllowanceAdjustment" as BillingAllowanceAdjustment {
 }
 
 entity "PromotionalCreditGrant" as PromotionalCreditGrant {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   * quantity : Int
@@ -639,6 +639,7 @@ entity "Shop" as Shop {
   * status : ShopStatus
   * installedAt : DateTime
   uninstalledAt : DateTime
+  reinstallPendingAt : DateTime
   * createdAt : DateTime
   * updatedAt : DateTime
 }
