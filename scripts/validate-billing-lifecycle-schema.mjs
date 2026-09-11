@@ -15,6 +15,10 @@ const reconciliationMigration = await readFile(
   "prisma/migrations/20260911000000_add_subscription_reconciliation_schedule/migration.sql",
   "utf8",
 );
+const reinstallMigration = await readFile(
+  "prisma/migrations/20260911160000_add_shop_reinstall_reconciliation_marker/migration.sql",
+  "utf8",
+);
 const providerLifecycleMigration = await readFile(
   "prisma/migrations/20260911140000_add_subscription_provider_lifecycle_evidence/migration.sql",
   "utf8",
@@ -81,6 +85,20 @@ assert.match(model("ShopEntitlementCounter"), /refundingQuantity\s+Int\s+@defaul
 const cancellation = model("SubscriptionCancellationRequest");
 const refund = model("RecoveryCreditRefund");
 const subscription = model("Subscription");
+const shop = model("Shop");
+assert.match(shop, /status\s+ShopStatus\s+@default\(ACTIVE\)/);
+assert.match(shop, /installedAt\s+DateTime\s+@default\(now\(\)\)/);
+assert.match(shop, /uninstalledAt\s+DateTime\?/);
+assert.match(shop, /reinstallPendingAt\s+DateTime\?/);
+assert.match(shop, /@@index\(\[status, reinstallPendingAt\]\)/);
+const generatedReinstallField = Prisma.dmmf.datamodel.models
+  .find(({ name }) => name === "Shop")
+  ?.fields.find(({ name }) => name === "reinstallPendingAt");
+assert.equal(generatedReinstallField?.kind, "scalar");
+assert.equal(generatedReinstallField?.type, "DateTime");
+assert.equal(generatedReinstallField?.isRequired, false);
+assert.equal(generatedReinstallField?.isList, false);
+assertExactEnum("ShopStatus", ["ACTIVE", "UNINSTALLED", "SUSPENDED"]);
 assert.match(subscription, /nextReconcileAt\s+DateTime\?/);
 assert.match(subscription, /@@index\(\[nextReconcileAt\]\)/);
 const generatedReconcileField = Prisma.dmmf.datamodel.models
@@ -157,6 +175,12 @@ includesAll(reconciliationMigration, [
   'ALTER TABLE "billing"."Subscription" ADD COLUMN "nextReconcileAt" TIMESTAMP(3)',
   'CREATE INDEX "Subscription_nextReconcileAt_idx" ON "billing"."Subscription"("nextReconcileAt")',
 ]);
+includesAll(reinstallMigration, [
+  'ALTER TABLE "commerce"."Shop" ADD COLUMN "reinstallPendingAt" TIMESTAMP(3)',
+  'CREATE INDEX "Shop_status_reinstallPendingAt_idx" ON "commerce"."Shop"("status", "reinstallPendingAt")',
+]);
+assert.doesNotMatch(reinstallMigration, /\b(UPDATE|DELETE|DROP|NOT NULL|DEFAULT)\b/);
+assert.doesNotMatch(reinstallMigration, /Subscription|BillingPeriod|Entitlement|Purchase|Refund|UsageReservation/);
 includesAll(providerLifecycleMigration, [
   'CREATE TYPE "billing"."ProviderSubscriptionLifecycleState" AS ENUM',
   "'CREATED'",

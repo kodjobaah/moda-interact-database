@@ -870,9 +870,10 @@ model Shop {
   shopifyShopId String? @unique
 
   // Installation lifecycle
-  status        ShopStatus @default(ACTIVE)
-  installedAt   DateTime   @default(now())
-  uninstalledAt DateTime?
+  status             ShopStatus @default(ACTIVE)
+  installedAt        DateTime   @default(now())
+  uninstalledAt      DateTime?
+  reinstallPendingAt DateTime?
 
   // Configuration / billing
   settings                         ShopSettings?
@@ -901,6 +902,7 @@ model Shop {
   updatedAt DateTime @updatedAt
 
   @@index([status])
+  @@index([status, reinstallPendingAt])
   @@schema("commerce")
 }
 

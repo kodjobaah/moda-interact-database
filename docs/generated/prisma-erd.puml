@@ -81,6 +81,7 @@ enum "BillingPeriodStatus" as BillingPeriodStatus {
 enum "EntitlementCounter" as EntitlementCounter {
   FREE_RECOVERY_LIFETIME
   PURCHASED_RECOVERY_CREDITS
+  PROMOTIONAL_RECOVERY_CREDITS
 }
 enum "UsageReservationStatus" as UsageReservationStatus {
   RESERVED
@@ -163,6 +164,15 @@ enum "BillingAuditAction" as BillingAuditAction {
   BILLING_CORRECTION_CREATED
   SUBSCRIPTION_CANCELLATION
   RECOVERY_CREDIT_REFUND
+  PROMOTIONAL_CREDITS_GRANTED
+}
+enum "PromotionalCreditGrantType" as PromotionalCreditGrantType {
+  CAMPAIGN
+  BETA_TESTER
+  GOODWILL
+  SUPPORT
+  INTERNAL_TEST
+  OTHER
 }
 enum "ShopStatus" as ShopStatus {
   ACTIVE
@@ -226,7 +236,7 @@ enum "MerchantTranslationReconciliationStatus" as MerchantTranslationReconciliat
   FAILED
 }
 entity "Session" as Session {
-+ id [PK] : String 
++ id [PK] : String
 --
   * shop : String
   * state : String
@@ -546,6 +556,19 @@ entity "BillingAllowanceAdjustment" as BillingAllowanceAdjustment {
   * createdAt : DateTime
 }
 
+entity "PromotionalCreditGrant" as PromotionalCreditGrant {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  * quantity : Int
+  * grantType : PromotionalCreditGrantType
+  * reason : String
+  campaignReference : String
+  * requestKey : String
+  # platformAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+}
+
 entity "BillingAuditEvent" as BillingAuditEvent {
 + id [PK] : String 
 --
@@ -579,6 +602,7 @@ entity "Shop" as Shop {
   * status : ShopStatus
   * installedAt : DateTime
   uninstalledAt : DateTime
+  reinstallPendingAt : DateTime
   * createdAt : DateTime
   * updatedAt : DateTime
 }
@@ -840,6 +864,8 @@ ShopBillingPolicyOverride |o--|| Shop
 ShopBillingPolicyOverride }o--o| PlatformAdmin
 BillingAllowanceAdjustment }o--|| Shop
 BillingAllowanceAdjustment }o--|| PlatformAdmin
+PromotionalCreditGrant }o--|| Shop
+PromotionalCreditGrant }o--|| PlatformAdmin
 BillingAuditEvent }o--o| Shop
 BillingAuditEvent }o--|| PlatformAdmin
 BillingPeriod }o--|| Shop
@@ -884,6 +910,7 @@ ShopEntitlementCounter |o--|| EntitlementCounter
 RecoveryCreditPurchase |o--|| RecoveryCreditPurchaseStatus
 UsageReservation |o--|| UsageReservationStatus
 BillingAllowanceAdjustment |o--|| EntitlementCounter
+PromotionalCreditGrant |o--|| PromotionalCreditGrantType
 BillingAuditEvent |o--|| BillingAuditAction
 BillingPeriod |o--|| BillingPeriodStatus
 Shop |o--|| ShopStatus
