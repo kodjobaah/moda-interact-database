@@ -411,6 +411,7 @@ entity "Subscription" as Subscription {
   pendingShopifyPlanHandle : String
   # pendingPlanId : [FK] BillingPlan
   pendingEffectiveAt : DateTime
+  nextReconcileAt : DateTime
   * createdAt : DateTime
   * updatedAt : DateTime
 }
