@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { Prisma } from "@prisma/client";
+import {
+  Prisma,
+  ProviderSubscriptionLifecycleState,
+  SubscriptionProjectionStatus,
+} from "@prisma/client";
 
 const schema = await readFile("prisma/schema.prisma", "utf8");
 const migration = await readFile(
@@ -9,6 +13,10 @@ const migration = await readFile(
 );
 const reconciliationMigration = await readFile(
   "prisma/migrations/20260911000000_add_subscription_reconciliation_schedule/migration.sql",
+  "utf8",
+);
+const providerLifecycleMigration = await readFile(
+  "prisma/migrations/20260911140000_add_subscription_provider_lifecycle_evidence/migration.sql",
   "utf8",
 );
 
@@ -82,7 +90,37 @@ assert.equal(generatedReconcileField?.kind, "scalar");
 assert.equal(generatedReconcileField?.type, "DateTime");
 assert.equal(generatedReconcileField?.isRequired, false);
 assert.equal(generatedReconcileField?.isList, false);
-assert.deepEqual(enumValues("SubscriptionProjectionStatus"), ["ACTIVE", "TRIALING", "NO_CONTRACT", "UNMAPPED", "SYNC_ERROR"]);
+assert.deepEqual(enumValues("SubscriptionProjectionStatus"), ["ACTIVE", "TRIALING", "NO_CONTRACT", "UNMAPPED", "SYNC_ERROR", "FROZEN"]);
+assert.equal(SubscriptionProjectionStatus.FROZEN, "FROZEN");
+assertExactEnum("ProviderSubscriptionLifecycleState", [
+  "CREATED",
+  "UPDATED",
+  "CANCELLATION_SCHEDULED",
+  "CANCELED",
+  "FROZEN",
+  "UNFROZEN",
+]);
+assert.deepEqual(Object.values(ProviderSubscriptionLifecycleState), [
+  "CREATED",
+  "UPDATED",
+  "CANCELLATION_SCHEDULED",
+  "CANCELED",
+  "FROZEN",
+  "UNFROZEN",
+]);
+for (const field of [
+  "lastProviderLifecycleState\\s+ProviderSubscriptionLifecycleState\\?",
+  "lastProviderLifecycleEventId\\s+String\\?",
+  "lastProviderLifecycleEventAt\\s+DateTime\\?",
+]) {
+  assert.match(subscription, new RegExp(field));
+}
+const generatedSubscription = Prisma.dmmf.datamodel.models.find(({ name }) => name === "Subscription");
+for (const field of ["lastProviderLifecycleState", "lastProviderLifecycleEventId", "lastProviderLifecycleEventAt"]) {
+  const generatedField = generatedSubscription?.fields.find(({ name }) => name === field);
+  assert.equal(generatedField?.isRequired, false);
+  assert.equal(generatedField?.isList, false);
+}
 assert.match(cancellation, /requestKey\s+String\s+@unique\s+@db\.VarChar\(255\)/);
 assert.match(cancellation, /@@index\(\[shopId, status, createdAt\]\)/);
 assert.match(cancellation, /@@index\(\[status, nextAttemptAt, createdAt\]\)/);
@@ -118,5 +156,19 @@ includesAll(reconciliationMigration, [
   'ALTER TABLE "billing"."Subscription" ADD COLUMN "nextReconcileAt" TIMESTAMP(3)',
   'CREATE INDEX "Subscription_nextReconcileAt_idx" ON "billing"."Subscription"("nextReconcileAt")',
 ]);
+includesAll(providerLifecycleMigration, [
+  'CREATE TYPE "billing"."ProviderSubscriptionLifecycleState" AS ENUM',
+  "'CREATED'",
+  "'UPDATED'",
+  "'CANCELLATION_SCHEDULED'",
+  "'CANCELED'",
+  "'FROZEN'",
+  "'UNFROZEN'",
+  'ALTER TYPE "billing"."SubscriptionProjectionStatus" ADD VALUE \'FROZEN\'',
+  'ADD COLUMN "lastProviderLifecycleState" "billing"."ProviderSubscriptionLifecycleState"',
+  'ADD COLUMN "lastProviderLifecycleEventId" TEXT',
+  'ADD COLUMN "lastProviderLifecycleEventAt" TIMESTAMP(3)',
+]);
+assert.doesNotMatch(providerLifecycleMigration, /\bUPDATE\b|\bDELETE\b|\bDROP TABLE\b|\bDROP COLUMN\b|BillingPeriod|ShopEntitlementCounter|UsageReservation/);
 
 console.log("Billing lifecycle schema assertions passed.");

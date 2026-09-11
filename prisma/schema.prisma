@@ -350,6 +350,18 @@ enum SubscriptionProjectionStatus {
   NO_CONTRACT
   UNMAPPED
   SYNC_ERROR
+  FROZEN
+
+  @@schema("billing")
+}
+
+enum ProviderSubscriptionLifecycleState {
+  CREATED
+  UPDATED
+  CANCELLATION_SCHEDULED
+  CANCELED
+  FROZEN
+  UNFROZEN
 
   @@schema("billing")
 }
@@ -550,6 +562,10 @@ model Subscription {
   pendingPlan              BillingPlan? @relation("PendingSubscriptionPlan", fields: [pendingPlanId], references: [id], onDelete: SetNull)
   pendingEffectiveAt       DateTime?
   nextReconcileAt          DateTime?
+
+  lastProviderLifecycleState   ProviderSubscriptionLifecycleState?
+  lastProviderLifecycleEventId String?
+  lastProviderLifecycleEventAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
