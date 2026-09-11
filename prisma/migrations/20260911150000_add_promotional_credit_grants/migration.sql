@@ -1,4 +1,5 @@
 -- AlterEnum
+ALTER TYPE "billing"."EntitlementCounter" ADD VALUE 'PROMOTIONAL_RECOVERY_CREDITS';
 ALTER TYPE "billing"."BillingAuditAction" ADD VALUE 'PROMOTIONAL_CREDITS_GRANTED';
 
 -- CreateEnum
