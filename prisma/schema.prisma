@@ -381,6 +381,12 @@ enum EntitlementCounter {
   @@schema("billing")
 }
 
+enum BillingPeriodEntitlementCounterKind {
+  INCLUDED_RECOVERY_CREDITS
+
+  @@schema("billing")
+}
+
 enum UsageReservationStatus {
   RESERVED
   COMMITTED
@@ -647,13 +653,39 @@ model ShopEntitlementCounter {
   refundingQuantity Int                @default(0)
   version           Int                @default(0)
 
-  reservations UsageReservation[]
+  reservations UsageReservation[] @relation("ShopEntitlementUsageReservations")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([shopId, counter])
   @@index([shopId])
+  @@schema("billing")
+}
+
+model BillingPeriodEntitlementCounter {
+  id String @id @default(cuid())
+
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  billingPeriodId String
+  billingPeriod   BillingPeriod @relation(fields: [billingPeriodId], references: [id], onDelete: Cascade)
+
+  counter           BillingPeriodEntitlementCounterKind
+  grantedQuantity   Int                                 @default(0)
+  committedQuantity Int                                 @default(0)
+  reservedQuantity  Int                                 @default(0)
+  forfeitedQuantity Int                                 @default(0)
+  version           Int                                 @default(0)
+
+  reservations UsageReservation[] @relation("BillingPeriodUsageReservations")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([billingPeriodId, counter])
+  @@index([shopId, billingPeriodId])
   @@schema("billing")
 }
 
@@ -697,9 +729,12 @@ model UsageReservation {
   id String @id @default(cuid())
 
   shopId    String
-  shop      Shop                   @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  counterId String
-  counter   ShopEntitlementCounter @relation(fields: [counterId], references: [id], onDelete: Cascade)
+  shop      Shop                    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  counterId String?
+  counter   ShopEntitlementCounter? @relation("ShopEntitlementUsageReservations", fields: [counterId], references: [id], onDelete: Cascade)
+
+  billingPeriodEntitlementCounterId String?
+  billingPeriodEntitlementCounter   BillingPeriodEntitlementCounter? @relation("BillingPeriodUsageReservations", fields: [billingPeriodEntitlementCounterId], references: [id], onDelete: Cascade)
 
   purchasedCreditPurchaseId String?
   purchasedCreditPurchase   RecoveryCreditPurchase? @relation(fields: [purchasedCreditPurchaseId], references: [id], onDelete: SetNull)
@@ -718,6 +753,7 @@ model UsageReservation {
   @@index([shopId, status])
   @@index([status, expiresAt])
   @@index([purchasedCreditPurchaseId, status])
+  @@index([billingPeriodEntitlementCounterId])
   @@schema("billing")
 }
 
@@ -838,16 +874,17 @@ model BillingAuditEvent {
 }
 
 model BillingPeriod {
-  id            String              @id @default(cuid())
-  shopId        String
-  shop          Shop                @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  periodStart   DateTime
-  periodEnd     DateTime
-  status        BillingPeriodStatus @default(OPEN)
-  subscriptions Subscription[]
-  usageEvents   UsageEvent[]
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  id                  String                            @id @default(cuid())
+  shopId              String
+  shop                Shop                              @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  periodStart         DateTime
+  periodEnd           DateTime
+  status              BillingPeriodStatus               @default(OPEN)
+  subscriptions       Subscription[]
+  usageEvents         UsageEvent[]
+  entitlementCounters BillingPeriodEntitlementCounter[]
+  createdAt           DateTime                          @default(now())
+  updatedAt           DateTime                          @updatedAt
 
   @@unique([shopId, periodStart, periodEnd])
   @@index([shopId, periodStart, periodEnd])
@@ -881,6 +918,7 @@ model Shop {
   usageEvents                      UsageEvent[]
   billingPeriods                   BillingPeriod[]
   entitlementCounters              ShopEntitlementCounter[]
+  billingPeriodEntitlementCounters BillingPeriodEntitlementCounter[]
   usageReservations                UsageReservation[]
   billingPolicyOverride            ShopBillingPolicyOverride?
   allowanceAdjustments             BillingAllowanceAdjustment[]
