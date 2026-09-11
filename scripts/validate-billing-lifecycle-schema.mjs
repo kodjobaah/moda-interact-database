@@ -23,6 +23,10 @@ const periodReservationMigration = await readFile(
   "prisma/migrations/20260911160000_add_billing_period_entitlement_reservations/migration.sql",
   "utf8",
 );
+const periodLifecycleMigration = await readFile(
+  "prisma/migrations/20260911200000_add_billing_period_lifecycle_history/migration.sql",
+  "utf8",
+);
 const reservationBaselineMigration = await readFile(
   "prisma/migrations/20260907180000_add_usage_reservation_reporting_ledger/migration.sql",
   "utf8",
@@ -54,6 +58,9 @@ includesAll(schema, [
 
 const periodCounter = model("BillingPeriodEntitlementCounter");
 const reservation = model("UsageReservation");
+const billingPeriod = model("BillingPeriod");
+const billingPlan = model("BillingPlan");
+const subscription = model("Subscription");
 assert.match(enumBlock("BillingPeriodEntitlementCounterKind"), /INCLUDED_RECOVERY_CREDITS/);
 assert.ok(periodCounter, "BillingPeriodEntitlementCounter model is required");
 assert.match(periodCounter, /@@unique\(\[billingPeriodId, counter\]\)/);
@@ -71,6 +78,58 @@ assert.match(periodReservationMigration, /BillingPeriodEntitlementCounter_forfei
 assert.match(periodReservationMigration, /BillingPeriodEntitlementCounter_capacity/);
 assert.match(schema, /FREE_RECOVERY_LIFETIME/);
 assert.match(schema, /PURCHASED_RECOVERY_CREDITS/);
+assert.match(enumBlock("BillingPeriodCloseReason"), /RENEWED_SAME_PLAN/);
+assertExactEnum("BillingPeriodCloseReason", [
+  "RENEWED_SAME_PLAN",
+  "PLAN_CHANGED",
+  "CONTRACT_ENDED",
+  "MIGRATION_RECONCILED",
+]);
+assertExactEnum("UsageReservationReleaseReason", ["PERIOD_CLOSED"]);
+assert.match(reservation, /releaseReason\s+UsageReservationReleaseReason\?/);
+assert.match(billingPlan, /billingPeriods\s+BillingPeriod\[\]\s+@relation\("BillingPeriodPlan"\)/);
+assert.match(subscription, /billingPeriod\s+BillingPeriod\?\s+@relation\("CurrentSubscriptionBillingPeriod"/);
+assert.match(subscription, /billingPeriods\s+BillingPeriod\[\]\s+@relation\("SubscriptionBillingPeriods"\)/);
+assert.match(billingPeriod, /subscriptionId\s+String/);
+assert.match(billingPeriod, /subscription\s+Subscription\s+@relation\("SubscriptionBillingPeriods"/);
+assert.match(billingPeriod, /currentForSubscriptions\s+Subscription\[\]\s+@relation\("CurrentSubscriptionBillingPeriod"\)/);
+for (const field of [
+  "planId\\s+String\\?",
+  "shopifyPlanHandleSnapshot\\s+String\\?",
+  "planNameSnapshot\\s+String\\?",
+  "planKindSnapshot\\s+BillingPlanKind\\?",
+  "includedRecoveryCreditsGranted\\s+Int\\?",
+  "closedAt\\s+DateTime\\?",
+  "closeReason\\s+BillingPeriodCloseReason\\?",
+]) {
+  assert.match(billingPeriod, new RegExp(field));
+}
+assert.match(billingPeriod, /@@unique\(\[shopId, periodStart, periodEnd\]\)/);
+assert.match(billingPeriod, /@@index\(\[subscriptionId, periodStart, periodEnd\]\)/);
+assert.match(periodLifecycleMigration, /ADD COLUMN "subscriptionId" TEXT/);
+assert.match(periodLifecycleMigration, /SET "subscriptionId" = subscription\."id"/);
+assert.match(periodLifecycleMigration, /Cannot map every BillingPeriod to exactly one Subscription/);
+assert.match(periodLifecycleMigration, /Cannot normalize multiple OPEN BillingPeriods without an unambiguous current pointer/);
+assert.match(periodLifecycleMigration, /"closeReason" = 'MIGRATION_RECONCILED'/);
+assert.match(periodLifecycleMigration, /subscription\."billingPeriodId"/);
+assert.match(periodLifecycleMigration, /CREATE UNIQUE INDEX "BillingPeriod_subscriptionId_open_key"/);
+assert.match(periodLifecycleMigration, /WHERE "status" = 'OPEN'/);
+assert.match(periodLifecycleMigration, /BillingPeriod_period_boundary/);
+assert.match(periodLifecycleMigration, /"periodStart" < "periodEnd"/);
+assert.match(periodLifecycleMigration, /BillingPeriod_included_recovery_credits_non_negative/);
+assert.match(periodLifecycleMigration, /BillingPeriod_open_close_metadata_empty/);
+assert.match(periodLifecycleMigration, /counter\."grantedQuantity" <> current_period\.allowance/);
+assert.match(periodLifecycleMigration, /includedRecoveryConversationAllowance/);
+assert.match(periodLifecycleMigration, /LEAST\(usage_total, current_period\.allowance\)/);
+assert.match(periodLifecycleMigration, /Current paid BillingPeriod .*invalid normal recovery usage total/);
+assert.match(periodLifecycleMigration, /Current paid BillingPeriod .*outside the exact current plan meter/);
+assert.match(periodLifecycleMigration, /^BEGIN;\s/m);
+assert.match(periodLifecycleMigration, /COMMIT;\s*$/m);
+assert.match(
+  periodLifecycleMigration,
+  /AND EXISTS \(\s+SELECT 1[\s\S]*current_period\."id" = subscription\."billingPeriodId"[\s\S]*current_period\."subscriptionId" = subscription\."id"[\s\S]*current_period\."status" = 'OPEN'/,
+);
+assert.match(periodReservationMigration, /BillingPeriodEntitlementCounter_capacity/);
 
 assert.match(enumBlock("RecoveryCreditPurchaseStatus"), /REFUNDED/);
 assertExactEnum("BillingLifecycleRequestSource", ["MERCHANT_UI", "MERCHANT_SUPPORT", "ADMIN"]);
@@ -112,7 +171,6 @@ includesAll(enumBlock("BillingAuditAction"), ["SUBSCRIPTION_CANCELLATION", "RECO
 assert.match(model("ShopEntitlementCounter"), /refundingQuantity\s+Int\s+@default\(0\)/);
 const cancellation = model("SubscriptionCancellationRequest");
 const refund = model("RecoveryCreditRefund");
-const subscription = model("Subscription");
 const shop = model("Shop");
 assert.match(shop, /status\s+ShopStatus\s+@default\(ACTIVE\)/);
 assert.match(shop, /installedAt\s+DateTime\s+@default\(now\(\)\)/);
