@@ -132,6 +132,12 @@ enum CheckoutRecoveryStatus {
   @@schema("commerce")
 }
 
+enum RecoveryAdmissionBlockReason {
+  RECOVERY_CAPACITY_EXHAUSTED
+
+  @@schema("commerce")
+}
+
 model CheckoutRecoveryStatusHistory {
   id String @id @default(cuid())
 
@@ -177,6 +183,9 @@ model CheckoutRecovery {
   completedAt   DateTime?
   expiredAt     DateTime?
 
+  admissionBlockedAt   DateTime?
+  admissionBlockReason RecoveryAdmissionBlockReason?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -185,6 +194,7 @@ model CheckoutRecovery {
 
   @@unique([shopId, checkoutToken])
   @@index([customerId])
+  @@index([shopId, admissionBlockReason, status, detectedAt])
   @@schema("commerce")
 }
 

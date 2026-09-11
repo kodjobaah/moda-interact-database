@@ -12,6 +12,7 @@
     "migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
     "prisma:validate": "prisma validate --schema prisma/schema.prisma",
     "test:recovery-credit-packs": "node scripts/validate-recovery-credit-pack-schema.mjs",
+    "test:checkout-recovery-capacity": "node scripts/validate-checkout-recovery-capacity-schema.mjs",
     "test:billing-lifecycle": "node scripts/validate-billing-lifecycle-schema.mjs",
     "erd:puml": "node scripts/generate-erd.mjs",
     "erd:png": "plantuml -tpng docs/generated/prisma-erd.puml",
