@@ -1,4 +1,6 @@
 -- Add durable lifecycle vocabulary without changing existing reservation semantics.
+BEGIN;
+
 CREATE TYPE "billing"."BillingPeriodCloseReason" AS ENUM (
     'RENEWED_SAME_PLAN',
     'PLAN_CHANGED',
@@ -88,7 +90,14 @@ SET "status" = 'CLOSED',
 FROM "billing"."Subscription" AS subscription
 WHERE period."subscriptionId" = subscription."id"
   AND period."status" = 'OPEN'
-  AND period."id" <> subscription."billingPeriodId";
+    AND period."id" <> subscription."billingPeriodId"
+    AND EXISTS (
+            SELECT 1
+            FROM "billing"."BillingPeriod" AS current_period
+            WHERE current_period."id" = subscription."billingPeriodId"
+                AND current_period."subscriptionId" = subscription."id"
+                AND current_period."status" = 'OPEN'
+    );
 
 -- Snapshot only the exact current Subscription plan. Historical periods remain nullable.
 UPDATE "billing"."BillingPeriod" AS period
@@ -240,3 +249,5 @@ ADD CONSTRAINT "BillingPeriod_included_recovery_credits_non_negative"
 CHECK ("includedRecoveryCreditsGranted" IS NULL OR "includedRecoveryCreditsGranted" >= 0),
 ADD CONSTRAINT "BillingPeriod_open_close_metadata_empty"
 CHECK ("status" <> 'OPEN' OR ("closedAt" IS NULL AND "closeReason" IS NULL));
+
+COMMIT;

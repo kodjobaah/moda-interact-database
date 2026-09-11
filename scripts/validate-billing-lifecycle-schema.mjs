@@ -123,6 +123,12 @@ assert.match(periodLifecycleMigration, /includedRecoveryConversationAllowance/);
 assert.match(periodLifecycleMigration, /LEAST\(usage_total, current_period\.allowance\)/);
 assert.match(periodLifecycleMigration, /Current paid BillingPeriod .*invalid normal recovery usage total/);
 assert.match(periodLifecycleMigration, /Current paid BillingPeriod .*outside the exact current plan meter/);
+assert.match(periodLifecycleMigration, /^BEGIN;\s/m);
+assert.match(periodLifecycleMigration, /COMMIT;\s*$/m);
+assert.match(
+  periodLifecycleMigration,
+  /AND EXISTS \(\s+SELECT 1[\s\S]*current_period\."id" = subscription\."billingPeriodId"[\s\S]*current_period\."subscriptionId" = subscription\."id"[\s\S]*current_period\."status" = 'OPEN'/,
+);
 assert.match(periodReservationMigration, /BillingPeriodEntitlementCounter_capacity/);
 
 assert.match(enumBlock("RecoveryCreditPurchaseStatus"), /REFUNDED/);
