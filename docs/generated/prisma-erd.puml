@@ -483,6 +483,7 @@ entity "PlatformBillingPolicy" as PlatformBillingPolicy {
 --
   * globalPauseNewRecoveries : Boolean
   * globalPauseAutomatedWhatsapp : Boolean
+  * lifetimeFreeRecoveryAllowance : Int
   * absoluteOutboundHardLimit : Int
   * defaultWarningPercent : Int
   * version : Int
