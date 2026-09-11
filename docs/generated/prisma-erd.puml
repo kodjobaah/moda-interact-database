@@ -118,6 +118,10 @@ enum "RecoveryCreditRefundSettlementMode" as RecoveryCreditRefundSettlementMode 
   CURRENT_CYCLE_APP_EVENT_CORRECTION
   PARTNER_DASHBOARD_REFUND
 }
+enum "RecoveryCreditProviderActionKind" as RecoveryCreditProviderActionKind {
+  REFUND
+  CREDIT
+}
 enum "RecoveryCreditRefundStatus" as RecoveryCreditRefundStatus {
   REQUESTED
   APPROVED
@@ -463,6 +467,11 @@ entity "RecoveryCreditPurchase" as RecoveryCreditPurchase {
   * shopifyPlanHandleSnapshot : String
   * shopifyEventHandleSnapshot : String
   * creditsGranted : Int
+  * committedQuantity : Int
+  * reservedQuantity : Int
+  * refundingQuantity : Int
+  * refundedQuantity : Int
+  * version : Int
   * status : RecoveryCreditPurchaseStatus
   # usageEventId : [FK] UsageEvent
   activatedAt : DateTime
@@ -475,6 +484,7 @@ entity "UsageReservation" as UsageReservation {
 --
   # shopId : [FK] Shop
   # counterId : [FK] ShopEntitlementCounter
+  # purchasedCreditPurchaseId : [FK] RecoveryCreditPurchase
   * sourceKey : String
   * quantity : Int
   * status : UsageReservationStatus
@@ -691,6 +701,10 @@ entity "RecoveryCreditRefund" as RecoveryCreditRefund {
   * planHandleSnapshot : String
   * eventHandleSnapshot : String
   * creditsSnapshot : Int
+  * purchaseCreditsGrantedSnapshot : Int
+  * creditsRequested : Int
+  creditsApproved : Int
+  creditsRefunded : Int
   settlementMode : RecoveryCreditRefundSettlementMode
   * status : RecoveryCreditRefundStatus
   * requestKey : String
@@ -700,6 +714,9 @@ entity "RecoveryCreditRefund" as RecoveryCreditRefund {
   holdAppliedAt : DateTime
   # correctionUsageEventId : [FK] UsageEvent
   providerReference : String
+  providerActionKind : RecoveryCreditProviderActionKind
+  providerAmount : Decimal
+  providerCurrency : String
   # providerConfirmedByPlatformAdminId : [FK] PlatformAdmin
   providerConfirmedAt : DateTime
   * version : Int
@@ -804,6 +821,7 @@ RecoveryCreditPurchase }o--o| BillingPlan
 RecoveryCreditPurchase |o--|| UsageEvent
 UsageReservation }o--|| Shop
 UsageReservation }o--|| ShopEntitlementCounter
+UsageReservation }o--o| RecoveryCreditPurchase
 UsageReservation |o--o| UsageEvent
 ShopBillingPolicyOverride |o--|| Shop
 ShopBillingPolicyOverride }o--o| PlatformAdmin
@@ -821,7 +839,7 @@ SubscriptionCancellationRequest }o--|| Shop
 SubscriptionCancellationRequest }o--o| MerchantSupportMessage
 SubscriptionCancellationRequest }o--o| PlatformAdmin
 RecoveryCreditRefund }o--|| Shop
-RecoveryCreditRefund |o--|| RecoveryCreditPurchase
+RecoveryCreditRefund }o--|| RecoveryCreditPurchase
 RecoveryCreditRefund }o--o| MerchantSupportMessage
 RecoveryCreditRefund }o--o| PlatformAdmin
 RecoveryCreditRefund |o--o| UsageEvent
@@ -865,6 +883,7 @@ SubscriptionCancellationRequest |o--|| SubscriptionCancellationStatus
 RecoveryCreditRefund |o--|| BillingLifecycleRequestSource
 RecoveryCreditRefund |o--|| RecoveryCreditRefundSettlementMode
 RecoveryCreditRefund |o--|| RecoveryCreditRefundStatus
+RecoveryCreditRefund |o--|| RecoveryCreditProviderActionKind
 MerchantMessageTranslation |o--|| MerchantTranslationDirection
 MerchantMessageTranslation |o--|| MerchantMessageTranslationStatus
 MerchantTranslationBatch |o--|| MerchantTranslationBatchStatus

@@ -64,6 +64,27 @@ SET
 FROM "billing"."RecoveryCreditPurchase" AS purchase
 WHERE purchase.id = refund."purchaseId";
 
+-- Seed refund and hold quantities before allocating reservations so those quantities
+-- reduce the capacity available to active reservations.
+UPDATE "billing"."RecoveryCreditPurchase" AS purchase
+SET
+  "refundedQuantity" = COALESCE(refunds."refundedQuantity", 0),
+  "refundingQuantity" = COALESCE(refunds."refundingQuantity", 0)
+FROM (
+  SELECT
+    refund."purchaseId",
+    SUM(CASE WHEN refund."status"::text = 'COMPLETED' THEN refund."creditsSnapshot" ELSE 0 END)::INTEGER AS "refundedQuantity",
+    SUM(CASE
+      WHEN refund."holdAppliedAt" IS NOT NULL
+       AND refund."status"::text NOT IN ('REJECTED', 'WITHDRAWN', 'COMPLETED')
+      THEN refund."creditsSnapshot"
+      ELSE 0
+    END)::INTEGER AS "refundingQuantity"
+  FROM "billing"."RecoveryCreditRefund" AS refund
+  GROUP BY refund."purchaseId"
+) AS refunds
+WHERE purchase.id = refunds."purchaseId";
+
 -- Build deterministic purchased-credit lots in canonical FIFO order.
 CREATE TEMP TABLE "_purchased_credit_lots" (
   "purchaseId" TEXT PRIMARY KEY,
@@ -71,9 +92,9 @@ CREATE TEMP TABLE "_purchased_credit_lots" (
 ) ON COMMIT DROP;
 
 INSERT INTO "_purchased_credit_lots" ("purchaseId", "remainingQuantity")
-SELECT purchase.id, purchase."creditsGranted"
+SELECT purchase.id, purchase."creditsGranted" - purchase."refundedQuantity" - purchase."refundingQuantity"
 FROM "billing"."RecoveryCreditPurchase" AS purchase
-WHERE purchase."status"::text IN ('ACTIVE', 'NEEDS_ATTENTION', 'REFUNDED')
+WHERE purchase."status"::text IN ('ACTIVE', 'REFUNDED')
 ORDER BY purchase."shopId", purchase."activatedAt" ASC NULLS LAST, purchase."createdAt" ASC, purchase.id ASC;
 
 DO $$
@@ -108,13 +129,17 @@ BEGIN
       RAISE EXCEPTION 'Cannot deterministically allocate purchased-credit reservation % without splitting a lot', reservation.id;
     END IF;
 
-    UPDATE "_purchased_credit_lots"
-    SET "remainingQuantity" = "remainingQuantity" - reservation.quantity
-    WHERE "purchaseId" = lot."purchaseId";
-
     UPDATE "billing"."UsageReservation"
     SET "purchasedCreditPurchaseId" = lot."purchaseId"
     WHERE id = reservation.id;
+
+    IF reservation.status = 'RELEASED' THEN
+      CONTINUE;
+    END IF;
+
+    UPDATE "_purchased_credit_lots"
+    SET "remainingQuantity" = "remainingQuantity" - reservation.quantity
+    WHERE "purchaseId" = lot."purchaseId";
 
     IF reservation.status = 'COMMITTED' THEN
       UPDATE "billing"."RecoveryCreditPurchase"
@@ -128,25 +153,6 @@ BEGIN
   END LOOP;
 END $$;
 
-UPDATE "billing"."RecoveryCreditPurchase" AS purchase
-SET
-  "refundedQuantity" = COALESCE(refunds."refundedQuantity", 0),
-  "refundingQuantity" = COALESCE(refunds."refundingQuantity", 0)
-FROM (
-  SELECT
-    refund."purchaseId",
-    SUM(CASE WHEN refund."status"::text = 'COMPLETED' THEN refund."creditsSnapshot" ELSE 0 END)::INTEGER AS "refundedQuantity",
-    SUM(CASE
-      WHEN refund."holdAppliedAt" IS NOT NULL
-       AND refund."status"::text NOT IN ('REJECTED', 'WITHDRAWN', 'COMPLETED')
-      THEN refund."creditsSnapshot"
-      ELSE 0
-    END)::INTEGER AS "refundingQuantity"
-  FROM "billing"."RecoveryCreditRefund" AS refund
-  GROUP BY refund."purchaseId"
-) AS refunds
-WHERE purchase.id = refunds."purchaseId";
-
 DO $$
 DECLARE
   shop_record RECORD;
@@ -156,7 +162,7 @@ BEGIN
   FOR shop_record IN
     SELECT DISTINCT purchase."shopId"
     FROM "billing"."RecoveryCreditPurchase" AS purchase
-    WHERE purchase."status"::text IN ('ACTIVE', 'NEEDS_ATTENTION', 'REFUNDED')
+    WHERE purchase."status"::text IN ('ACTIVE', 'REFUNDED')
   LOOP
     SELECT
       COALESCE(SUM(purchase."creditsGranted" - purchase."refundedQuantity"), 0)::INTEGER AS granted,
@@ -166,7 +172,7 @@ BEGIN
     INTO purchase_totals
     FROM "billing"."RecoveryCreditPurchase" AS purchase
     WHERE purchase."shopId" = shop_record."shopId"
-      AND purchase."status"::text IN ('ACTIVE', 'NEEDS_ATTENTION', 'REFUNDED');
+      AND purchase."status"::text IN ('ACTIVE', 'REFUNDED');
 
     SELECT
       COALESCE(counter."grantedQuantity", 0)::INTEGER AS granted,

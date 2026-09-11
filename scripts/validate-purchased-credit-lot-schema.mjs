@@ -55,6 +55,9 @@ for (const fragment of [
 }
 assert.match(migration, /status = 'COMMITTED'|status = 'COMMITTED'/);
 assert.match(migration, /status IN \('RESERVED', 'AMBIGUOUS'\)/);
+assert.match(migration, /status = 'RELEASED'/);
+assert.match(migration, /status.*IN \('ACTIVE', 'REFUNDED'\)/);
+assert.match(migration, /creditsGranted.*refundedQuantity.*refundingQuantity/);
 assert.match(migration, /\."status"::text NOT IN \('REJECTED', 'WITHDRAWN', 'COMPLETED'\)/);
 assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|BillingPeriod/);
 assert.doesNotMatch(migration, /availableQuantity/);
@@ -65,23 +68,38 @@ assert.ok(generatedPurchase?.fields.some(({ name, type, isRequired }) => name ==
 assert.ok(generatedPurchase?.fields.some(({ name }) => name === "refunds"));
 assert.ok(generatedReservation?.fields.some(({ name }) => name === "purchasedCreditPurchase"));
 
-const allocateFifo = (lots, reservations) => {
-  const remaining = lots.map((lot) => ({ ...lot }));
+const allocateFifo = (purchases, reservations) => {
+  const remaining = purchases
+    .filter(({ status }) => ["ACTIVE", "REFUNDED"].includes(status))
+    .map((purchase) => ({
+      ...purchase,
+      remaining: purchase.creditsGranted - purchase.refundedQuantity - purchase.refundingQuantity,
+    }));
   return reservations.map((reservation) => {
     const lot = remaining.find((candidate) => candidate.remaining >= reservation.quantity);
     if (!lot) throw new Error("ambiguous allocation");
-    lot.remaining -= reservation.quantity;
+    if (reservation.status !== "RELEASED") lot.remaining -= reservation.quantity;
     return { ...reservation, purchaseId: lot.id };
   });
 };
 const fixture = allocateFifo(
-  [{ id: "purchase-a", remaining: 5 }, { id: "purchase-b", remaining: 8 }],
-  [{ id: "reservation-a", quantity: 2, status: "COMMITTED" }, { id: "reservation-b", quantity: 3, status: "RESERVED" }],
+  [
+    { id: "purchase-a", status: "ACTIVE", creditsGranted: 8, refundedQuantity: 2, refundingQuantity: 1 },
+    { id: "purchase-b", status: "ACTIVE", creditsGranted: 8, refundedQuantity: 0, refundingQuantity: 0 },
+    { id: "purchase-needs-attention", status: "NEEDS_ATTENTION", creditsGranted: 20, refundedQuantity: 0, refundingQuantity: 0 },
+  ],
+  [
+    { id: "reservation-released", quantity: 2, status: "RELEASED" },
+    { id: "reservation-a", quantity: 2, status: "COMMITTED" },
+    { id: "reservation-b", quantity: 3, status: "RESERVED" },
+  ],
 );
-assert.deepEqual(fixture.map(({ purchaseId }) => purchaseId), ["purchase-a", "purchase-a"]);
+assert.deepEqual(fixture.map(({ purchaseId }) => purchaseId), ["purchase-a", "purchase-a", "purchase-a"]);
 assert.equal(fixture.filter(({ status }) => status === "COMMITTED").reduce((sum, row) => sum + row.quantity, 0), 2);
 assert.equal(fixture.filter(({ status }) => status === "RESERVED").reduce((sum, row) => sum + row.quantity, 0), 3);
-assert.throws(() => allocateFifo([{ id: "purchase-a", remaining: 5 }], [{ id: "reservation-a", quantity: 6 }]), /ambiguous allocation/);
+assert.equal(fixture.filter(({ status }) => status === "RELEASED").reduce((sum, row) => sum + row.quantity, 0), 2);
+assert.throws(() => allocateFifo([{ id: "purchase-a", status: "ACTIVE", creditsGranted: 5, refundedQuantity: 0, refundingQuantity: 0 }], [{ id: "reservation-a", quantity: 6, status: "RESERVED" }]), /ambiguous allocation/);
+assert.throws(() => allocateFifo([{ id: "purchase-a", status: "ACTIVE", creditsGranted: 5, refundedQuantity: 4, refundingQuantity: 1 }], [{ id: "reservation-a", quantity: 1, status: "RESERVED" }]), /ambiguous allocation/);
 
 const legacyRefunds = [
   { status: "COMPLETED", creditsSnapshot: 5, holdAppliedAt: "2026-01-01" },
