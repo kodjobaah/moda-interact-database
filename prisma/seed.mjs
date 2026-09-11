@@ -124,6 +124,20 @@ async function main() {
 
   console.log("Billing plans seeded.");
 
+  await prisma.platformBillingPolicy.upsert({
+    where: { id: "default" },
+    create: {
+      id: "default",
+      lifetimeFreeRecoveryAllowance: 5,
+      absoluteOutboundHardLimit: 2000,
+      defaultWarningPercent: 80,
+    },
+    update: {
+      lifetimeFreeRecoveryAllowance: 5,
+    },
+  });
+  console.log("Platform billing policy seeded.");
+
   const session = await prisma.session.findFirst({
     orderBy: { expires: "desc" },
   });

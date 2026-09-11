@@ -12,6 +12,7 @@
     "migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
     "prisma:validate": "prisma validate --schema prisma/schema.prisma",
     "test:recovery-credit-packs": "node scripts/validate-recovery-credit-pack-schema.mjs",
+    "test:billing-policy": "node scripts/validate-billing-policy-schema.mjs",
     "test:checkout-recovery-capacity": "node scripts/validate-checkout-recovery-capacity-schema.mjs",
     "test:purchased-credit-lots": "node scripts/validate-purchased-credit-lot-schema.mjs",
     "test:billing-lifecycle": "node scripts/validate-billing-lifecycle-schema.mjs",

@@ -492,6 +492,7 @@ model BillingPlan {
   active            Boolean         @default(true)
 
   shopifyUsageEventHandle               String?
+  // Legacy catalog field; ARCH-010 runtime entitlement authority is the shop snapshot.
   freeLifetimeConversationAllowance     Int?
   includedRecoveryConversationAllowance Int?
   recoveryCreditPackEnabled             Boolean @default(false)
@@ -705,11 +706,12 @@ model UsageReservation {
 model PlatformBillingPolicy {
   id String @id @default("default")
 
-  globalPauseNewRecoveries     Boolean @default(false)
-  globalPauseAutomatedWhatsapp Boolean @default(false)
-  absoluteOutboundHardLimit    Int
-  defaultWarningPercent        Int
-  version                      Int     @default(0)
+  globalPauseNewRecoveries      Boolean @default(false)
+  globalPauseAutomatedWhatsapp  Boolean @default(false)
+  lifetimeFreeRecoveryAllowance Int     @default(5)
+  absoluteOutboundHardLimit     Int
+  defaultWarningPercent         Int
+  version                       Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
