@@ -83,6 +83,9 @@ enum "EntitlementCounter" as EntitlementCounter {
   PURCHASED_RECOVERY_CREDITS
   PROMOTIONAL_RECOVERY_CREDITS
 }
+enum "BillingPeriodEntitlementCounterKind" as BillingPeriodEntitlementCounterKind {
+  INCLUDED_RECOVERY_CREDITS
+}
 enum "UsageReservationStatus" as UsageReservationStatus {
   RESERVED
   COMMITTED
@@ -236,7 +239,7 @@ enum "MerchantTranslationReconciliationStatus" as MerchantTranslationReconciliat
   FAILED
 }
 entity "Session" as Session {
-+ id [PK] : String
++ id [PK] : String 
 --
   * shop : String
   * state : String
@@ -481,6 +484,21 @@ entity "ShopEntitlementCounter" as ShopEntitlementCounter {
   * updatedAt : DateTime
 }
 
+entity "BillingPeriodEntitlementCounter" as BillingPeriodEntitlementCounter {
++ id [PK] : String 
+--
+  # shopId : [FK] Shop
+  # billingPeriodId : [FK] BillingPeriod
+  * counter : BillingPeriodEntitlementCounterKind
+  * grantedQuantity : Int
+  * committedQuantity : Int
+  * reservedQuantity : Int
+  * forfeitedQuantity : Int
+  * version : Int
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 entity "RecoveryCreditPurchase" as RecoveryCreditPurchase {
 + id [PK] : String 
 --
@@ -506,6 +524,7 @@ entity "UsageReservation" as UsageReservation {
 --
   # shopId : [FK] Shop
   # counterId : [FK] ShopEntitlementCounter
+  # billingPeriodEntitlementCounterId : [FK] BillingPeriodEntitlementCounter
   # purchasedCreditPurchaseId : [FK] RecoveryCreditPurchase
   * sourceKey : String
   * quantity : Int
@@ -557,7 +576,7 @@ entity "BillingAllowanceAdjustment" as BillingAllowanceAdjustment {
 }
 
 entity "PromotionalCreditGrant" as PromotionalCreditGrant {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   * quantity : Int
@@ -853,11 +872,14 @@ UsageEvent }o--|| Shop
 UsageEvent }o--o| BillingPeriod
 UsageEvent }o--o| UsageEvent
 ShopEntitlementCounter }o--|| Shop
+BillingPeriodEntitlementCounter }o--|| Shop
+BillingPeriodEntitlementCounter }o--|| BillingPeriod
 RecoveryCreditPurchase }o--|| Shop
 RecoveryCreditPurchase }o--o| BillingPlan
 RecoveryCreditPurchase |o--|| UsageEvent
 UsageReservation }o--|| Shop
-UsageReservation }o--|| ShopEntitlementCounter
+UsageReservation }o--o| ShopEntitlementCounter
+UsageReservation }o--o| BillingPeriodEntitlementCounter
 UsageReservation }o--o| RecoveryCreditPurchase
 UsageReservation |o--o| UsageEvent
 ShopBillingPolicyOverride |o--|| Shop
@@ -907,6 +929,7 @@ Subscription |o--|| ProviderSubscriptionLifecycleState
 UsageEvent |o--|| UsageMetric
 UsageEvent |o--|| ShopifyReportState
 ShopEntitlementCounter |o--|| EntitlementCounter
+BillingPeriodEntitlementCounter |o--|| BillingPeriodEntitlementCounterKind
 RecoveryCreditPurchase |o--|| RecoveryCreditPurchaseStatus
 UsageReservation |o--|| UsageReservationStatus
 BillingAllowanceAdjustment |o--|| EntitlementCounter

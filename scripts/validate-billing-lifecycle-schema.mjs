@@ -19,6 +19,14 @@ const reinstallMigration = await readFile(
   "prisma/migrations/20260911160000_add_shop_reinstall_reconciliation_marker/migration.sql",
   "utf8",
 );
+const periodReservationMigration = await readFile(
+  "prisma/migrations/20260911160000_add_billing_period_entitlement_reservations/migration.sql",
+  "utf8",
+);
+const reservationBaselineMigration = await readFile(
+  "prisma/migrations/20260907180000_add_usage_reservation_reporting_ledger/migration.sql",
+  "utf8",
+);
 const providerLifecycleMigration = await readFile(
   "prisma/migrations/20260911140000_add_subscription_provider_lifecycle_evidence/migration.sql",
   "utf8",
@@ -43,6 +51,26 @@ includesAll(schema, [
   "PlatformAdmin",
   "BillingAuditEvent",
 ]);
+
+const periodCounter = model("BillingPeriodEntitlementCounter");
+const reservation = model("UsageReservation");
+assert.match(enumBlock("BillingPeriodEntitlementCounterKind"), /INCLUDED_RECOVERY_CREDITS/);
+assert.ok(periodCounter, "BillingPeriodEntitlementCounter model is required");
+assert.match(periodCounter, /@@unique\(\[billingPeriodId, counter\]\)/);
+assert.match(reservation, /counterId\s+String\?/);
+assert.match(reservation, /billingPeriodEntitlementCounterId\s+String\?/);
+assert.match(reservation, /@@index\(\[billingPeriodEntitlementCounterId\]\)/);
+assert.match(reservationBaselineMigration, /UsageReservation_counterId_fkey/);
+assert.match(periodReservationMigration, /ALTER COLUMN "counterId" DROP NOT NULL/);
+assert.match(periodReservationMigration, /UsageReservation_billingPeriodEntitlementCounterId_fkey/);
+assert.match(periodReservationMigration, /UsageReservation_counter_family_xor/);
+assert.match(periodReservationMigration, /BillingPeriodEntitlementCounter_grantedQuantity_non_negative/);
+assert.match(periodReservationMigration, /BillingPeriodEntitlementCounter_committedQuantity_non_negative/);
+assert.match(periodReservationMigration, /BillingPeriodEntitlementCounter_reservedQuantity_non_negative/);
+assert.match(periodReservationMigration, /BillingPeriodEntitlementCounter_forfeitedQuantity_non_negative/);
+assert.match(periodReservationMigration, /BillingPeriodEntitlementCounter_capacity/);
+assert.match(schema, /FREE_RECOVERY_LIFETIME/);
+assert.match(schema, /PURCHASED_RECOVERY_CREDITS/);
 
 assert.match(enumBlock("RecoveryCreditPurchaseStatus"), /REFUNDED/);
 assertExactEnum("BillingLifecycleRequestSource", ["MERCHANT_UI", "MERCHANT_SUPPORT", "ADMIN"]);
