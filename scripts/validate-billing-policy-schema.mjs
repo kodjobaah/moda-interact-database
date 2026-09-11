@@ -31,6 +31,9 @@ const existingCounterUpdate = migration.match(
 assert.match(existingCounterUpdate, /"grantedQuantity" = 5/);
 assert.match(existingCounterUpdate, /counter\."grantedQuantity" = 0/);
 assert.doesNotMatch(existingCounterUpdate, /"committedQuantity"\s*=|"reservedQuantity"\s*=|"refundingQuantity"\s*=/);
-assert.doesNotMatch(migration, /BillingPlan|billingPlan|planId|planKind|PAID_METERED/);
+assert.doesNotMatch(
+  migration,
+  /BillingPlan|billingPlan|planId|planKind|planHandle|settings\."plan"|PAID_METERED/,
+);
 
 console.log("Billing policy schema assertions passed.");
