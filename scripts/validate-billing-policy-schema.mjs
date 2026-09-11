@@ -7,6 +7,10 @@ const migration = await readFile(
   "utf8",
 );
 const seed = await readFile("prisma/seed.mjs", "utf8");
+const promotionalMigration = await readFile(
+  "prisma/migrations/20260911150000_add_promotional_credit_grants/migration.sql",
+  "utf8",
+);
 
 assert.match(schema, /model PlatformBillingPolicy\s*\{[\s\S]*?lifetimeFreeRecoveryAllowance\s+Int\s+@default\(5\)/);
 assert.match(schema, /model BillingPlan\s*\{[\s\S]*?freeLifetimeConversationAllowance\s+Int\?/);
@@ -35,5 +39,27 @@ assert.doesNotMatch(
   migration,
   /BillingPlan|billingPlan|planId|planKind|planHandle|settings\."plan"|PAID_METERED/,
 );
+
+assert.match(schema, /enum EntitlementCounter\s*\{[\s\S]*PROMOTIONAL_RECOVERY_CREDITS/);
+assert.match(schema, /enum EntitlementCounter\s*\{[\s\S]*FREE_RECOVERY_LIFETIME[\s\S]*PURCHASED_RECOVERY_CREDITS[\s\S]*PROMOTIONAL_RECOVERY_CREDITS/);
+assert.match(schema, /enum BillingAuditAction\s*\{[\s\S]*PROMOTIONAL_CREDITS_GRANTED/);
+assert.match(schema, /enum PromotionalCreditGrantType\s*\{[\s\S]*CAMPAIGN[\s\S]*BETA_TESTER[\s\S]*GOODWILL[\s\S]*SUPPORT[\s\S]*INTERNAL_TEST[\s\S]*OTHER/);
+assert.match(schema, /model PromotionalCreditGrant\s*\{[\s\S]*quantity\s+Int[\s\S]*reason\s+String\s+@db\.VarChar\(1000\)[\s\S]*campaignReference\s+String\?[\s\S]*requestKey\s+String\s+@unique[\s\S]*platformAdminId\s+String/);
+assert.match(schema, /model PromotionalCreditGrant\s*\{[\s\S]*shop\s+Shop\s+@relation\([^)]*onDelete:\s*Restrict\)/);
+assert.match(schema, /model PromotionalCreditGrant\s*\{[\s\S]*platformAdmin\s+PlatformAdmin\s+@relation\([^)]*onDelete:\s*Restrict\)/);
+assert.match(schema, /promotionalCreditGrants\s+PromotionalCreditGrant\[\]/);
+assert.match(promotionalMigration, /CREATE TYPE "billing"\."PromotionalCreditGrantType"/);
+assert.match(promotionalMigration, /ALTER TYPE "billing"\."EntitlementCounter" ADD VALUE 'PROMOTIONAL_RECOVERY_CREDITS'/);
+assert.match(promotionalMigration, /ALTER TYPE "billing"\."BillingAuditAction" ADD VALUE 'PROMOTIONAL_CREDITS_GRANTED'/);
+assert.match(promotionalMigration, /CREATE TABLE "billing"\."PromotionalCreditGrant"/);
+assert.match(promotionalMigration, /PromotionalCreditGrant_quantity_positive/);
+assert.match(promotionalMigration, /PromotionalCreditGrant_requestKey_key/);
+assert.match(promotionalMigration, /PromotionalCreditGrant_shopId_createdAt_idx/);
+assert.match(promotionalMigration, /PromotionalCreditGrant_campaignReference_createdAt_idx/);
+assert.match(promotionalMigration, /PromotionalCreditGrant_platformAdminId_createdAt_idx/);
+assert.match(promotionalMigration, /PromotionalCreditGrant_shopId_fkey[\s\S]*ON DELETE RESTRICT/);
+assert.match(promotionalMigration, /PromotionalCreditGrant_platformAdminId_fkey[\s\S]*ON DELETE RESTRICT/);
+assert.doesNotMatch(promotionalMigration, /INSERT INTO/);
+assert.doesNotMatch(promotionalMigration, /BillingAllowanceAdjustment|FREE_RECOVERY_LIFETIME|PURCHASED_RECOVERY_CREDITS|BillingPeriod|Subscription/);
 
 console.log("Billing policy schema assertions passed.");

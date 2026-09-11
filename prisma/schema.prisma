@@ -376,6 +376,7 @@ enum BillingPeriodStatus {
 enum EntitlementCounter {
   FREE_RECOVERY_LIFETIME
   PURCHASED_RECOVERY_CREDITS
+  PROMOTIONAL_RECOVERY_CREDITS
 
   @@schema("billing")
 }
@@ -491,6 +492,7 @@ enum BillingAuditAction {
   BILLING_CORRECTION_CREATED
   SUBSCRIPTION_CANCELLATION
   RECOVERY_CREDIT_REFUND
+  PROMOTIONAL_CREDITS_GRANTED
 
   @@schema("billing")
 }
@@ -780,6 +782,38 @@ model BillingAllowanceAdjustment {
   @@schema("billing")
 }
 
+enum PromotionalCreditGrantType {
+  CAMPAIGN
+  BETA_TESTER
+  GOODWILL
+  SUPPORT
+  INTERNAL_TEST
+  OTHER
+
+  @@schema("billing")
+}
+
+model PromotionalCreditGrant {
+  id String @id @default(cuid())
+
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Restrict)
+
+  quantity          Int
+  grantType         PromotionalCreditGrantType
+  reason            String                     @db.VarChar(1000)
+  campaignReference String?                    @db.VarChar(255)
+  requestKey        String                     @unique @db.VarChar(255)
+  platformAdminId   String
+  platformAdmin     PlatformAdmin              @relation(fields: [platformAdminId], references: [id], onDelete: Restrict)
+  createdAt         DateTime                   @default(now())
+
+  @@index([shopId, createdAt])
+  @@index([campaignReference, createdAt])
+  @@index([platformAdminId, createdAt])
+  @@schema("billing")
+}
+
 model BillingAuditEvent {
   id String @id @default(cuid())
 
@@ -852,6 +886,7 @@ model Shop {
   allowanceAdjustments             BillingAllowanceAdjustment[]
   billingAuditEvents               BillingAuditEvent[]
   recoveryCreditPurchases          RecoveryCreditPurchase[]
+  promotionalCreditGrants          PromotionalCreditGrant[]
   subscriptionCancellationRequests SubscriptionCancellationRequest[]
   recoveryCreditRefunds            RecoveryCreditRefund[]
   whatsappTemplateVariants         WhatsAppTemplateVariant[]
@@ -962,6 +997,7 @@ model PlatformAdmin {
   approvedSubscriptionCancellations         SubscriptionCancellationRequest[]          @relation("ApprovedSubscriptionCancellations")
   approvedRecoveryCreditRefunds             RecoveryCreditRefund[]                     @relation("ApprovedRecoveryCreditRefunds")
   confirmedRecoveryCreditRefunds            RecoveryCreditRefund[]                     @relation("ConfirmedRecoveryCreditRefunds")
+  promotionalCreditGrants                   PromotionalCreditGrant[]
 
   @@unique([provider, providerSubject])
   @@index([active, role])
