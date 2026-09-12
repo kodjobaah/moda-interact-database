@@ -9,7 +9,6 @@ const plans = [
     name: "Starter",
     kind: "FREE",
     shopifyUsageEventHandle: null,
-    freeLifetimeConversationAllowance: 5,
     defaultOutboundSoftLimit: 100,
     defaultOutboundHardLimit: 200,
     terminalMessageReservedSlots: 1,
@@ -28,7 +27,6 @@ const plans = [
     name: "Growth",
     kind: "PAID_METERED",
     shopifyUsageEventHandle: "growth-recovery-conversation",
-    freeLifetimeConversationAllowance: null,
     defaultOutboundSoftLimit: 1000,
     defaultOutboundHardLimit: 2000,
     terminalMessageReservedSlots: 1,
@@ -47,7 +45,6 @@ const plans = [
     name: "Pro",
     kind: "PAID_METERED",
     shopifyUsageEventHandle: "pro-recovery-conversation",
-    freeLifetimeConversationAllowance: null,
     defaultOutboundSoftLimit: 5000,
     defaultOutboundHardLimit: 10000,
     terminalMessageReservedSlots: 1,
@@ -107,7 +104,6 @@ async function main() {
         name: plan.name,
         kind: plan.kind,
         shopifyUsageEventHandle: plan.shopifyUsageEventHandle,
-        freeLifetimeConversationAllowance: plan.freeLifetimeConversationAllowance,
         defaultOutboundSoftLimit: plan.defaultOutboundSoftLimit,
         defaultOutboundHardLimit: plan.defaultOutboundHardLimit,
         terminalMessageReservedSlots: plan.terminalMessageReservedSlots,
@@ -129,11 +125,13 @@ async function main() {
     create: {
       id: "default",
       lifetimeFreeRecoveryAllowance: 5,
+      minimumUpgradePremiumBps: 2000,
       absoluteOutboundHardLimit: 2000,
       defaultWarningPercent: 80,
     },
     update: {
       lifetimeFreeRecoveryAllowance: 5,
+      minimumUpgradePremiumBps: 2000,
     },
   });
   console.log("Platform billing policy seeded.");
