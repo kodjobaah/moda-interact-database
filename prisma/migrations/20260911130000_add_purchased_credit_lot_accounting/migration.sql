@@ -99,25 +99,25 @@ ORDER BY purchase."shopId", purchase."activatedAt" ASC NULLS LAST, purchase."cre
 
 DO $$
 DECLARE
-  reservation_record RECORD;
+  reservation RECORD;
   lot RECORD;
   allocated BOOLEAN;
 BEGIN
-  FOR reservation_record IN
+  FOR reservation IN
     SELECT reservation.id, reservation.quantity, reservation.status::text AS status
     FROM "billing"."UsageReservation" AS reservation
     JOIN "billing"."ShopEntitlementCounter" AS counter ON counter.id = reservation."counterId"
     WHERE counter.counter = 'PURCHASED_RECOVERY_CREDITS'
     ORDER BY reservation."createdAt" ASC, reservation.id ASC
   LOOP
-    IF reservation_record.quantity <= 0 THEN
-      RAISE EXCEPTION 'Cannot backfill purchased-credit reservation % with non-positive quantity %', reservation_record.id, reservation_record.quantity;
+    IF reservation.quantity <= 0 THEN
+      RAISE EXCEPTION 'Cannot backfill purchased-credit reservation % with non-positive quantity %', reservation.id, reservation.quantity;
     END IF;
 
     SELECT lots."purchaseId", lots."remainingQuantity"
     INTO lot
     FROM "_purchased_credit_lots" AS lots
-    JOIN "billing"."UsageReservation" AS current_reservation ON current_reservation.id = reservation_record.id
+    JOIN "billing"."UsageReservation" AS current_reservation ON current_reservation.id = reservation.id
     JOIN "billing"."ShopEntitlementCounter" AS current_counter ON current_counter.id = current_reservation."counterId"
     JOIN "billing"."RecoveryCreditPurchase" AS purchase ON purchase.id = lots."purchaseId"
     WHERE purchase."shopId" = current_counter."shopId"
@@ -125,29 +125,29 @@ BEGIN
     ORDER BY purchase."activatedAt" ASC NULLS LAST, purchase."createdAt" ASC, purchase.id ASC
     LIMIT 1;
 
-    IF NOT FOUND OR lot."remainingQuantity" < reservation_record.quantity THEN
-      RAISE EXCEPTION 'Cannot deterministically allocate purchased-credit reservation % without splitting a lot', reservation_record.id;
+    IF NOT FOUND OR lot."remainingQuantity" < reservation.quantity THEN
+      RAISE EXCEPTION 'Cannot deterministically allocate purchased-credit reservation % without splitting a lot', reservation.id;
     END IF;
 
     UPDATE "billing"."UsageReservation"
     SET "purchasedCreditPurchaseId" = lot."purchaseId"
-    WHERE id = reservation_record.id;
+    WHERE id = reservation.id;
 
-    IF reservation_record.status = 'RELEASED' THEN
+    IF reservation.status = 'RELEASED' THEN
       CONTINUE;
     END IF;
 
     UPDATE "_purchased_credit_lots"
-    SET "remainingQuantity" = "remainingQuantity" - reservation_record.quantity
+    SET "remainingQuantity" = "remainingQuantity" - reservation.quantity
     WHERE "purchaseId" = lot."purchaseId";
 
-    IF reservation_record.status = 'COMMITTED' THEN
+    IF reservation.status = 'COMMITTED' THEN
       UPDATE "billing"."RecoveryCreditPurchase"
-      SET "committedQuantity" = "committedQuantity" + reservation_record.quantity
+      SET "committedQuantity" = "committedQuantity" + reservation.quantity
       WHERE id = lot."purchaseId";
-    ELSIF reservation_record.status IN ('RESERVED', 'AMBIGUOUS') THEN
+    ELSIF reservation.status IN ('RESERVED', 'AMBIGUOUS') THEN
       UPDATE "billing"."RecoveryCreditPurchase"
-      SET "reservedQuantity" = "reservedQuantity" + reservation_record.quantity
+      SET "reservedQuantity" = "reservedQuantity" + reservation.quantity
       WHERE id = lot."purchaseId";
     END IF;
   END LOOP;
