@@ -265,7 +265,7 @@ enum "MerchantTranslationReconciliationStatus" as MerchantTranslationReconciliat
   FAILED
 }
 entity "Session" as Session {
-+ id [PK] : String 
++ id [PK] : String
 --
   * shop : String
   * state : String
@@ -286,7 +286,7 @@ entity "Session" as Session {
 }
 
 entity "ShopSettings" as ShopSettings {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   * onboardingCompleted : Boolean
