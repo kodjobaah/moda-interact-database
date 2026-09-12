@@ -14,6 +14,7 @@
     "test:recovery-credit-packs": "node scripts/validate-recovery-credit-pack-schema.mjs",
     "test:billing-policy": "node scripts/validate-billing-policy-schema.mjs",
     "test:promotion-campaign": "node scripts/validate-promotion-campaign-schema.mjs",
+    "test:promotion-selection": "node scripts/validate-promotion-selection-schema.mjs",
     "test:checkout-recovery-capacity": "node scripts/validate-checkout-recovery-capacity-schema.mjs",
     "test:purchased-credit-lots": "node scripts/validate-purchased-credit-lot-schema.mjs",
     "test:billing-lifecycle": "node scripts/validate-billing-lifecycle-schema.mjs",
