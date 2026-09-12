@@ -186,6 +186,23 @@ enum "PromotionalCreditGrantType" as PromotionalCreditGrantType {
   INTERNAL_TEST
   OTHER
 }
+enum "PromotionTargetScope" as PromotionTargetScope {
+  GLOBAL
+  PLAN
+  SHOP
+}
+enum "PromotionCampaignStatus" as PromotionCampaignStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+enum "PromotionCampaignEventType" as PromotionCampaignEventType {
+  CREATED
+  ACTIVATED
+  CLOSED
+  REOPENED
+  EXPIRY_CHANGED
+}
 enum "ShopStatus" as ShopStatus {
   ACTIVE
   UNINSTALLED
@@ -248,7 +265,7 @@ enum "MerchantTranslationReconciliationStatus" as MerchantTranslationReconciliat
   FAILED
 }
 entity "Session" as Session {
-+ id [PK] : String 
++ id [PK] : String
 --
   * shop : String
   * state : String
@@ -269,7 +286,7 @@ entity "Session" as Session {
 }
 
 entity "ShopSettings" as ShopSettings {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   * onboardingCompleted : Boolean
@@ -581,6 +598,35 @@ entity "BillingAllowanceAdjustment" as BillingAllowanceAdjustment {
   * counter : EntitlementCounter
   * quantity : Int
   * reason : String
+  # platformAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+}
+
+entity "PromotionCampaign" as PromotionCampaign {
++ id [PK] : String 
+--
+  * name : String
+  merchantDescription : String
+  * scope : PromotionTargetScope
+  * quantity : Int
+  # targetPlanId : [FK] BillingPlan
+  # targetShopId : [FK] Shop
+  * startsAt : DateTime
+  * expiresAt : DateTime
+  * status : PromotionCampaignStatus
+  # createdByPlatformAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+  * version : Int
+}
+
+entity "PromotionCampaignEvent" as PromotionCampaignEvent {
++ id [PK] : String 
+--
+  # campaignId : [FK] PromotionCampaign
+  * kind : PromotionCampaignEventType
+  oldExpiresAt : DateTime
+  newExpiresAt : DateTime
   # platformAdminId : [FK] PlatformAdmin
   * createdAt : DateTime
 }
@@ -904,6 +950,11 @@ ShopBillingPolicyOverride |o--|| Shop
 ShopBillingPolicyOverride }o--o| PlatformAdmin
 BillingAllowanceAdjustment }o--|| Shop
 BillingAllowanceAdjustment }o--|| PlatformAdmin
+PromotionCampaign }o--o| BillingPlan
+PromotionCampaign }o--o| Shop
+PromotionCampaign }o--|| PlatformAdmin
+PromotionCampaignEvent }o--|| PromotionCampaign
+PromotionCampaignEvent }o--|| PlatformAdmin
 PromotionalCreditGrant }o--|| Shop
 PromotionalCreditGrant }o--|| PlatformAdmin
 BillingAuditEvent }o--o| Shop
@@ -954,6 +1005,9 @@ RecoveryCreditPurchase |o--|| RecoveryCreditPurchaseStatus
 UsageReservation |o--|| UsageReservationStatus
 UsageReservation |o--|| UsageReservationReleaseReason
 BillingAllowanceAdjustment |o--|| EntitlementCounter
+PromotionCampaign |o--|| PromotionTargetScope
+PromotionCampaign |o--|| PromotionCampaignStatus
+PromotionCampaignEvent |o--|| PromotionCampaignEventType
 PromotionalCreditGrant |o--|| PromotionalCreditGrantType
 BillingAuditEvent |o--|| BillingAuditAction
 BillingPeriod |o--|| BillingPlanKind
