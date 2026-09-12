@@ -757,6 +757,9 @@ model UsageReservation {
   purchasedCreditPurchaseId String?
   purchasedCreditPurchase   RecoveryCreditPurchase? @relation(fields: [purchasedCreditPurchaseId], references: [id], onDelete: SetNull)
 
+  promotionalCreditGrantId String?
+  promotionalCreditGrant   PromotionalCreditGrant? @relation(fields: [promotionalCreditGrantId], references: [id], onDelete: SetNull)
+
   sourceKey     String                         @unique
   quantity      Int
   status        UsageReservationStatus         @default(RESERVED)
@@ -772,6 +775,7 @@ model UsageReservation {
   @@index([shopId, status])
   @@index([status, expiresAt])
   @@index([purchasedCreditPurchaseId, status])
+  @@index([promotionalCreditGrantId, status])
   @@index([billingPeriodEntitlementCounterId])
   @@schema("billing")
 }
@@ -897,7 +901,8 @@ model PromotionCampaign {
   updatedAt DateTime @updatedAt
   version   Int      @default(0)
 
-  events PromotionCampaignEvent[]
+  events                  PromotionCampaignEvent[]
+  promotionalCreditGrants PromotionalCreditGrant[]
 
   @@index([status, startsAt, expiresAt])
   @@index([targetPlanId, status, startsAt, expiresAt])
@@ -939,11 +944,42 @@ model PromotionalCreditGrant {
   requestKey        String                     @unique @db.VarChar(255)
   platformAdminId   String
   platformAdmin     PlatformAdmin              @relation(fields: [platformAdminId], references: [id], onDelete: Restrict)
+  campaignId        String?
+  campaign          PromotionCampaign?         @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  reservedQuantity  Int                        @default(0)
+  committedQuantity Int                        @default(0)
+  firstSelectedAt   DateTime?
+  lastSelectedAt    DateTime?
+  selectionCount    Int                        @default(0)
+  firstUsedAt       DateTime?
+  lastUsedAt        DateTime?
+  exhaustedAt       DateTime?
+  version           Int                        @default(0)
   createdAt         DateTime                   @default(now())
 
+  reservations UsageReservation[]
+  selection    MerchantPromotionSelection?
+
+  @@unique([campaignId, shopId])
+  @@unique([id, shopId])
   @@index([shopId, createdAt])
+  @@index([campaignId, createdAt])
   @@index([campaignReference, createdAt])
   @@index([platformAdminId, createdAt])
+  @@schema("billing")
+}
+
+model MerchantPromotionSelection {
+  id                       String                 @id @default(cuid())
+  shopId                   String                 @unique
+  shop                     Shop                   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  promotionalCreditGrantId String                 @unique
+  promotionalCreditGrant   PromotionalCreditGrant @relation(fields: [promotionalCreditGrantId, shopId], references: [id, shopId], onDelete: Restrict)
+  selectedAt               DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  version                  Int                    @default(0)
+
+  @@unique([promotionalCreditGrantId, shopId])
   @@schema("billing")
 }
 
@@ -1034,6 +1070,7 @@ model Shop {
   billingAuditEvents               BillingAuditEvent[]
   recoveryCreditPurchases          RecoveryCreditPurchase[]
   promotionalCreditGrants          PromotionalCreditGrant[]
+  merchantPromotionSelection       MerchantPromotionSelection?
   promotionCampaigns               PromotionCampaign[]               @relation("PromotionCampaignTargetShop")
   subscriptionCancellationRequests SubscriptionCancellationRequest[]
   recoveryCreditRefunds            RecoveryCreditRefund[]

@@ -300,7 +300,7 @@ entity "ShopSettings" as ShopSettings {
 }
 
 entity "ShopBrand" as ShopBrand {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   brandName : String
@@ -316,7 +316,7 @@ entity "ShopBrand" as ShopBrand {
 }
 
 entity "Customer" as Customer {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   phone : String
@@ -552,6 +552,7 @@ entity "UsageReservation" as UsageReservation {
   # counterId : [FK] ShopEntitlementCounter
   # billingPeriodEntitlementCounterId : [FK] BillingPeriodEntitlementCounter
   # purchasedCreditPurchaseId : [FK] RecoveryCreditPurchase
+  # promotionalCreditGrantId : [FK] PromotionalCreditGrant
   * sourceKey : String
   * quantity : Int
   * status : UsageReservationStatus
@@ -641,7 +642,27 @@ entity "PromotionalCreditGrant" as PromotionalCreditGrant {
   campaignReference : String
   * requestKey : String
   # platformAdminId : [FK] PlatformAdmin
+  # campaignId : [FK] PromotionCampaign
+  * reservedQuantity : Int
+  * committedQuantity : Int
+  firstSelectedAt : DateTime
+  lastSelectedAt : DateTime
+  * selectionCount : Int
+  firstUsedAt : DateTime
+  lastUsedAt : DateTime
+  exhaustedAt : DateTime
+  * version : Int
   * createdAt : DateTime
+}
+
+entity "MerchantPromotionSelection" as MerchantPromotionSelection {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # promotionalCreditGrantId : [FK] PromotionalCreditGrant
+  * selectedAt : DateTime
+  * updatedAt : DateTime
+  * version : Int
 }
 
 entity "BillingAuditEvent" as BillingAuditEvent {
@@ -945,6 +966,7 @@ UsageReservation }o--|| Shop
 UsageReservation }o--o| ShopEntitlementCounter
 UsageReservation }o--o| BillingPeriodEntitlementCounter
 UsageReservation }o--o| RecoveryCreditPurchase
+UsageReservation }o--o| PromotionalCreditGrant
 UsageReservation |o--o| UsageEvent
 ShopBillingPolicyOverride |o--|| Shop
 ShopBillingPolicyOverride }o--o| PlatformAdmin
@@ -957,6 +979,10 @@ PromotionCampaignEvent }o--|| PromotionCampaign
 PromotionCampaignEvent }o--|| PlatformAdmin
 PromotionalCreditGrant }o--|| Shop
 PromotionalCreditGrant }o--|| PlatformAdmin
+PromotionalCreditGrant }o--o| PromotionCampaign
+MerchantPromotionSelection |o--|| Shop
+MerchantPromotionSelection |o--|| PromotionalCreditGrant
+MerchantPromotionSelection |o--|| PromotionalCreditGrant
 BillingAuditEvent }o--o| Shop
 BillingAuditEvent }o--|| PlatformAdmin
 BillingPeriod }o--|| Shop
