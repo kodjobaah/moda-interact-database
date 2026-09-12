@@ -316,7 +316,7 @@ entity "ShopBrand" as ShopBrand {
 }
 
 entity "Customer" as Customer {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   phone : String
