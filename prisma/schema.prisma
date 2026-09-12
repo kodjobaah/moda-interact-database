@@ -542,6 +542,7 @@ model BillingPlan {
   pendingSubscriptions    Subscription[]           @relation("PendingSubscriptionPlan")
   billingPeriods          BillingPeriod[]          @relation("BillingPeriodPlan")
   recoveryCreditPurchases RecoveryCreditPurchase[]
+  promotionCampaigns      PromotionCampaign[]      @relation("PromotionCampaignTargetPlan")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -847,6 +848,84 @@ enum PromotionalCreditGrantType {
   @@schema("billing")
 }
 
+enum PromotionTargetScope {
+  GLOBAL
+  PLAN
+  SHOP
+
+  @@schema("billing")
+}
+
+enum PromotionCampaignStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+
+  @@schema("billing")
+}
+
+enum PromotionCampaignEventType {
+  CREATED
+  ACTIVATED
+  CLOSED
+  REOPENED
+  EXPIRY_CHANGED
+
+  @@schema("billing")
+}
+
+model PromotionCampaign {
+  id                  String               @id @default(cuid())
+  name                String
+  merchantDescription String?              @db.Text
+  scope               PromotionTargetScope
+  quantity            Int
+
+  targetPlanId String?
+  targetPlan   BillingPlan? @relation("PromotionCampaignTargetPlan", fields: [targetPlanId], references: [id], onDelete: Restrict)
+  targetShopId String?
+  targetShop   Shop?        @relation("PromotionCampaignTargetShop", fields: [targetShopId], references: [id], onDelete: Restrict)
+
+  startsAt  DateTime
+  expiresAt DateTime
+  status    PromotionCampaignStatus
+
+  createdByPlatformAdminId String
+  createdByPlatformAdmin   PlatformAdmin @relation("PromotionCampaignCreator", fields: [createdByPlatformAdminId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  version   Int      @default(0)
+
+  events PromotionCampaignEvent[]
+
+  @@index([status, startsAt, expiresAt])
+  @@index([targetPlanId, status, startsAt, expiresAt])
+  @@index([targetShopId, status, startsAt, expiresAt])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@schema("billing")
+}
+
+model PromotionCampaignEvent {
+  id String @id @default(cuid())
+
+  campaignId String
+  campaign   PromotionCampaign          @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  kind       PromotionCampaignEventType
+
+  oldExpiresAt DateTime?
+  newExpiresAt DateTime?
+
+  platformAdminId String
+  platformAdmin   PlatformAdmin @relation("PromotionCampaignEvents", fields: [platformAdminId], references: [id], onDelete: Restrict)
+  createdAt       DateTime      @default(now())
+
+  @@index([campaignId, createdAt])
+  @@index([platformAdminId, createdAt])
+  @@schema("billing")
+}
+
 model PromotionalCreditGrant {
   id String @id @default(cuid())
 
@@ -955,6 +1034,7 @@ model Shop {
   billingAuditEvents               BillingAuditEvent[]
   recoveryCreditPurchases          RecoveryCreditPurchase[]
   promotionalCreditGrants          PromotionalCreditGrant[]
+  promotionCampaigns               PromotionCampaign[]               @relation("PromotionCampaignTargetShop")
   subscriptionCancellationRequests SubscriptionCancellationRequest[]
   recoveryCreditRefunds            RecoveryCreditRefund[]
   whatsappTemplateVariants         WhatsAppTemplateVariant[]
@@ -1063,6 +1143,8 @@ model PlatformAdmin {
   shopBillingPolicyOverrides                ShopBillingPolicyOverride[]
   billingAllowanceAdjustments               BillingAllowanceAdjustment[]
   billingAuditEvents                        BillingAuditEvent[]
+  createdPromotionCampaigns                 PromotionCampaign[]                        @relation("PromotionCampaignCreator")
+  promotionCampaignEvents                   PromotionCampaignEvent[]                   @relation("PromotionCampaignEvents")
   approvedSubscriptionCancellations         SubscriptionCancellationRequest[]          @relation("ApprovedSubscriptionCancellations")
   approvedRecoveryCreditRefunds             RecoveryCreditRefund[]                     @relation("ApprovedRecoveryCreditRefunds")
   confirmedRecoveryCreditRefunds            RecoveryCreditRefund[]                     @relation("ConfirmedRecoveryCreditRefunds")
