@@ -550,8 +550,8 @@ model BillingEconomicsSnapshot {
   verifiedAt                                   DateTime
   createdAt                                    DateTime      @default(now())
 
-  @@index([billingPlanId, createdAt])
-  @@index([verifiedByPlatformAdminId, createdAt])
+  @@index([billingPlanId, verifiedAt])
+  @@index([verifiedByPlatformAdminId, verifiedAt])
   @@schema("billing")
 }
 

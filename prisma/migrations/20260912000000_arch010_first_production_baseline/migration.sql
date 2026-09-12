@@ -931,10 +931,10 @@ CREATE UNIQUE INDEX "BillingUpgradeEconomicsEdge_lowerPlanId_key" ON "billing"."
 CREATE UNIQUE INDEX "BillingUpgradeEconomicsEdge_higherPlanId_key" ON "billing"."BillingUpgradeEconomicsEdge"("higherPlanId");
 
 -- CreateIndex
-CREATE INDEX "BillingEconomicsSnapshot_billingPlanId_createdAt_idx" ON "billing"."BillingEconomicsSnapshot"("billingPlanId", "createdAt");
+CREATE INDEX "BillingEconomicsSnapshot_billingPlanId_verifiedAt_idx" ON "billing"."BillingEconomicsSnapshot"("billingPlanId", "verifiedAt");
 
 -- CreateIndex
-CREATE INDEX "BillingEconomicsSnapshot_verifiedByPlatformAdminId_createdA_idx" ON "billing"."BillingEconomicsSnapshot"("verifiedByPlatformAdminId", "createdAt");
+CREATE INDEX "BillingEconomicsSnapshot_verifiedByPlatformAdminId_verified_idx" ON "billing"."BillingEconomicsSnapshot"("verifiedByPlatformAdminId", "verifiedAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "BillingPlanFeature_planId_feature_key" ON "billing"."BillingPlanFeature"("planId", "feature");
@@ -1411,4 +1411,126 @@ ADD CONSTRAINT "PromotionalCreditGrant_quantityAccounting_check"
 CHECK ("reservedQuantity" + "committedQuantity" <= "quantity"),
 ADD CONSTRAINT "PromotionalCreditGrant_nonnegativeSelectionCount_check"
 CHECK ("selectionCount" >= 0);
+
+ALTER TABLE "whatsapp"."Conversation"
+ADD CONSTRAINT "Conversation_standalone_scope_invariant"
+CHECK (
+    "standaloneScopeKey" IS NULL
+    OR (
+        "shopId" IS NOT NULL
+        AND "customerId" IS NOT NULL
+        AND "checkoutRecoveryId" IS NULL
+    )
+);
+
+ALTER TABLE "billing"."BillingPlan"
+ADD CONSTRAINT "BillingPlan_recovery_credit_pack_config"
+CHECK (
+    (NOT "recoveryCreditPackEnabled" OR ("recoveryCreditsPerPack" IS NOT NULL AND "recoveryCreditsPerPack" > 0))
+    AND (NOT "recoveryCreditPackEnabled" OR NULLIF(BTRIM("shopifyRecoveryCreditPackEventHandle"), '') IS NOT NULL)
+    AND (NOT ("kind" = 'PAID_METERED' AND "recoveryCreditPackEnabled") OR ("includedRecoveryConversationAllowance" IS NOT NULL AND "includedRecoveryConversationAllowance" >= 0))
+    AND ("shopifyUsageEventHandle" IS NULL OR "shopifyRecoveryCreditPackEventHandle" IS NULL OR "shopifyUsageEventHandle" <> "shopifyRecoveryCreditPackEventHandle")
+);
+
+ALTER TABLE "billing"."RecoveryCreditPurchase"
+ADD CONSTRAINT "RecoveryCreditPurchase_creditsGranted_positive"
+CHECK ("creditsGranted" > 0),
+ADD CONSTRAINT "RecoveryCreditPurchase_lot_quantities_non_negative"
+CHECK (
+    "committedQuantity" >= 0
+    AND "reservedQuantity" >= 0
+    AND "refundingQuantity" >= 0
+    AND "refundedQuantity" >= 0
+    AND "version" >= 0
+),
+ADD CONSTRAINT "RecoveryCreditPurchase_lot_quantities_within_grant"
+CHECK ("committedQuantity" + "reservedQuantity" + "refundingQuantity" + "refundedQuantity" <= "creditsGranted");
+
+ALTER TABLE "commerce"."CheckoutRecovery"
+ADD CONSTRAINT "CheckoutRecovery_admission_block_pair"
+CHECK (
+    ("admissionBlockedAt" IS NULL AND "admissionBlockReason" IS NULL)
+    OR ("admissionBlockedAt" IS NOT NULL AND "admissionBlockReason" IS NOT NULL)
+);
+
+ALTER TABLE "billing"."PlatformBillingPolicy"
+ADD CONSTRAINT "PlatformBillingPolicy_lifetimeFreeRecoveryAllowance_non_negative"
+CHECK ("lifetimeFreeRecoveryAllowance" >= 0);
+
+ALTER TABLE "billing"."RecoveryCreditRefund"
+ADD CONSTRAINT "RecoveryCreditRefund_quantities_positive"
+CHECK (
+    "purchaseCreditsGrantedSnapshot" > 0
+    AND "creditsRequested" > 0
+    AND ("creditsApproved" IS NULL OR "creditsApproved" > 0)
+    AND ("creditsRefunded" IS NULL OR "creditsRefunded" > 0)
+    AND ("creditsApproved" IS NULL OR "creditsApproved" <= "creditsRequested")
+    AND ("creditsRefunded" IS NULL OR "creditsRefunded" <= "creditsApproved")
+);
+
+ALTER TABLE "billing"."BillingPeriodEntitlementCounter"
+ADD CONSTRAINT "BillingPeriodEntitlementCounter_grantedQuantity_non_negative"
+CHECK ("grantedQuantity" >= 0),
+ADD CONSTRAINT "BillingPeriodEntitlementCounter_committedQuantity_non_negative"
+CHECK ("committedQuantity" >= 0),
+ADD CONSTRAINT "BillingPeriodEntitlementCounter_reservedQuantity_non_negative"
+CHECK ("reservedQuantity" >= 0),
+ADD CONSTRAINT "BillingPeriodEntitlementCounter_forfeitedQuantity_non_negative"
+CHECK ("forfeitedQuantity" >= 0),
+ADD CONSTRAINT "BillingPeriodEntitlementCounter_capacity"
+CHECK ("committedQuantity" + "reservedQuantity" + "forfeitedQuantity" <= "grantedQuantity");
+
+ALTER TABLE "billing"."BillingPeriod"
+ADD CONSTRAINT "BillingPeriod_period_boundary"
+CHECK ("periodStart" < "periodEnd"),
+ADD CONSTRAINT "BillingPeriod_included_recovery_credits_non_negative"
+CHECK ("includedRecoveryCreditsGranted" IS NULL OR "includedRecoveryCreditsGranted" >= 0),
+ADD CONSTRAINT "BillingPeriod_open_close_metadata_empty"
+CHECK ("status" <> 'OPEN' OR ("closedAt" IS NULL AND "closeReason" IS NULL));
+
+ALTER TABLE "billing"."PromotionCampaign"
+ADD CONSTRAINT "PromotionCampaign_quantity_positive"
+CHECK ("quantity" > 0),
+ADD CONSTRAINT "PromotionCampaign_expiry_after_start"
+CHECK ("expiresAt" > "startsAt"),
+ADD CONSTRAINT "PromotionCampaign_scope_target_shape"
+CHECK (
+    ("scope" = 'GLOBAL' AND "targetPlanId" IS NULL AND "targetShopId" IS NULL)
+    OR ("scope" = 'PLAN' AND "targetPlanId" IS NOT NULL AND "targetShopId" IS NULL)
+    OR ("scope" = 'SHOP' AND "targetPlanId" IS NULL AND "targetShopId" IS NOT NULL)
+);
+
+ALTER TABLE "billing"."MerchantPromotionSelection"
+ADD CONSTRAINT "MerchantPromotionSelection_version_non_negative"
+CHECK ("version" >= 0);
+
+ALTER TABLE "billing"."PromotionalCreditGrant"
+ADD CONSTRAINT "PromotionalCreditGrant_nonnegativeVersion_check"
+CHECK ("version" >= 0);
+
+ALTER TABLE "billing"."UsageReservation"
+ADD CONSTRAINT "UsageReservation_capacity_source_shape"
+CHECK (
+    (
+        "counterId" IS NOT NULL
+        AND "billingPeriodEntitlementCounterId" IS NULL
+        AND "promotionalCreditGrantId" IS NULL
+    )
+    OR (
+        "counterId" IS NULL
+        AND "billingPeriodEntitlementCounterId" IS NOT NULL
+        AND "purchasedCreditPurchaseId" IS NULL
+        AND "promotionalCreditGrantId" IS NULL
+    )
+    OR (
+        "counterId" IS NULL
+        AND "billingPeriodEntitlementCounterId" IS NULL
+        AND "purchasedCreditPurchaseId" IS NULL
+        AND "promotionalCreditGrantId" IS NOT NULL
+    )
+);
+
+ALTER TABLE "billing"."BillingEconomicsSnapshot"
+ADD CONSTRAINT "BillingEconomicsSnapshot_currency_normalized"
+CHECK ("currency" ~ '^[A-Z]{3}$');
 
