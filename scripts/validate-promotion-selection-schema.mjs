@@ -24,6 +24,7 @@ assert.match(
   /model PromotionalCreditGrant\s*\{[\s\S]*?campaignId\s+String\?[\s\S]*?reservedQuantity\s+Int\s+@default\(0\)[\s\S]*?committedQuantity\s+Int\s+@default\(0\)[\s\S]*?firstSelectedAt\s+DateTime\?[\s\S]*?lastSelectedAt\s+DateTime\?[\s\S]*?selectionCount\s+Int\s+@default\(0\)[\s\S]*?firstUsedAt\s+DateTime\?[\s\S]*?lastUsedAt\s+DateTime\?[\s\S]*?exhaustedAt\s+DateTime\?[\s\S]*?version\s+Int\s+@default\(0\)/,
 );
 assert.match(schema, /model PromotionalCreditGrant\s*\{[\s\S]*?@@unique\(\[campaignId, shopId\]\)/);
+assert.match(schema, /model PromotionalCreditGrant\s*\{[\s\S]*?@@index\(\[campaignId, createdAt\]\)/);
 assert.match(
   schema,
   /model MerchantPromotionSelection\s*\{[\s\S]*?shopId\s+String\s+@unique[\s\S]*?promotionalCreditGrantId\s+String\s+@unique[\s\S]*?selectedAt\s+DateTime[\s\S]*?updatedAt\s+DateTime[\s\S]*?version\s+Int\s+@default\(0\)/,
@@ -44,6 +45,7 @@ assert.match(migration, /ADD COLUMN "campaignId" TEXT/);
 assert.match(migration, /ADD COLUMN "promotionalCreditGrantId" TEXT/);
 assert.match(grantMigration, /PromotionalCreditGrant_quantity_positive[\s\S]*?CHECK \("quantity" > 0\)/);
 assert.match(migration, /PromotionalCreditGrant_campaignId_shopId_key/);
+assert.match(migration, /PromotionalCreditGrant_campaignId_createdAt_idx[\s\S]*?\("campaignId", "createdAt"\)/);
 assert.match(migration, /MerchantPromotionSelection_shopId_key/);
 assert.match(migration, /MerchantPromotionSelection_promotionalCreditGrantId_key/);
 assert.match(migration, /PromotionalCreditGrant_lot_quantities_non_negative/);

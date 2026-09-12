@@ -963,6 +963,7 @@ model PromotionalCreditGrant {
   @@unique([campaignId, shopId])
   @@unique([id, shopId])
   @@index([shopId, createdAt])
+  @@index([campaignId, createdAt])
   @@index([campaignReference, createdAt])
   @@index([platformAdminId, createdAt])
   @@schema("billing")

@@ -300,7 +300,7 @@ entity "ShopSettings" as ShopSettings {
 }
 
 entity "ShopBrand" as ShopBrand {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   brandName : String
