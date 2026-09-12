@@ -82,12 +82,10 @@ enum "BillingPeriodCloseReason" as BillingPeriodCloseReason {
   RENEWED_SAME_PLAN
   PLAN_CHANGED
   CONTRACT_ENDED
-  MIGRATION_RECONCILED
 }
 enum "EntitlementCounter" as EntitlementCounter {
-  FREE_RECOVERY_LIFETIME
+  LIFETIME_FREE_RECOVERY_CREDITS
   PURCHASED_RECOVERY_CREDITS
-  PROMOTIONAL_RECOVERY_CREDITS
 }
 enum "BillingPeriodEntitlementCounterKind" as BillingPeriodEntitlementCounterKind {
   INCLUDED_RECOVERY_CREDITS
@@ -112,33 +110,11 @@ enum "RecoveryCreditPurchaseStatus" as RecoveryCreditPurchaseStatus {
   ACTIVE
   NEEDS_ATTENTION
   CANCELLED
-  REFUNDED
 }
 enum "BillingLifecycleRequestSource" as BillingLifecycleRequestSource {
   MERCHANT_UI
   MERCHANT_SUPPORT
   ADMIN
-}
-enum "SubscriptionCancellationMode" as SubscriptionCancellationMode {
-  END_OF_CYCLE
-  IMMEDIATE_NO_PRORATION
-  IMMEDIATE_PRORATED
-  IMMEDIATE_SKIP_FINAL_USAGE
-}
-enum "SubscriptionCancellationStatus" as SubscriptionCancellationStatus {
-  REQUESTED
-  APPROVED
-  PROCESSING
-  RETRYABLE
-  PROVIDER_ACCEPTED
-  COMPLETED
-  REJECTED
-  WITHDRAWN
-  NEEDS_ATTENTION
-}
-enum "RecoveryCreditRefundSettlementMode" as RecoveryCreditRefundSettlementMode {
-  CURRENT_CYCLE_APP_EVENT_CORRECTION
-  PARTNER_DASHBOARD_REFUND
 }
 enum "RecoveryCreditProviderActionKind" as RecoveryCreditProviderActionKind {
   REFUND
@@ -146,11 +122,7 @@ enum "RecoveryCreditProviderActionKind" as RecoveryCreditProviderActionKind {
 }
 enum "RecoveryCreditRefundStatus" as RecoveryCreditRefundStatus {
   REQUESTED
-  APPROVED
-  PROCESSING
-  PROVIDER_PENDING
   PROVIDER_ACTION_REQUIRED
-  PROVIDER_CONFIRMED
   COMPLETED
   REJECTED
   WITHDRAWN
@@ -169,22 +141,12 @@ enum "BillingAuditAction" as BillingAuditAction {
   PLATFORM_POLICY_CHANGED
   SHOP_OVERRIDE_CHANGED
   SHOP_OVERRIDE_EXPIRED
-  FREE_ALLOWANCE_ADJUSTED
   AUTOMATION_PAUSED
   AUTOMATION_RESUMED
   BILLING_EVENT_RETRY
   BILLING_CORRECTION_CREATED
-  SUBSCRIPTION_CANCELLATION
   RECOVERY_CREDIT_REFUND
-  PROMOTIONAL_CREDITS_GRANTED
-}
-enum "PromotionalCreditGrantType" as PromotionalCreditGrantType {
-  CAMPAIGN
-  BETA_TESTER
-  GOODWILL
-  SUPPORT
-  INTERNAL_TEST
-  OTHER
+  UPGRADE_ECONOMICS_EVALUATED
 }
 enum "PromotionTargetScope" as PromotionTargetScope {
   GLOBAL
@@ -329,7 +291,7 @@ entity "Customer" as Customer {
 }
 
 entity "CustomerPhone" as CustomerPhone {
-+ id [PK] : String 
++ id [PK] : String
 --
   # customerId : [FK] Customer
   * phone : String
@@ -340,7 +302,7 @@ entity "CustomerPhone" as CustomerPhone {
 }
 
 entity "CheckoutRecoveryStatusHistory" as CheckoutRecoveryStatusHistory {
-+ id [PK] : String 
++ id [PK] : String
 --
   # checkoutRecoveryId : [FK] CheckoutRecovery
   fromStatus : CheckoutRecoveryStatus
@@ -352,7 +314,7 @@ entity "CheckoutRecoveryStatusHistory" as CheckoutRecoveryStatusHistory {
 }
 
 entity "CheckoutRecovery" as CheckoutRecovery {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   * checkoutToken : String
@@ -375,7 +337,7 @@ entity "CheckoutRecovery" as CheckoutRecovery {
 }
 
 entity "Conversation" as Conversation {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # customerId : [FK] Customer
@@ -401,7 +363,7 @@ entity "Conversation" as Conversation {
 }
 
 entity "ConversationMessage" as ConversationMessage {
-+ id [PK] : String 
++ id [PK] : String
 --
   # conversationId : [FK] Conversation
   providerMessageId : String
@@ -417,14 +379,13 @@ entity "ConversationMessage" as ConversationMessage {
 }
 
 entity "BillingPlan" as BillingPlan {
-+ id [PK] : String 
++ id [PK] : String
 --
   * shopifyPlanHandle : String
   * name : String
   * kind : BillingPlanKind
   * active : Boolean
   shopifyUsageEventHandle : String
-  freeLifetimeConversationAllowance : Int
   includedRecoveryConversationAllowance : Int
   * recoveryCreditPackEnabled : Boolean
   recoveryCreditsPerPack : Int
@@ -436,8 +397,36 @@ entity "BillingPlan" as BillingPlan {
   * updatedAt : DateTime
 }
 
+entity "BillingUpgradeEconomicsEdge" as BillingUpgradeEconomicsEdge {
++ id [PK] : String
+--
+  # lowerPlanId : [FK] BillingPlan
+  # higherPlanId : [FK] BillingPlan
+  * active : Boolean
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "BillingEconomicsSnapshot" as BillingEconomicsSnapshot {
++ id [PK] : String
+--
+  # billingPlanId : [FK] BillingPlan
+  * shopifyPlanHandleSnapshot : String
+  * monthlyRecurringAmountMinor : Int
+  * currency : String
+  * recoveryCreditPackEnabledSnapshot : Boolean
+  recoveryCreditsPerPackSnapshot : Int
+  shopifyRecoveryCreditPackEventHandleSnapshot : String
+  usagePricingSnapshot : Json
+  providerEvidence : Json
+  # verifiedByPlatformAdminId : [FK] PlatformAdmin
+  * verificationReason : String
+  * verifiedAt : DateTime
+  * createdAt : DateTime
+}
+
 entity "BillingPlanFeature" as BillingPlanFeature {
-+ id [PK] : String 
++ id [PK] : String
 --
   # planId : [FK] BillingPlan
   * feature : BillingPlanFeatureIdentifier
@@ -445,7 +434,7 @@ entity "BillingPlanFeature" as BillingPlanFeature {
 }
 
 entity "Subscription" as Subscription {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # planId : [FK] BillingPlan
@@ -472,7 +461,7 @@ entity "Subscription" as Subscription {
 }
 
 entity "UsageEvent" as UsageEvent {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # billingPeriodId : [FK] BillingPeriod
@@ -497,7 +486,7 @@ entity "UsageEvent" as UsageEvent {
 }
 
 entity "ShopEntitlementCounter" as ShopEntitlementCounter {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   * counter : EntitlementCounter
@@ -511,7 +500,7 @@ entity "ShopEntitlementCounter" as ShopEntitlementCounter {
 }
 
 entity "BillingPeriodEntitlementCounter" as BillingPeriodEntitlementCounter {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # billingPeriodId : [FK] BillingPeriod
@@ -526,7 +515,7 @@ entity "BillingPeriodEntitlementCounter" as BillingPeriodEntitlementCounter {
 }
 
 entity "RecoveryCreditPurchase" as RecoveryCreditPurchase {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # planId : [FK] BillingPlan
@@ -546,7 +535,7 @@ entity "RecoveryCreditPurchase" as RecoveryCreditPurchase {
 }
 
 entity "UsageReservation" as UsageReservation {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # counterId : [FK] ShopEntitlementCounter
@@ -564,11 +553,12 @@ entity "UsageReservation" as UsageReservation {
 }
 
 entity "PlatformBillingPolicy" as PlatformBillingPolicy {
-+ id [PK] : String 
++ id [PK] : String
 --
   * globalPauseNewRecoveries : Boolean
   * globalPauseAutomatedWhatsapp : Boolean
   * lifetimeFreeRecoveryAllowance : Int
+  * minimumUpgradePremiumBps : Int
   * absoluteOutboundHardLimit : Int
   * defaultWarningPercent : Int
   * version : Int
@@ -577,7 +567,7 @@ entity "PlatformBillingPolicy" as PlatformBillingPolicy {
 }
 
 entity "ShopBillingPolicyOverride" as ShopBillingPolicyOverride {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   outboundSoftLimit : Int
@@ -592,19 +582,8 @@ entity "ShopBillingPolicyOverride" as ShopBillingPolicyOverride {
   * updatedAt : DateTime
 }
 
-entity "BillingAllowanceAdjustment" as BillingAllowanceAdjustment {
-+ id [PK] : String 
---
-  # shopId : [FK] Shop
-  * counter : EntitlementCounter
-  * quantity : Int
-  * reason : String
-  # platformAdminId : [FK] PlatformAdmin
-  * createdAt : DateTime
-}
-
 entity "PromotionCampaign" as PromotionCampaign {
-+ id [PK] : String 
++ id [PK] : String
 --
   * name : String
   merchantDescription : String
@@ -622,7 +601,7 @@ entity "PromotionCampaign" as PromotionCampaign {
 }
 
 entity "PromotionCampaignEvent" as PromotionCampaignEvent {
-+ id [PK] : String 
++ id [PK] : String
 --
   # campaignId : [FK] PromotionCampaign
   * kind : PromotionCampaignEventType
@@ -633,16 +612,11 @@ entity "PromotionCampaignEvent" as PromotionCampaignEvent {
 }
 
 entity "PromotionalCreditGrant" as PromotionalCreditGrant {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
-  * quantity : Int
-  * grantType : PromotionalCreditGrantType
-  * reason : String
-  campaignReference : String
-  * requestKey : String
-  # platformAdminId : [FK] PlatformAdmin
   # campaignId : [FK] PromotionCampaign
+  * quantity : Int
   * reservedQuantity : Int
   * committedQuantity : Int
   firstSelectedAt : DateTime
@@ -666,7 +640,7 @@ entity "MerchantPromotionSelection" as MerchantPromotionSelection {
 }
 
 entity "BillingAuditEvent" as BillingAuditEvent {
-+ id [PK] : String 
++ id [PK] : String
 --
   * action : BillingAuditAction
   # shopId : [FK] Shop
@@ -680,7 +654,7 @@ entity "BillingAuditEvent" as BillingAuditEvent {
 }
 
 entity "BillingPeriod" as BillingPeriod {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # subscriptionId : [FK] Subscription
@@ -699,7 +673,7 @@ entity "BillingPeriod" as BillingPeriod {
 }
 
 entity "Shop" as Shop {
-+ id [PK] : String 
++ id [PK] : String
 --
   * domain : String
   shopifyShopId : String
@@ -712,7 +686,7 @@ entity "Shop" as Shop {
 }
 
 entity "WhatsAppTemplateVariant" as WhatsAppTemplateVariant {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   * providerAccountId : String
@@ -728,7 +702,7 @@ entity "WhatsAppTemplateVariant" as WhatsAppTemplateVariant {
 }
 
 entity "Tour" as Tour {
-+ id [PK] : String 
++ id [PK] : String
 --
   * createdAt : DateTime
   * updatedAt : DateTime
@@ -741,7 +715,7 @@ entity "Tour" as Tour {
 }
 
 entity "RagSearchResults" as RagSearchResults {
-+ id [PK] : String 
++ id [PK] : String
 --
   * createdAt : DateTime
   * updatedAt : DateTime
@@ -751,7 +725,7 @@ entity "RagSearchResults" as RagSearchResults {
 }
 
 entity "PlatformAdmin" as PlatformAdmin {
-+ id [PK] : String 
++ id [PK] : String
 --
   * provider : String
   providerSubject : String
@@ -765,7 +739,7 @@ entity "PlatformAdmin" as PlatformAdmin {
 }
 
 entity "MerchantSupportThread" as MerchantSupportThread {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   lastMessageAt : DateTime
@@ -780,7 +754,7 @@ entity "MerchantSupportThread" as MerchantSupportThread {
 }
 
 entity "MerchantSupportMessage" as MerchantSupportMessage {
-+ id [PK] : String 
++ id [PK] : String
 --
   # threadId : [FK] MerchantSupportThread
   * kind : MerchantSupportMessageKind
@@ -800,37 +774,8 @@ entity "MerchantSupportMessage" as MerchantSupportMessage {
   * updatedAt : DateTime
 }
 
-entity "SubscriptionCancellationRequest" as SubscriptionCancellationRequest {
-+ id [PK] : String 
---
-  # shopId : [FK] Shop
-  * source : BillingLifecycleRequestSource
-  # sourceMessageId : [FK] MerchantSupportMessage
-  requestedByShopifyUserId : String
-  * providerSubscriptionIdSnapshot : String
-  * planHandleSnapshot : String
-  currentPeriodEndSnapshot : DateTime
-  * mode : SubscriptionCancellationMode
-  * status : SubscriptionCancellationStatus
-  * requestKey : String
-  reason : String
-  # approvedByPlatformAdminId : [FK] PlatformAdmin
-  approvedAt : DateTime
-  * version : Int
-  * attemptCount : Int
-  nextAttemptAt : DateTime
-  lastAttemptAt : DateTime
-  processingStartedAt : DateTime
-  providerAcceptedAt : DateTime
-  providerErrorCode : String
-  providerResponseSummary : String
-  completedAt : DateTime
-  * createdAt : DateTime
-  * updatedAt : DateTime
-}
-
 entity "RecoveryCreditRefund" as RecoveryCreditRefund {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # purchaseId : [FK] RecoveryCreditPurchase
@@ -846,14 +791,12 @@ entity "RecoveryCreditRefund" as RecoveryCreditRefund {
   * creditsRequested : Int
   creditsApproved : Int
   creditsRefunded : Int
-  settlementMode : RecoveryCreditRefundSettlementMode
   * status : RecoveryCreditRefundStatus
   * requestKey : String
   reason : String
   # approvedByPlatformAdminId : [FK] PlatformAdmin
   approvedAt : DateTime
   holdAppliedAt : DateTime
-  # correctionUsageEventId : [FK] UsageEvent
   providerReference : String
   providerActionKind : RecoveryCreditProviderActionKind
   providerAmount : Decimal
@@ -861,19 +804,13 @@ entity "RecoveryCreditRefund" as RecoveryCreditRefund {
   # providerConfirmedByPlatformAdminId : [FK] PlatformAdmin
   providerConfirmedAt : DateTime
   * version : Int
-  * attemptCount : Int
-  nextAttemptAt : DateTime
-  lastAttemptAt : DateTime
-  processingStartedAt : DateTime
-  providerErrorCode : String
-  providerResponseSummary : String
   completedAt : DateTime
   * createdAt : DateTime
   * updatedAt : DateTime
 }
 
 entity "MerchantMessageTranslation" as MerchantMessageTranslation {
-+ id [PK] : String 
++ id [PK] : String
 --
   # messageId : [FK] MerchantSupportMessage
   * direction : MerchantTranslationDirection
@@ -891,7 +828,7 @@ entity "MerchantMessageTranslation" as MerchantMessageTranslation {
 }
 
 entity "MerchantTranslationBatch" as MerchantTranslationBatch {
-+ id [PK] : String 
++ id [PK] : String
 --
   * provider : String
   * model : String
@@ -915,7 +852,7 @@ entity "MerchantTranslationBatch" as MerchantTranslationBatch {
 }
 
 entity "MerchantTranslationBatchItem" as MerchantTranslationBatchItem {
-+ id [PK] : String 
++ id [PK] : String
 --
   # batchId : [FK] MerchantTranslationBatch
   # translationId : [FK] MerchantMessageTranslation
@@ -924,7 +861,7 @@ entity "MerchantTranslationBatchItem" as MerchantTranslationBatchItem {
 }
 
 entity "MerchantTranslationReconciliationRequest" as MerchantTranslationReconciliationRequest {
-+ id [PK] : String 
++ id [PK] : String
 --
   # requestedByPlatformAdminId : [FK] PlatformAdmin
   * scope : MerchantTranslationReconciliationScope
@@ -948,6 +885,10 @@ Conversation }o--o| Shop
 Conversation }o--o| Customer
 Conversation |o--o| CheckoutRecovery
 ConversationMessage }o--|| Conversation
+BillingUpgradeEconomicsEdge |o--|| BillingPlan
+BillingUpgradeEconomicsEdge |o--|| BillingPlan
+BillingEconomicsSnapshot }o--|| BillingPlan
+BillingEconomicsSnapshot }o--|| PlatformAdmin
 BillingPlanFeature }o--|| BillingPlan
 Subscription |o--|| Shop
 Subscription }o--o| BillingPlan
@@ -967,19 +908,17 @@ UsageReservation }o--o| ShopEntitlementCounter
 UsageReservation }o--o| BillingPeriodEntitlementCounter
 UsageReservation }o--o| RecoveryCreditPurchase
 UsageReservation }o--o| PromotionalCreditGrant
+UsageReservation }o--o| PromotionalCreditGrant
 UsageReservation |o--o| UsageEvent
 ShopBillingPolicyOverride |o--|| Shop
 ShopBillingPolicyOverride }o--o| PlatformAdmin
-BillingAllowanceAdjustment }o--|| Shop
-BillingAllowanceAdjustment }o--|| PlatformAdmin
 PromotionCampaign }o--o| BillingPlan
 PromotionCampaign }o--o| Shop
 PromotionCampaign }o--|| PlatformAdmin
 PromotionCampaignEvent }o--|| PromotionCampaign
 PromotionCampaignEvent }o--|| PlatformAdmin
 PromotionalCreditGrant }o--|| Shop
-PromotionalCreditGrant }o--|| PlatformAdmin
-PromotionalCreditGrant }o--o| PromotionCampaign
+PromotionalCreditGrant }o--|| PromotionCampaign
 MerchantPromotionSelection |o--|| Shop
 MerchantPromotionSelection |o--|| PromotionalCreditGrant
 MerchantPromotionSelection |o--|| PromotionalCreditGrant
@@ -993,14 +932,10 @@ MerchantSupportThread |o--|| Shop
 MerchantSupportThread }o--o| PlatformAdmin
 MerchantSupportMessage }o--|| MerchantSupportThread
 MerchantSupportMessage }o--o| PlatformAdmin
-SubscriptionCancellationRequest }o--|| Shop
-SubscriptionCancellationRequest }o--o| MerchantSupportMessage
-SubscriptionCancellationRequest }o--o| PlatformAdmin
 RecoveryCreditRefund }o--|| Shop
 RecoveryCreditRefund }o--|| RecoveryCreditPurchase
 RecoveryCreditRefund }o--o| MerchantSupportMessage
 RecoveryCreditRefund }o--o| PlatformAdmin
-RecoveryCreditRefund |o--o| UsageEvent
 RecoveryCreditRefund }o--o| PlatformAdmin
 MerchantMessageTranslation }o--|| MerchantSupportMessage
 MerchantMessageTranslation }o--o| MerchantTranslationBatch
@@ -1030,11 +965,9 @@ BillingPeriodEntitlementCounter |o--|| BillingPeriodEntitlementCounterKind
 RecoveryCreditPurchase |o--|| RecoveryCreditPurchaseStatus
 UsageReservation |o--|| UsageReservationStatus
 UsageReservation |o--|| UsageReservationReleaseReason
-BillingAllowanceAdjustment |o--|| EntitlementCounter
 PromotionCampaign |o--|| PromotionTargetScope
 PromotionCampaign |o--|| PromotionCampaignStatus
 PromotionCampaignEvent |o--|| PromotionCampaignEventType
-PromotionalCreditGrant |o--|| PromotionalCreditGrantType
 BillingAuditEvent |o--|| BillingAuditAction
 BillingPeriod |o--|| BillingPlanKind
 BillingPeriod |o--|| BillingPeriodStatus
@@ -1044,11 +977,7 @@ WhatsAppTemplateVariant |o--|| WhatsAppTemplateStatus
 PlatformAdmin |o--|| PlatformAdminRole
 MerchantSupportMessage |o--|| MerchantSupportMessageKind
 MerchantSupportMessage |o--|| MerchantSupportMessageState
-SubscriptionCancellationRequest |o--|| BillingLifecycleRequestSource
-SubscriptionCancellationRequest |o--|| SubscriptionCancellationMode
-SubscriptionCancellationRequest |o--|| SubscriptionCancellationStatus
 RecoveryCreditRefund |o--|| BillingLifecycleRequestSource
-RecoveryCreditRefund |o--|| RecoveryCreditRefundSettlementMode
 RecoveryCreditRefund |o--|| RecoveryCreditRefundStatus
 RecoveryCreditRefund |o--|| RecoveryCreditProviderActionKind
 MerchantMessageTranslation |o--|| MerchantTranslationDirection
