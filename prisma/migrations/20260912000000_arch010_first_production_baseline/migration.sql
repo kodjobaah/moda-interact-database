@@ -74,7 +74,7 @@ CREATE TYPE "billing"."UsageReservationReleaseReason" AS ENUM ('PERIOD_CLOSED');
 CREATE TYPE "billing"."UsageMetric" AS ENUM ('RECOVERY_CONVERSATION', 'OUTBOUND_AUTOMATED_MESSAGE', 'DELIVERED_WHATSAPP_MESSAGE', 'RECOVERY_CREDIT_PACK_PURCHASE');
 
 -- CreateEnum
-CREATE TYPE "billing"."RecoveryCreditPurchaseStatus" AS ENUM ('PENDING_BILLING', 'ACTIVE', 'NEEDS_ATTENTION', 'CANCELLED');
+CREATE TYPE "billing"."RecoveryCreditPurchaseStatus" AS ENUM ('REQUESTED', 'ACTIVE', 'COMPLETED', 'WITHDRAWN', 'REFUNDED');
 
 -- CreateEnum
 CREATE TYPE "billing"."BillingLifecycleRequestSource" AS ENUM ('MERCHANT_UI', 'MERCHANT_SUPPORT', 'ADMIN');
@@ -83,7 +83,7 @@ CREATE TYPE "billing"."BillingLifecycleRequestSource" AS ENUM ('MERCHANT_UI', 'M
 CREATE TYPE "billing"."RecoveryCreditProviderActionKind" AS ENUM ('REFUND', 'CREDIT');
 
 -- CreateEnum
-CREATE TYPE "billing"."RecoveryCreditRefundStatus" AS ENUM ('REQUESTED', 'PROVIDER_ACTION_REQUIRED', 'COMPLETED', 'REJECTED', 'WITHDRAWN', 'NEEDS_ATTENTION');
+CREATE TYPE "billing"."RecoveryCreditRefundStatus" AS ENUM ('REQUESTED', 'PROVIDER_ACTION_REQUIRED', 'COMPLETED', 'REJECTED', 'CANCELLED', 'NEEDS_ATTENTION');
 
 -- CreateEnum
 CREATE TYPE "billing"."ShopifyReportState" AS ENUM ('NOT_APPLICABLE', 'PENDING', 'IN_FLIGHT', 'RETRYABLE', 'REPORTED', 'NEEDS_ATTENTION');
@@ -456,16 +456,26 @@ CREATE TABLE "billing"."BillingPeriodEntitlementCounter" (
 CREATE TABLE "billing"."RecoveryCreditPurchase" (
     "id" TEXT NOT NULL,
     "shopId" TEXT NOT NULL,
-    "planId" TEXT,
+    "planId" TEXT NOT NULL,
+    "billingPeriodId" TEXT NOT NULL,
     "shopifyPlanHandleSnapshot" TEXT NOT NULL,
     "shopifyEventHandleSnapshot" TEXT NOT NULL,
+    "providerSubscriptionIdSnapshot" TEXT NOT NULL,
+    "providerUsageQuantityBeforeSnapshot" INTEGER NOT NULL,
+    "providerUsageCostBeforeSnapshot" DECIMAL(65,30) NOT NULL,
+    "providerUsageCostCurrencyBeforeSnapshot" VARCHAR(3) NOT NULL,
+    "providerUsageQuantityAfterSnapshot" INTEGER,
+    "providerUsageCostAfterSnapshot" DECIMAL(65,30),
+    "providerUsageCostCurrencyAfterSnapshot" VARCHAR(3),
+    "providerPurchaseAmount" DECIMAL(65,30),
+    "providerPurchaseCurrency" VARCHAR(3),
+    "providerValuationConfirmedAt" TIMESTAMP(3),
+    "providerPriceSnapshot" JSONB,
     "creditsGranted" INTEGER NOT NULL,
-    "committedQuantity" INTEGER NOT NULL DEFAULT 0,
-    "reservedQuantity" INTEGER NOT NULL DEFAULT 0,
-    "refundingQuantity" INTEGER NOT NULL DEFAULT 0,
-    "refundedQuantity" INTEGER NOT NULL DEFAULT 0,
+    "currentAmount" INTEGER NOT NULL DEFAULT 0,
+    "reservedAmount" INTEGER NOT NULL DEFAULT 0,
     "version" INTEGER NOT NULL DEFAULT 0,
-    "status" "billing"."RecoveryCreditPurchaseStatus" NOT NULL DEFAULT 'PENDING_BILLING',
+    "status" "billing"."RecoveryCreditPurchaseStatus" NOT NULL DEFAULT 'REQUESTED',
     "usageEventId" TEXT NOT NULL,
     "activatedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -754,15 +764,19 @@ CREATE TABLE "billing"."RecoveryCreditRefund" (
     "source" "billing"."BillingLifecycleRequestSource" NOT NULL,
     "sourceMessageId" TEXT,
     "requestedByShopifyUserId" TEXT,
-    "originalUsageEventIdSnapshot" TEXT NOT NULL,
-    "billingPeriodIdSnapshot" TEXT,
+    "purchaseCreditsGrantedSnapshot" INTEGER NOT NULL,
+    "currentAmountAtRequestSnapshot" INTEGER NOT NULL,
+    "reservedAmountAtRequestSnapshot" INTEGER NOT NULL,
+    "availableAmountAtRequestSnapshot" INTEGER NOT NULL,
+    "billingPeriodIdSnapshot" TEXT NOT NULL,
+    "providerSubscriptionIdSnapshot" TEXT NOT NULL,
     "planHandleSnapshot" TEXT NOT NULL,
     "eventHandleSnapshot" TEXT NOT NULL,
-    "creditsSnapshot" INTEGER NOT NULL,
-    "purchaseCreditsGrantedSnapshot" INTEGER NOT NULL,
-    "creditsRequested" INTEGER NOT NULL,
-    "creditsApproved" INTEGER,
-    "creditsRefunded" INTEGER,
+    "purchaseProviderAmountSnapshot" DECIMAL(65,30) NOT NULL,
+    "purchaseProviderCurrencySnapshot" VARCHAR(3) NOT NULL,
+    "finalCreditQuantity" INTEGER,
+    "expectedProviderAmount" DECIMAL(65,30),
+    "expectedProviderCurrency" VARCHAR(3),
     "status" "billing"."RecoveryCreditRefundStatus" NOT NULL DEFAULT 'REQUESTED',
     "requestKey" VARCHAR(255) NOT NULL,
     "reason" VARCHAR(1000),
@@ -771,7 +785,7 @@ CREATE TABLE "billing"."RecoveryCreditRefund" (
     "holdAppliedAt" TIMESTAMP(3),
     "providerReference" VARCHAR(512),
     "providerActionKind" "billing"."RecoveryCreditProviderActionKind",
-    "providerAmount" DECIMAL(20,2),
+    "providerAmount" DECIMAL(65,30),
     "providerCurrency" VARCHAR(3),
     "providerConfirmedByPlatformAdminId" TEXT,
     "providerConfirmedAt" TIMESTAMP(3),
@@ -1003,6 +1017,9 @@ CREATE INDEX "RecoveryCreditPurchase_shopId_status_activatedAt_createdAt__idx" O
 CREATE INDEX "RecoveryCreditPurchase_planId_createdAt_idx" ON "billing"."RecoveryCreditPurchase"("planId", "createdAt");
 
 -- CreateIndex
+CREATE INDEX "RecoveryCreditPurchase_billingPeriodId_createdAt_idx" ON "billing"."RecoveryCreditPurchase"("billingPeriodId", "createdAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "UsageReservation_sourceKey_key" ON "billing"."UsageReservation"("sourceKey");
 
 -- CreateIndex
@@ -1153,6 +1170,9 @@ CREATE UNIQUE INDEX "RecoveryCreditRefund_requestKey_key" ON "billing"."Recovery
 CREATE INDEX "RecoveryCreditRefund_shopId_status_createdAt_idx" ON "billing"."RecoveryCreditRefund"("shopId", "status", "createdAt");
 
 -- CreateIndex
+CREATE INDEX "RecoveryCreditRefund_status_createdAt_id_idx" ON "billing"."RecoveryCreditRefund"("status", "createdAt", "id");
+
+-- CreateIndex
 CREATE INDEX "RecoveryCreditRefund_purchaseId_status_createdAt_idx" ON "billing"."RecoveryCreditRefund"("purchaseId", "status", "createdAt");
 
 -- CreateIndex
@@ -1163,6 +1183,16 @@ CREATE INDEX "RecoveryCreditRefund_approvedByPlatformAdminId_createdAt_idx" ON "
 
 -- CreateIndex
 CREATE INDEX "RecoveryCreditRefund_providerConfirmedByPlatformAdminId_cre_idx" ON "billing"."RecoveryCreditRefund"("providerConfirmedByPlatformAdminId", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RecoveryCreditRefund_one_non_terminal_per_purchase_key"
+ON "billing"."RecoveryCreditRefund"("purchaseId")
+WHERE "status" IN ('REQUESTED', 'PROVIDER_ACTION_REQUIRED', 'NEEDS_ATTENTION');
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RecoveryCreditRefund_one_completed_per_purchase_key"
+ON "billing"."RecoveryCreditRefund"("purchaseId")
+WHERE "status" = 'COMPLETED';
 
 -- CreateIndex
 CREATE INDEX "MerchantMessageTranslation_status_currentBatchId_nextAttemp_idx" ON "support"."MerchantMessageTranslation"("status", "currentBatchId", "nextAttemptAt", "createdAt");
@@ -1276,7 +1306,10 @@ ALTER TABLE "billing"."BillingPeriodEntitlementCounter" ADD CONSTRAINT "BillingP
 ALTER TABLE "billing"."RecoveryCreditPurchase" ADD CONSTRAINT "RecoveryCreditPurchase_shopId_fkey" FOREIGN KEY ("shopId") REFERENCES "commerce"."Shop"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "billing"."RecoveryCreditPurchase" ADD CONSTRAINT "RecoveryCreditPurchase_planId_fkey" FOREIGN KEY ("planId") REFERENCES "billing"."BillingPlan"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "billing"."RecoveryCreditPurchase" ADD CONSTRAINT "RecoveryCreditPurchase_planId_fkey" FOREIGN KEY ("planId") REFERENCES "billing"."BillingPlan"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "billing"."RecoveryCreditPurchase" ADD CONSTRAINT "RecoveryCreditPurchase_billingPeriodId_fkey" FOREIGN KEY ("billingPeriodId") REFERENCES "billing"."BillingPeriod"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "billing"."RecoveryCreditPurchase" ADD CONSTRAINT "RecoveryCreditPurchase_usageEventId_fkey" FOREIGN KEY ("usageEventId") REFERENCES "billing"."UsageEvent"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -1435,16 +1468,39 @@ CHECK (
 ALTER TABLE "billing"."RecoveryCreditPurchase"
 ADD CONSTRAINT "RecoveryCreditPurchase_creditsGranted_positive"
 CHECK ("creditsGranted" > 0),
-ADD CONSTRAINT "RecoveryCreditPurchase_lot_quantities_non_negative"
+ADD CONSTRAINT "RecoveryCreditPurchase_amounts_non_negative"
 CHECK (
-    "committedQuantity" >= 0
-    AND "reservedQuantity" >= 0
-    AND "refundingQuantity" >= 0
-    AND "refundedQuantity" >= 0
+    "currentAmount" >= 0
+    AND "currentAmount" <= "creditsGranted"
+    AND "reservedAmount" >= 0
+    AND "reservedAmount" <= "currentAmount"
     AND "version" >= 0
 ),
-ADD CONSTRAINT "RecoveryCreditPurchase_lot_quantities_within_grant"
-CHECK ("committedQuantity" + "reservedQuantity" + "refundingQuantity" + "refundedQuantity" <= "creditsGranted");
+ADD CONSTRAINT "RecoveryCreditPurchase_lifecycle_amounts"
+CHECK (
+    ("status" = 'REQUESTED' AND "currentAmount" = 0 AND "reservedAmount" = 0)
+    OR ("status" = 'ACTIVE' AND "currentAmount" > 0 AND "reservedAmount" <= "currentAmount")
+    OR ("status" = 'WITHDRAWN' AND "currentAmount" > 0 AND "reservedAmount" <= "currentAmount")
+    OR ("status" IN ('COMPLETED', 'REFUNDED') AND "currentAmount" = 0 AND "reservedAmount" = 0)
+),
+ADD CONSTRAINT "RecoveryCreditPurchase_confirmed_valuation_complete"
+CHECK (
+    "status" = 'REQUESTED'
+    OR (
+        "providerUsageQuantityAfterSnapshot" IS NOT NULL
+        AND "providerUsageCostAfterSnapshot" IS NOT NULL
+        AND "providerUsageCostCurrencyAfterSnapshot" IS NOT NULL
+        AND "providerPurchaseAmount" IS NOT NULL
+        AND "providerPurchaseAmount" > 0
+        AND "providerPurchaseCurrency" IS NOT NULL
+        AND "providerValuationConfirmedAt" IS NOT NULL
+        AND "providerPriceSnapshot" IS NOT NULL
+        AND "providerUsageCostCurrencyBeforeSnapshot" = "providerUsageCostCurrencyAfterSnapshot"
+        AND "providerUsageCostCurrencyAfterSnapshot" = "providerPurchaseCurrency"
+        AND "providerUsageCostAfterSnapshot" > "providerUsageCostBeforeSnapshot"
+        AND "providerPurchaseAmount" = "providerUsageCostAfterSnapshot" - "providerUsageCostBeforeSnapshot"
+    )
+);
 
 ALTER TABLE "commerce"."CheckoutRecovery"
 ADD CONSTRAINT "CheckoutRecovery_admission_block_pair"
@@ -1458,14 +1514,19 @@ ADD CONSTRAINT "PlatformBillingPolicy_lifetimeFreeRecoveryAllowance_non_negative
 CHECK ("lifetimeFreeRecoveryAllowance" >= 0);
 
 ALTER TABLE "billing"."RecoveryCreditRefund"
-ADD CONSTRAINT "RecoveryCreditRefund_quantities_positive"
+ADD CONSTRAINT "RecoveryCreditRefund_snapshot_amounts"
 CHECK (
     "purchaseCreditsGrantedSnapshot" > 0
-    AND "creditsRequested" > 0
-    AND ("creditsApproved" IS NULL OR "creditsApproved" > 0)
-    AND ("creditsRefunded" IS NULL OR "creditsRefunded" > 0)
-    AND ("creditsApproved" IS NULL OR "creditsApproved" <= "creditsRequested")
-    AND ("creditsRefunded" IS NULL OR "creditsRefunded" <= "creditsApproved")
+    AND "purchaseProviderAmountSnapshot" > 0
+    AND "currentAmountAtRequestSnapshot" >= 0
+    AND "currentAmountAtRequestSnapshot" <= "purchaseCreditsGrantedSnapshot"
+    AND "reservedAmountAtRequestSnapshot" >= 0
+    AND "reservedAmountAtRequestSnapshot" <= "currentAmountAtRequestSnapshot"
+    AND "availableAmountAtRequestSnapshot" = "currentAmountAtRequestSnapshot" - "reservedAmountAtRequestSnapshot"
+    AND "availableAmountAtRequestSnapshot" > 0
+    AND ("finalCreditQuantity" IS NULL OR "finalCreditQuantity" > 0)
+    AND ("finalCreditQuantity" IS NULL OR "finalCreditQuantity" <= "currentAmountAtRequestSnapshot")
+    AND ("expectedProviderAmount" IS NULL OR "expectedProviderAmount" >= 0)
 );
 
 ALTER TABLE "billing"."BillingPeriodEntitlementCounter"
