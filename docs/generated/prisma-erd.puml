@@ -801,8 +801,8 @@ entity "RecoveryCreditRefund" as RecoveryCreditRefund {
   * providerSubscriptionIdSnapshot : String
   * planHandleSnapshot : String
   * eventHandleSnapshot : String
-  purchaseProviderAmountSnapshot : Decimal
-  purchaseProviderCurrencySnapshot : String
+  * purchaseProviderAmountSnapshot : Decimal
+  * purchaseProviderCurrencySnapshot : String
   finalCreditQuantity : Int
   expectedProviderAmount : Decimal
   expectedProviderCurrency : String

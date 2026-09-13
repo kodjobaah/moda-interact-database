@@ -1271,8 +1271,8 @@ model RecoveryCreditRefund {
   providerSubscriptionIdSnapshot   String
   planHandleSnapshot               String
   eventHandleSnapshot              String
-  purchaseProviderAmountSnapshot   Decimal?
-  purchaseProviderCurrencySnapshot String?  @db.VarChar(3)
+  purchaseProviderAmountSnapshot   Decimal
+  purchaseProviderCurrencySnapshot String   @db.VarChar(3)
   finalCreditQuantity              Int?
   expectedProviderAmount           Decimal?
   expectedProviderCurrency         String?  @db.VarChar(3)
@@ -1290,7 +1290,7 @@ model RecoveryCreditRefund {
 
   providerReference  String?                           @db.VarChar(512)
   providerActionKind RecoveryCreditProviderActionKind?
-  providerAmount     Decimal?                          @db.Decimal(20, 2)
+  providerAmount     Decimal?
   providerCurrency   String?                           @db.VarChar(3)
 
   providerConfirmedByPlatformAdminId String?
@@ -1304,6 +1304,7 @@ model RecoveryCreditRefund {
   updatedAt DateTime @updatedAt
 
   @@index([shopId, status, createdAt])
+  @@index([status, createdAt, id])
   @@index([purchaseId, status, createdAt])
   @@index([sourceMessageId])
   @@index([approvedByPlatformAdminId, createdAt])

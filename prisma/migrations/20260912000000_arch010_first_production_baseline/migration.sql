@@ -772,8 +772,8 @@ CREATE TABLE "billing"."RecoveryCreditRefund" (
     "providerSubscriptionIdSnapshot" TEXT NOT NULL,
     "planHandleSnapshot" TEXT NOT NULL,
     "eventHandleSnapshot" TEXT NOT NULL,
-    "purchaseProviderAmountSnapshot" DECIMAL(65,30),
-    "purchaseProviderCurrencySnapshot" VARCHAR(3),
+    "purchaseProviderAmountSnapshot" DECIMAL(65,30) NOT NULL,
+    "purchaseProviderCurrencySnapshot" VARCHAR(3) NOT NULL,
     "finalCreditQuantity" INTEGER,
     "expectedProviderAmount" DECIMAL(65,30),
     "expectedProviderCurrency" VARCHAR(3),
@@ -785,7 +785,7 @@ CREATE TABLE "billing"."RecoveryCreditRefund" (
     "holdAppliedAt" TIMESTAMP(3),
     "providerReference" VARCHAR(512),
     "providerActionKind" "billing"."RecoveryCreditProviderActionKind",
-    "providerAmount" DECIMAL(20,2),
+    "providerAmount" DECIMAL(65,30),
     "providerCurrency" VARCHAR(3),
     "providerConfirmedByPlatformAdminId" TEXT,
     "providerConfirmedAt" TIMESTAMP(3),
@@ -1170,6 +1170,9 @@ CREATE UNIQUE INDEX "RecoveryCreditRefund_requestKey_key" ON "billing"."Recovery
 CREATE INDEX "RecoveryCreditRefund_shopId_status_createdAt_idx" ON "billing"."RecoveryCreditRefund"("shopId", "status", "createdAt");
 
 -- CreateIndex
+CREATE INDEX "RecoveryCreditRefund_status_createdAt_id_idx" ON "billing"."RecoveryCreditRefund"("status", "createdAt", "id");
+
+-- CreateIndex
 CREATE INDEX "RecoveryCreditRefund_purchaseId_status_createdAt_idx" ON "billing"."RecoveryCreditRefund"("purchaseId", "status", "createdAt");
 
 -- CreateIndex
@@ -1468,6 +1471,7 @@ CHECK ("creditsGranted" > 0),
 ADD CONSTRAINT "RecoveryCreditPurchase_amounts_non_negative"
 CHECK (
     "currentAmount" >= 0
+    AND "currentAmount" <= "creditsGranted"
     AND "reservedAmount" >= 0
     AND "reservedAmount" <= "currentAmount"
     AND "version" >= 0
@@ -1479,17 +1483,22 @@ CHECK (
     OR ("status" = 'WITHDRAWN' AND "currentAmount" > 0 AND "reservedAmount" <= "currentAmount")
     OR ("status" IN ('COMPLETED', 'REFUNDED') AND "currentAmount" = 0 AND "reservedAmount" = 0)
 ),
-ADD CONSTRAINT "RecoveryCreditPurchase_active_valuation_complete"
+ADD CONSTRAINT "RecoveryCreditPurchase_confirmed_valuation_complete"
 CHECK (
-    "status" <> 'ACTIVE'
+    "status" = 'REQUESTED'
     OR (
         "providerUsageQuantityAfterSnapshot" IS NOT NULL
         AND "providerUsageCostAfterSnapshot" IS NOT NULL
         AND "providerUsageCostCurrencyAfterSnapshot" IS NOT NULL
         AND "providerPurchaseAmount" IS NOT NULL
+        AND "providerPurchaseAmount" > 0
         AND "providerPurchaseCurrency" IS NOT NULL
         AND "providerValuationConfirmedAt" IS NOT NULL
         AND "providerPriceSnapshot" IS NOT NULL
+        AND "providerUsageCostCurrencyBeforeSnapshot" = "providerUsageCostCurrencyAfterSnapshot"
+        AND "providerUsageCostCurrencyAfterSnapshot" = "providerPurchaseCurrency"
+        AND "providerUsageCostAfterSnapshot" > "providerUsageCostBeforeSnapshot"
+        AND "providerPurchaseAmount" = "providerUsageCostAfterSnapshot" - "providerUsageCostBeforeSnapshot"
     )
 );
 
@@ -1508,11 +1517,15 @@ ALTER TABLE "billing"."RecoveryCreditRefund"
 ADD CONSTRAINT "RecoveryCreditRefund_snapshot_amounts"
 CHECK (
     "purchaseCreditsGrantedSnapshot" > 0
+    AND "purchaseProviderAmountSnapshot" > 0
     AND "currentAmountAtRequestSnapshot" >= 0
+    AND "currentAmountAtRequestSnapshot" <= "purchaseCreditsGrantedSnapshot"
     AND "reservedAmountAtRequestSnapshot" >= 0
     AND "reservedAmountAtRequestSnapshot" <= "currentAmountAtRequestSnapshot"
     AND "availableAmountAtRequestSnapshot" = "currentAmountAtRequestSnapshot" - "reservedAmountAtRequestSnapshot"
+    AND "availableAmountAtRequestSnapshot" > 0
     AND ("finalCreditQuantity" IS NULL OR "finalCreditQuantity" > 0)
+    AND ("finalCreditQuantity" IS NULL OR "finalCreditQuantity" <= "currentAmountAtRequestSnapshot")
     AND ("expectedProviderAmount" IS NULL OR "expectedProviderAmount" >= 0)
 );
 
