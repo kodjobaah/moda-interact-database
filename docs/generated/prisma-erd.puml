@@ -106,10 +106,11 @@ enum "UsageMetric" as UsageMetric {
   RECOVERY_CREDIT_PACK_PURCHASE
 }
 enum "RecoveryCreditPurchaseStatus" as RecoveryCreditPurchaseStatus {
-  PENDING_BILLING
+  REQUESTED
   ACTIVE
-  NEEDS_ATTENTION
-  CANCELLED
+  COMPLETED
+  WITHDRAWN
+  REFUNDED
 }
 enum "BillingLifecycleRequestSource" as BillingLifecycleRequestSource {
   MERCHANT_UI
@@ -125,7 +126,7 @@ enum "RecoveryCreditRefundStatus" as RecoveryCreditRefundStatus {
   PROVIDER_ACTION_REQUIRED
   COMPLETED
   REJECTED
-  WITHDRAWN
+  CANCELLED
   NEEDS_ATTENTION
 }
 enum "ShopifyReportState" as ShopifyReportState {
@@ -519,13 +520,23 @@ entity "RecoveryCreditPurchase" as RecoveryCreditPurchase {
 --
   # shopId : [FK] Shop
   # planId : [FK] BillingPlan
+  # billingPeriodId : [FK] BillingPeriod
   * shopifyPlanHandleSnapshot : String
   * shopifyEventHandleSnapshot : String
+  * providerSubscriptionIdSnapshot : String
+  * providerUsageQuantityBeforeSnapshot : Int
+  * providerUsageCostBeforeSnapshot : Decimal
+  * providerUsageCostCurrencyBeforeSnapshot : String
+  providerUsageQuantityAfterSnapshot : Int
+  providerUsageCostAfterSnapshot : Decimal
+  providerUsageCostCurrencyAfterSnapshot : String
+  providerPurchaseAmount : Decimal
+  providerPurchaseCurrency : String
+  providerValuationConfirmedAt : DateTime
+  providerPriceSnapshot : Json
   * creditsGranted : Int
-  * committedQuantity : Int
-  * reservedQuantity : Int
-  * refundingQuantity : Int
-  * refundedQuantity : Int
+  * currentAmount : Int
+  * reservedAmount : Int
   * version : Int
   * status : RecoveryCreditPurchaseStatus
   # usageEventId : [FK] UsageEvent
@@ -782,15 +793,19 @@ entity "RecoveryCreditRefund" as RecoveryCreditRefund {
   * source : BillingLifecycleRequestSource
   # sourceMessageId : [FK] MerchantSupportMessage
   requestedByShopifyUserId : String
-  * originalUsageEventIdSnapshot : String
-  billingPeriodIdSnapshot : String
+  * purchaseCreditsGrantedSnapshot : Int
+  * currentAmountAtRequestSnapshot : Int
+  * reservedAmountAtRequestSnapshot : Int
+  * availableAmountAtRequestSnapshot : Int
+  * billingPeriodIdSnapshot : String
+  * providerSubscriptionIdSnapshot : String
   * planHandleSnapshot : String
   * eventHandleSnapshot : String
-  * creditsSnapshot : Int
-  * purchaseCreditsGrantedSnapshot : Int
-  * creditsRequested : Int
-  creditsApproved : Int
-  creditsRefunded : Int
+  purchaseProviderAmountSnapshot : Decimal
+  purchaseProviderCurrencySnapshot : String
+  finalCreditQuantity : Int
+  expectedProviderAmount : Decimal
+  expectedProviderCurrency : String
   * status : RecoveryCreditRefundStatus
   * requestKey : String
   reason : String
@@ -901,7 +916,8 @@ ShopEntitlementCounter }o--|| Shop
 BillingPeriodEntitlementCounter }o--|| Shop
 BillingPeriodEntitlementCounter }o--|| BillingPeriod
 RecoveryCreditPurchase }o--|| Shop
-RecoveryCreditPurchase }o--o| BillingPlan
+RecoveryCreditPurchase }o--|| BillingPlan
+RecoveryCreditPurchase }o--|| BillingPeriod
 RecoveryCreditPurchase |o--|| UsageEvent
 UsageReservation }o--|| Shop
 UsageReservation }o--o| ShopEntitlementCounter

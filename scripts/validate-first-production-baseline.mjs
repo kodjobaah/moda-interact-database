@@ -28,13 +28,19 @@ assert.match(policy, /minimumUpgradePremiumBps\s+Int\s+@default\(2000\)/);
 assert.match(enumBlock("EntitlementCounter"), /LIFETIME_FREE_RECOVERY_CREDITS/);
 assert.match(enumBlock("EntitlementCounter"), /PURCHASED_RECOVERY_CREDITS/);
 assert.doesNotMatch(enumBlock("EntitlementCounter"), /PROMOTIONAL/);
-assert.match(enumBlock("RecoveryCreditPurchaseStatus"), /PENDING_BILLING/);
+assert.deepEqual(
+  enumBlock("RecoveryCreditPurchaseStatus")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => /^[A-Z_]+$/.test(line)),
+  ["REQUESTED", "ACTIVE", "COMPLETED", "WITHDRAWN", "REFUNDED"],
+);
 assert.deepEqual(
   enumBlock("RecoveryCreditRefundStatus")
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => /^[A-Z_]+$/.test(line)),
-  ["REQUESTED", "PROVIDER_ACTION_REQUIRED", "COMPLETED", "REJECTED", "WITHDRAWN", "NEEDS_ATTENTION"],
+  ["REQUESTED", "PROVIDER_ACTION_REQUIRED", "COMPLETED", "REJECTED", "CANCELLED", "NEEDS_ATTENTION"],
 );
 
 const grant = model("PromotionalCreditGrant");
@@ -42,6 +48,34 @@ assert.match(grant, /campaignId\s+String\n/);
 assert.match(grant, /@@unique\(\[campaignId, shopId\]\)/);
 assert.match(model("MerchantPromotionSelection"), /shopId\s+String\s+@unique/);
 assert.match(model("UsageReservation"), /promotionalCreditGrantId\s+String\?/);
+
+const purchase = model("RecoveryCreditPurchase");
+assert.match(purchase, /billingPeriodId\s+String/);
+assert.match(purchase, /providerSubscriptionIdSnapshot\s+String/);
+assert.match(purchase, /providerUsageQuantityBeforeSnapshot\s+Int/);
+assert.match(purchase, /providerUsageCostBeforeSnapshot\s+Decimal/);
+assert.match(purchase, /providerPurchaseAmount\s+Decimal\?/);
+assert.match(purchase, /providerPurchaseCurrency\s+String\?/);
+assert.match(purchase, /providerPriceSnapshot\s+Json\?/);
+assert.match(purchase, /currentAmount\s+Int\s+@default\(0\)/);
+assert.match(purchase, /reservedAmount\s+Int\s+@default\(0\)/);
+assert.doesNotMatch(purchase, /availableAmount|refundingQuantity|refundedQuantity/);
+assert.match(purchase, /billingPeriod\s+BillingPeriod.*onDelete: Restrict/);
+assert.match(model("BillingPeriod"), /recoveryCreditPurchases\s+RecoveryCreditPurchase\[\]/);
+
+const refund = model("RecoveryCreditRefund");
+assert.match(refund, /currentAmountAtRequestSnapshot\s+Int/);
+assert.match(refund, /reservedAmountAtRequestSnapshot\s+Int/);
+assert.match(refund, /availableAmountAtRequestSnapshot\s+Int/);
+assert.match(refund, /finalCreditQuantity\s+Int\?/);
+assert.doesNotMatch(refund, /creditsRequested|creditsApproved/);
+assert.match(migration, /RecoveryCreditPurchase_billingPeriodId_fkey[\s\S]*ON DELETE RESTRICT/);
+assert.match(migration, /RecoveryCreditPurchase_planId_fkey[\s\S]*ON DELETE RESTRICT/);
+assert.match(migration, /RecoveryCreditRefund_one_non_terminal_per_purchase_key[\s\S]*REQUESTED[\s\S]*PROVIDER_ACTION_REQUIRED[\s\S]*NEEDS_ATTENTION/);
+assert.match(migration, /RecoveryCreditRefund_one_completed_per_purchase_key[\s\S]*status" = 'COMPLETED'/);
+assert.match(erd, /entity "RecoveryCreditPurchase"[\s\S]*currentAmount[\s\S]*reservedAmount/);
+assert.match(erd, /entity "RecoveryCreditRefund"[\s\S]*currentAmountAtRequestSnapshot[\s\S]*finalCreditQuantity/);
+assert.doesNotMatch(erd, /entity "RecoveryCreditPurchase"[\s\S]*refundingQuantity|entity "RecoveryCreditPurchase"[\s\S]*refundedQuantity/);
 
 assert.match(model("BillingUpgradeEconomicsEdge"), /@@unique\(\[lowerPlanId\]\)/);
 assert.match(model("BillingUpgradeEconomicsEdge"), /@@unique\(\[higherPlanId\]\)/);
@@ -66,11 +100,14 @@ for (const constraint of [
   "Conversation_standalone_scope_invariant",
   "BillingPlan_recovery_credit_pack_config",
   "RecoveryCreditPurchase_creditsGranted_positive",
+  "RecoveryCreditPurchase_amounts_non_negative",
+  "RecoveryCreditPurchase_lifecycle_amounts",
+  "RecoveryCreditPurchase_active_valuation_complete",
+  "RecoveryCreditRefund_snapshot_amounts",
+  "RecoveryCreditRefund_one_non_terminal_per_purchase_key",
+  "RecoveryCreditRefund_one_completed_per_purchase_key",
   "CheckoutRecovery_admission_block_pair",
   "PlatformBillingPolicy_lifetimeFreeRecoveryAllowance_non_negative",
-  "RecoveryCreditPurchase_lot_quantities_non_negative",
-  "RecoveryCreditPurchase_lot_quantities_within_grant",
-  "RecoveryCreditRefund_quantities_positive",
   "BillingPeriodEntitlementCounter_grantedQuantity_non_negative",
   "BillingPeriodEntitlementCounter_committedQuantity_non_negative",
   "BillingPeriodEntitlementCounter_reservedQuantity_non_negative",
@@ -94,7 +131,7 @@ assert.match(
 );
 assert.doesNotMatch(migration, /UsageReservation_counter_family_xor/);
 
-assert.doesNotMatch(model("RecoveryCreditRefund"), /settlementMode|correctionUsageEventId|attemptCount|nextAttemptAt|lastAttemptAt|processingStartedAt|providerErrorCode|providerResponseSummary/);
+assert.doesNotMatch(refund, /settlementMode|correctionUsageEventId|attemptCount|nextAttemptAt|lastAttemptAt|processingStartedAt|providerErrorCode|providerResponseSummary/);
 assert.doesNotMatch(grant, /grantType|campaignReference|platformAdminId/);
 assert.doesNotMatch(schema, /SubscriptionCancellationRequest|SubscriptionCancellationMode|SubscriptionCancellationStatus/);
 assert.match(enumBlock("EntitlementCounter"), /LIFETIME_FREE_RECOVERY_CREDITS/);

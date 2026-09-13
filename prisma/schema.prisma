@@ -419,10 +419,11 @@ enum UsageMetric {
 }
 
 enum RecoveryCreditPurchaseStatus {
-  PENDING_BILLING
+  REQUESTED
   ACTIVE
-  NEEDS_ATTENTION
-  CANCELLED
+  COMPLETED
+  WITHDRAWN
+  REFUNDED
 
   @@schema("billing")
 }
@@ -447,7 +448,7 @@ enum RecoveryCreditRefundStatus {
   PROVIDER_ACTION_REQUIRED
   COMPLETED
   REJECTED
-  WITHDRAWN
+  CANCELLED
   NEEDS_ATTENTION
 
   @@schema("billing")
@@ -716,19 +717,32 @@ model RecoveryCreditPurchase {
   shopId String
   shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  planId String?
-  plan   BillingPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  planId String
+  plan   BillingPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
 
-  shopifyPlanHandleSnapshot  String
-  shopifyEventHandleSnapshot String
-  creditsGranted             Int
-  committedQuantity          Int    @default(0)
-  reservedQuantity           Int    @default(0)
-  refundingQuantity          Int    @default(0)
-  refundedQuantity           Int    @default(0)
-  version                    Int    @default(0)
+  billingPeriodId String
+  billingPeriod   BillingPeriod @relation("RecoveryCreditPurchaseBillingPeriod", fields: [billingPeriodId], references: [id], onDelete: Restrict)
 
-  status RecoveryCreditPurchaseStatus @default(PENDING_BILLING)
+  shopifyPlanHandleSnapshot               String
+  shopifyEventHandleSnapshot              String
+  providerSubscriptionIdSnapshot          String
+  providerUsageQuantityBeforeSnapshot     Int
+  providerUsageCostBeforeSnapshot         Decimal
+  providerUsageCostCurrencyBeforeSnapshot String    @db.VarChar(3)
+  providerUsageQuantityAfterSnapshot      Int?
+  providerUsageCostAfterSnapshot          Decimal?
+  providerUsageCostCurrencyAfterSnapshot  String?   @db.VarChar(3)
+  providerPurchaseAmount                  Decimal?
+  providerPurchaseCurrency                String?   @db.VarChar(3)
+  providerValuationConfirmedAt            DateTime?
+  providerPriceSnapshot                   Json?
+
+  creditsGranted Int
+  currentAmount  Int @default(0)
+  reservedAmount Int @default(0)
+  version        Int @default(0)
+
+  status RecoveryCreditPurchaseStatus @default(REQUESTED)
 
   usageEventId String     @unique
   usageEvent   UsageEvent @relation(fields: [usageEventId], references: [id], onDelete: Restrict)
@@ -743,6 +757,7 @@ model RecoveryCreditPurchase {
   @@index([shopId, status, createdAt])
   @@index([shopId, status, activatedAt, createdAt, id])
   @@index([planId, createdAt])
+  @@index([billingPeriodId, createdAt])
   @@schema("billing")
 }
 
@@ -993,6 +1008,7 @@ model BillingPeriod {
   closeReason                    BillingPeriodCloseReason?
   usageEvents                    UsageEvent[]
   entitlementCounters            BillingPeriodEntitlementCounter[]
+  recoveryCreditPurchases        RecoveryCreditPurchase[]          @relation("RecoveryCreditPurchaseBillingPeriod")
   createdAt                      DateTime                          @default(now())
   updatedAt                      DateTime                          @updatedAt
 
@@ -1247,15 +1263,19 @@ model RecoveryCreditRefund {
 
   requestedByShopifyUserId String?
 
-  originalUsageEventIdSnapshot   String
-  billingPeriodIdSnapshot        String?
-  planHandleSnapshot             String
-  eventHandleSnapshot            String
-  creditsSnapshot                Int
-  purchaseCreditsGrantedSnapshot Int
-  creditsRequested               Int
-  creditsApproved                Int?
-  creditsRefunded                Int?
+  purchaseCreditsGrantedSnapshot   Int
+  currentAmountAtRequestSnapshot   Int
+  reservedAmountAtRequestSnapshot  Int
+  availableAmountAtRequestSnapshot Int
+  billingPeriodIdSnapshot          String
+  providerSubscriptionIdSnapshot   String
+  planHandleSnapshot               String
+  eventHandleSnapshot              String
+  purchaseProviderAmountSnapshot   Decimal?
+  purchaseProviderCurrencySnapshot String?  @db.VarChar(3)
+  finalCreditQuantity              Int?
+  expectedProviderAmount           Decimal?
+  expectedProviderCurrency         String?  @db.VarChar(3)
 
   status RecoveryCreditRefundStatus @default(REQUESTED)
 
