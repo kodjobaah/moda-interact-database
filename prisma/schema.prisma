@@ -1030,12 +1030,30 @@ model PromotionCampaign {
 
   events                  PromotionCampaignEvent[]
   promotionalCreditGrants PromotionalCreditGrant[]
+  translations            PromotionCampaignTranslation[]
 
   @@index([status, startsAt, expiresAt])
   @@index([targetPlanId, status, startsAt, expiresAt])
   @@index([targetShopId, status, startsAt, expiresAt])
   @@index([createdAt])
   @@index([updatedAt])
+  @@schema("billing")
+}
+
+model PromotionCampaignTranslation {
+  id                  String            @id @default(cuid())
+  promotionCampaignId String
+  promotionCampaign   PromotionCampaign @relation(fields: [promotionCampaignId], references: [id], onDelete: Cascade)
+
+  locale              String @db.VarChar(16)
+  merchantTitle       String @db.VarChar(255)
+  merchantDescription String @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([promotionCampaignId, locale])
+  @@index([promotionCampaignId])
   @@schema("billing")
 }
 
