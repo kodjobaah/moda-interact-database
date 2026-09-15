@@ -594,10 +594,10 @@ entity "RecoveryCreditPurchase" as RecoveryCreditPurchase {
   * shopifyPlanHandleSnapshot : String
   * shopifyEventHandleSnapshot : String
   * providerSubscriptionIdSnapshot : String
-  * providerUsageQuantityBeforeSnapshot : Int
+  * providerUsageQuantityBeforeSnapshot : Decimal
   * providerUsageCostBeforeSnapshot : Decimal
   * providerUsageCostCurrencyBeforeSnapshot : String
-  providerUsageQuantityAfterSnapshot : Int
+  providerUsageQuantityAfterSnapshot : Decimal
   providerUsageCostAfterSnapshot : Decimal
   providerUsageCostCurrencyAfterSnapshot : String
   providerPurchaseAmount : Decimal

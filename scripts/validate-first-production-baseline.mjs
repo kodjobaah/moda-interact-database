@@ -52,7 +52,7 @@ assert.match(model("UsageReservation"), /promotionalCreditGrantId\s+String\?/);
 const purchase = model("RecoveryCreditPurchase");
 assert.match(purchase, /billingPeriodId\s+String/);
 assert.match(purchase, /providerSubscriptionIdSnapshot\s+String/);
-assert.match(purchase, /providerUsageQuantityBeforeSnapshot\s+Int/);
+assert.match(migration, /"providerUsageQuantityBeforeSnapshot" INTEGER NOT NULL/);
 assert.match(purchase, /providerUsageCostBeforeSnapshot\s+Decimal/);
 assert.match(purchase, /providerPurchaseAmount\s+Decimal\?/);
 assert.match(purchase, /providerPurchaseCurrency\s+String\?/);

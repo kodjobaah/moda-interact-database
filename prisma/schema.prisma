@@ -827,10 +827,10 @@ model RecoveryCreditPurchase {
   shopifyPlanHandleSnapshot               String
   shopifyEventHandleSnapshot              String
   providerSubscriptionIdSnapshot          String
-  providerUsageQuantityBeforeSnapshot     Int
+  providerUsageQuantityBeforeSnapshot     Decimal
   providerUsageCostBeforeSnapshot         Decimal
   providerUsageCostCurrencyBeforeSnapshot String    @db.VarChar(3)
-  providerUsageQuantityAfterSnapshot      Int?
+  providerUsageQuantityAfterSnapshot      Decimal?
   providerUsageCostAfterSnapshot          Decimal?
   providerUsageCostCurrencyAfterSnapshot  String?   @db.VarChar(3)
   providerPurchaseAmount                  Decimal?
