@@ -146,10 +146,71 @@ const checkNames = [
   "discovery_sender_ten_minute_cap", "discovery_conversation_minute_cap", "discovery_conversation_ten_minute_cap",
 ];
 for (const name of checkNames) expect(migration.includes(`CONSTRAINT "ck_arch014_background_runtime_config_${name}" CHECK`), `missing named CHECK ${name}`);
+const requiredCheckExpressions = {
+  version: '"version" >= 0',
+  billing_reconciliation_interval: '"billingReconciliationIntervalSeconds" BETWEEN 10 AND 3600',
+  billing_reconciliation_batch: '"billingReconciliationShopBatchSize" BETWEEN 1 AND 200',
+  shopify_usage_publish_batch: '"shopifyUsagePublishBatchSize" BETWEEN 1 AND 200',
+  recovery_repair_interval: '"recoveryRepairIntervalSeconds" BETWEEN 30 AND 3600',
+  recovery_repair_batch: '"recoveryRepairShopBatchSize" BETWEEN 1 AND 500',
+  recovery_resume_batch: '"recoveryResumeBatchSize" BETWEEN 1 AND 100',
+  translation_reconciliation_interval: '"translationReconciliationIntervalSeconds" BETWEEN 30 AND 3600',
+  translation_batch_requests: '"translationBatchMaxRequests" BETWEEN 1 AND 500',
+  conversation_quiet_window: '"conversationQuietWindowMs" BETWEEN 250 AND 10000',
+  conversation_settle_window: '"conversationMaxSettleWindowMs" BETWEEN 1000 AND 30000',
+  billing_frozen_recheck: '"billingFrozenRecheckSeconds" BETWEEN 300 AND 86400',
+  billing_provider_retry: '"billingProviderRetrySeconds" BETWEEN 30 AND 3600',
+  shopify_usage_retry_base: '"shopifyUsageRetryBaseSeconds" BETWEEN 10 AND 3600',
+  shopify_usage_retry_max: '"shopifyUsageRetryMaxSeconds" BETWEEN 60 AND 86400',
+  translation_page_size: '"translationReconciliationPageSize" BETWEEN 1 AND 500',
+  translation_claim_timeout: '"translationClaimTimeoutSeconds" BETWEEN 60 AND 86400',
+  translation_submit_retry: '"translationSubmitRetrySeconds" BETWEEN 30 AND 86400',
+  translation_initial_poll: '"translationInitialPollSeconds" BETWEEN 30 AND 86400',
+  translation_poll_interval: '"translationPollIntervalSeconds" BETWEEN 30 AND 86400',
+  translation_result_retry: '"translationResultRetrySeconds" BETWEEN 30 AND 86400',
+  translation_submit_attempts: '"translationSubmitMaxAttempts" BETWEEN 1 AND 10',
+  translation_auto_retries: '"translationMaxAutoRetries" BETWEEN 0 AND 10',
+  raw_sender_limit: '"rawSenderLimitPerMinute" BETWEEN 1 AND 10000',
+  raw_global_limit: '"rawGlobalLimitPerMinute" BETWEEN 1 AND 1000000',
+  turn_sender_minute_limit: '"turnSenderLimitPerMinute" BETWEEN 1 AND 10000',
+  turn_sender_ten_minute_limit: '"turnSenderLimitPerTenMinutes" BETWEEN 1 AND 100000',
+  turn_conversation_minute_limit: '"turnConversationLimitPerMinute" BETWEEN 1 AND 10000',
+  turn_conversation_ten_minute_limit: '"turnConversationLimitPerTenMinutes" BETWEEN 1 AND 100000',
+  turn_shop_limit: '"turnShopLimitPerMinute" BETWEEN 1 AND 100000',
+  turn_global_limit: '"turnGlobalLimitPerMinute" BETWEEN 1 AND 1000000',
+  discovery_sender_minute_limit: '"discoverySenderLimitPerMinute" BETWEEN 1 AND 10000',
+  discovery_sender_ten_minute_limit: '"discoverySenderLimitPerTenMinutes" BETWEEN 1 AND 100000',
+  discovery_conversation_minute_limit: '"discoveryConversationLimitPerMinute" BETWEEN 1 AND 10000',
+  discovery_conversation_ten_minute_limit: '"discoveryConversationLimitPerTenMinutes" BETWEEN 1 AND 100000',
+  checkout_queue_concurrency: '"checkoutQueueGlobalConcurrency" BETWEEN 1 AND 100',
+  order_queue_concurrency: '"orderQueueGlobalConcurrency" BETWEEN 1 AND 100',
+  pending_recovery_queue_concurrency: '"pendingRecoveryQueueGlobalConcurrency" BETWEEN 1 AND 100',
+  recovery_resume_queue_concurrency: '"recoveryResumeQueueGlobalConcurrency" BETWEEN 1 AND 100',
+  whatsapp_queue_concurrency: '"whatsappQueueGlobalConcurrency" BETWEEN 1 AND 100',
+  merchant_communications_queue_concurrency: '"merchantCommunicationsQueueGlobalConcurrency" BETWEEN 1 AND 100',
+  billing_subscription_queue_concurrency: '"billingSubscriptionQueueGlobalConcurrency" BETWEEN 1 AND 100',
+  settle_window_order: '"conversationMaxSettleWindowMs" >= "conversationQuietWindowMs"',
+  shopify_retry_order: '"shopifyUsageRetryMaxSeconds" >= "shopifyUsageRetryBaseSeconds"',
+  raw_global_order: '"rawGlobalLimitPerMinute" >= "rawSenderLimitPerMinute"',
+  turn_sender_window_order: '"turnSenderLimitPerTenMinutes" >= "turnSenderLimitPerMinute"',
+  turn_conversation_window_order: '"turnConversationLimitPerTenMinutes" >= "turnConversationLimitPerMinute"',
+  turn_global_order: '"turnGlobalLimitPerMinute" >= "turnShopLimitPerMinute"',
+  turn_shop_order: '"turnShopLimitPerMinute" >= "turnSenderLimitPerMinute"',
+  discovery_sender_window_order: '"discoverySenderLimitPerTenMinutes" >= "discoverySenderLimitPerMinute"',
+  discovery_conversation_window_order: '"discoveryConversationLimitPerTenMinutes" >= "discoveryConversationLimitPerMinute"',
+  discovery_sender_minute_cap: '"discoverySenderLimitPerMinute" <= "turnSenderLimitPerMinute"',
+  discovery_sender_ten_minute_cap: '"discoverySenderLimitPerTenMinutes" <= "turnSenderLimitPerTenMinutes"',
+  discovery_conversation_minute_cap: '"discoveryConversationLimitPerMinute" <= "turnConversationLimitPerMinute"',
+  discovery_conversation_ten_minute_cap: '"discoveryConversationLimitPerTenMinutes" <= "turnConversationLimitPerTenMinutes"',
+};
+for (const [name, expression] of Object.entries(requiredCheckExpressions)) {
+  expect(migration.includes(`CONSTRAINT "ck_arch014_background_runtime_config_${name}" CHECK (${expression})`), `CHECK ${name} has an unexpected expression`);
+}
 expect(migration.includes('CONSTRAINT "BackgroundRuntimeConfig_pkey"'), "config primary key is missing");
 expect(migration.includes("INSERT INTO \"public\".\"BackgroundRuntimeConfig\""), "default config seed is missing");
-expect(migration.includes("'default', 0, 60, 50, 50, 300, 100, 25"), "default config seed values are not exact");
+expect(migration.replace(/\s+/g, " ").includes("'default', 0, 60, 50, 50, 300, 100, 25, 300, 100, 3000, 10000, 3600, 300, 60, 3600, 100, 900, 300, 300, 300, 300, 3, 3, 60, 20000, 12, 60, 12, 60, 600, 5000, 4, 12, 4, 12, 10, 5, 10, 10, 20, 10, 10"), "default config seed values are not exact");
 expect(migration.includes('ON CONFLICT ("id") DO NOTHING'), "default config seed is not idempotent");
+expect(!migration.includes('INSERT INTO "public"."BackgroundRuntimeLease"'), "migration must not seed lease rows");
 expect(!/ALTER TABLE\s+"(?:public|shopify|commerce|whatsapp|billing|support)"/i.test(migration), "migration alters a pre-existing table");
 expect(!migration.includes('"PlatformAdmin"'), "migration must not alter or reference PlatformAdmin");
 for (const field of Object.keys(configFields).filter((field) => field.endsWith("QueueGlobalConcurrency"))) {

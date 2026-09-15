@@ -256,7 +256,7 @@ enum "BackgroundRuntimeLeaseName" as BackgroundRuntimeLeaseName {
   QUEUE_CONCURRENCY_RECONCILIATION
 }
 entity "Session" as Session {
-+ id [PK] : String
++ id [PK] : String 
 --
   * shop : String
   * state : String
@@ -277,7 +277,7 @@ entity "Session" as Session {
 }
 
 entity "ShopSettings" as ShopSettings {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   * onboardingCompleted : Boolean
@@ -291,7 +291,7 @@ entity "ShopSettings" as ShopSettings {
 }
 
 entity "ShopBrand" as ShopBrand {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   brandName : String
@@ -307,7 +307,7 @@ entity "ShopBrand" as ShopBrand {
 }
 
 entity "Customer" as Customer {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   phone : String
@@ -320,7 +320,7 @@ entity "Customer" as Customer {
 }
 
 entity "CustomerPhone" as CustomerPhone {
-+ id [PK] : String
++ id [PK] : String 
 --
   # customerId : [FK] Customer
   * phone : String
@@ -331,7 +331,7 @@ entity "CustomerPhone" as CustomerPhone {
 }
 
 entity "CheckoutRecoveryStatusHistory" as CheckoutRecoveryStatusHistory {
-+ id [PK] : String
++ id [PK] : String 
 --
   # checkoutRecoveryId : [FK] CheckoutRecovery
   fromStatus : CheckoutRecoveryStatus
@@ -343,7 +343,7 @@ entity "CheckoutRecoveryStatusHistory" as CheckoutRecoveryStatusHistory {
 }
 
 entity "CheckoutRecovery" as CheckoutRecovery {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   * checkoutToken : String
@@ -366,7 +366,7 @@ entity "CheckoutRecovery" as CheckoutRecovery {
 }
 
 entity "Conversation" as Conversation {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   # customerId : [FK] Customer
@@ -392,7 +392,7 @@ entity "Conversation" as Conversation {
 }
 
 entity "ConversationMessage" as ConversationMessage {
-+ id [PK] : String
++ id [PK] : String 
 --
   # conversationId : [FK] Conversation
   providerMessageId : String
@@ -408,7 +408,7 @@ entity "ConversationMessage" as ConversationMessage {
 }
 
 entity "MerchantPricingPlan" as MerchantPricingPlan {
-+ id [PK] : String
++ id [PK] : String 
 --
   * shopifyPlanHandle : String
   * displayName : String
@@ -426,7 +426,7 @@ entity "MerchantPricingPlan" as MerchantPricingPlan {
 }
 
 entity "MerchantPricingPlanTranslation" as MerchantPricingPlanTranslation {
-+ id [PK] : String
++ id [PK] : String 
 --
   # merchantPricingPlanId : [FK] MerchantPricingPlan
   * locale : String
@@ -436,7 +436,7 @@ entity "MerchantPricingPlanTranslation" as MerchantPricingPlanTranslation {
 }
 
 entity "MerchantPricingPlanHighlight" as MerchantPricingPlanHighlight {
-+ id [PK] : String
++ id [PK] : String 
 --
   # merchantPricingPlanId : [FK] MerchantPricingPlan
   * contentKey : String
@@ -446,7 +446,7 @@ entity "MerchantPricingPlanHighlight" as MerchantPricingPlanHighlight {
 }
 
 entity "MerchantPricingPlanHighlightTranslation" as MerchantPricingPlanHighlightTranslation {
-+ id [PK] : String
++ id [PK] : String 
 --
   # merchantPricingPlanHighlightId : [FK] MerchantPricingPlanHighlight
   * locale : String
@@ -457,7 +457,7 @@ entity "MerchantPricingPlanHighlightTranslation" as MerchantPricingPlanHighlight
 }
 
 entity "MerchantPricingUsageEvent" as MerchantPricingUsageEvent {
-+ id [PK] : String
++ id [PK] : String 
 --
   # merchantPricingPlanId : [FK] MerchantPricingPlan
   * eventHandle : String
@@ -473,7 +473,7 @@ entity "MerchantPricingUsageEvent" as MerchantPricingUsageEvent {
 }
 
 entity "MerchantPricingUsageTier" as MerchantPricingUsageTier {
-+ id [PK] : String
++ id [PK] : String 
 --
   # merchantPricingUsageEventId : [FK] MerchantPricingUsageEvent
   * position : Int
@@ -483,7 +483,7 @@ entity "MerchantPricingUsageTier" as MerchantPricingUsageTier {
 }
 
 entity "BillingPlan" as BillingPlan {
-+ id [PK] : String
++ id [PK] : String 
 --
   * shopifyPlanHandle : String
   * name : String
@@ -502,7 +502,7 @@ entity "BillingPlan" as BillingPlan {
 }
 
 entity "BillingUpgradeEconomicsEdge" as BillingUpgradeEconomicsEdge {
-+ id [PK] : String
++ id [PK] : String 
 --
   # lowerPlanId : [FK] BillingPlan
   # higherPlanId : [FK] BillingPlan
@@ -512,7 +512,7 @@ entity "BillingUpgradeEconomicsEdge" as BillingUpgradeEconomicsEdge {
 }
 
 entity "BillingEconomicsSnapshot" as BillingEconomicsSnapshot {
-+ id [PK] : String
++ id [PK] : String 
 --
   # billingPlanId : [FK] BillingPlan
   * shopifyPlanHandleSnapshot : String
@@ -530,7 +530,7 @@ entity "BillingEconomicsSnapshot" as BillingEconomicsSnapshot {
 }
 
 entity "BillingPlanFeature" as BillingPlanFeature {
-+ id [PK] : String
++ id [PK] : String 
 --
   # planId : [FK] BillingPlan
   * feature : BillingPlanFeatureIdentifier
@@ -538,7 +538,7 @@ entity "BillingPlanFeature" as BillingPlanFeature {
 }
 
 entity "Subscription" as Subscription {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   # planId : [FK] BillingPlan
@@ -565,7 +565,7 @@ entity "Subscription" as Subscription {
 }
 
 entity "UsageEvent" as UsageEvent {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   # billingPeriodId : [FK] BillingPeriod
@@ -590,7 +590,7 @@ entity "UsageEvent" as UsageEvent {
 }
 
 entity "ShopEntitlementCounter" as ShopEntitlementCounter {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   * counter : EntitlementCounter
@@ -604,7 +604,7 @@ entity "ShopEntitlementCounter" as ShopEntitlementCounter {
 }
 
 entity "BillingPeriodEntitlementCounter" as BillingPeriodEntitlementCounter {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   # billingPeriodId : [FK] BillingPeriod
@@ -619,7 +619,7 @@ entity "BillingPeriodEntitlementCounter" as BillingPeriodEntitlementCounter {
 }
 
 entity "RecoveryCreditPurchase" as RecoveryCreditPurchase {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   # planId : [FK] BillingPlan
@@ -649,7 +649,7 @@ entity "RecoveryCreditPurchase" as RecoveryCreditPurchase {
 }
 
 entity "UsageReservation" as UsageReservation {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   # counterId : [FK] ShopEntitlementCounter
@@ -667,7 +667,7 @@ entity "UsageReservation" as UsageReservation {
 }
 
 entity "PlatformBillingPolicy" as PlatformBillingPolicy {
-+ id [PK] : String
++ id [PK] : String 
 --
   * globalPauseNewRecoveries : Boolean
   * globalPauseAutomatedWhatsapp : Boolean
@@ -681,7 +681,7 @@ entity "PlatformBillingPolicy" as PlatformBillingPolicy {
 }
 
 entity "ShopBillingPolicyOverride" as ShopBillingPolicyOverride {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   outboundSoftLimit : Int
@@ -697,7 +697,7 @@ entity "ShopBillingPolicyOverride" as ShopBillingPolicyOverride {
 }
 
 entity "PromotionCampaign" as PromotionCampaign {
-+ id [PK] : String
++ id [PK] : String 
 --
   * name : String
   merchantDescription : String
@@ -715,7 +715,7 @@ entity "PromotionCampaign" as PromotionCampaign {
 }
 
 entity "PromotionCampaignTranslation" as PromotionCampaignTranslation {
-+ id [PK] : String
++ id [PK] : String 
 --
   # promotionCampaignId : [FK] PromotionCampaign
   * locale : String
@@ -726,7 +726,7 @@ entity "PromotionCampaignTranslation" as PromotionCampaignTranslation {
 }
 
 entity "PromotionCampaignEvent" as PromotionCampaignEvent {
-+ id [PK] : String
++ id [PK] : String 
 --
   # campaignId : [FK] PromotionCampaign
   * kind : PromotionCampaignEventType
@@ -737,7 +737,7 @@ entity "PromotionCampaignEvent" as PromotionCampaignEvent {
 }
 
 entity "PromotionalCreditGrant" as PromotionalCreditGrant {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   # campaignId : [FK] PromotionCampaign
@@ -755,7 +755,7 @@ entity "PromotionalCreditGrant" as PromotionalCreditGrant {
 }
 
 entity "MerchantPromotionSelection" as MerchantPromotionSelection {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   # promotionalCreditGrantId : [FK] PromotionalCreditGrant
@@ -765,7 +765,7 @@ entity "MerchantPromotionSelection" as MerchantPromotionSelection {
 }
 
 entity "BillingAuditEvent" as BillingAuditEvent {
-+ id [PK] : String
++ id [PK] : String 
 --
   * action : BillingAuditAction
   # shopId : [FK] Shop
@@ -779,7 +779,7 @@ entity "BillingAuditEvent" as BillingAuditEvent {
 }
 
 entity "BillingPeriod" as BillingPeriod {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   # subscriptionId : [FK] Subscription
@@ -798,7 +798,7 @@ entity "BillingPeriod" as BillingPeriod {
 }
 
 entity "Shop" as Shop {
-+ id [PK] : String
++ id [PK] : String 
 --
   * domain : String
   shopifyShopId : String
@@ -811,7 +811,7 @@ entity "Shop" as Shop {
 }
 
 entity "WhatsAppTemplateVariant" as WhatsAppTemplateVariant {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   * providerAccountId : String
@@ -827,7 +827,7 @@ entity "WhatsAppTemplateVariant" as WhatsAppTemplateVariant {
 }
 
 entity "Tour" as Tour {
-+ id [PK] : String
++ id [PK] : String 
 --
   * createdAt : DateTime
   * updatedAt : DateTime
@@ -840,7 +840,7 @@ entity "Tour" as Tour {
 }
 
 entity "RagSearchResults" as RagSearchResults {
-+ id [PK] : String
++ id [PK] : String 
 --
   * createdAt : DateTime
   * updatedAt : DateTime
@@ -850,7 +850,7 @@ entity "RagSearchResults" as RagSearchResults {
 }
 
 entity "PlatformAdmin" as PlatformAdmin {
-+ id [PK] : String
++ id [PK] : String 
 --
   * provider : String
   providerSubject : String
@@ -864,7 +864,7 @@ entity "PlatformAdmin" as PlatformAdmin {
 }
 
 entity "MerchantSupportThread" as MerchantSupportThread {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   lastMessageAt : DateTime
@@ -879,7 +879,7 @@ entity "MerchantSupportThread" as MerchantSupportThread {
 }
 
 entity "MerchantSupportMessage" as MerchantSupportMessage {
-+ id [PK] : String
++ id [PK] : String 
 --
   # threadId : [FK] MerchantSupportThread
   * kind : MerchantSupportMessageKind
@@ -900,7 +900,7 @@ entity "MerchantSupportMessage" as MerchantSupportMessage {
 }
 
 entity "RecoveryCreditRefund" as RecoveryCreditRefund {
-+ id [PK] : String
++ id [PK] : String 
 --
   # shopId : [FK] Shop
   # purchaseId : [FK] RecoveryCreditPurchase
@@ -939,7 +939,7 @@ entity "RecoveryCreditRefund" as RecoveryCreditRefund {
 }
 
 entity "MerchantMessageTranslation" as MerchantMessageTranslation {
-+ id [PK] : String
++ id [PK] : String 
 --
   # messageId : [FK] MerchantSupportMessage
   * direction : MerchantTranslationDirection
@@ -957,7 +957,7 @@ entity "MerchantMessageTranslation" as MerchantMessageTranslation {
 }
 
 entity "MerchantTranslationBatch" as MerchantTranslationBatch {
-+ id [PK] : String
++ id [PK] : String 
 --
   * provider : String
   * model : String
@@ -981,7 +981,7 @@ entity "MerchantTranslationBatch" as MerchantTranslationBatch {
 }
 
 entity "MerchantTranslationBatchItem" as MerchantTranslationBatchItem {
-+ id [PK] : String
++ id [PK] : String 
 --
   # batchId : [FK] MerchantTranslationBatch
   # translationId : [FK] MerchantMessageTranslation
@@ -990,7 +990,7 @@ entity "MerchantTranslationBatchItem" as MerchantTranslationBatchItem {
 }
 
 entity "MerchantTranslationReconciliationRequest" as MerchantTranslationReconciliationRequest {
-+ id [PK] : String
++ id [PK] : String 
 --
   # requestedByPlatformAdminId : [FK] PlatformAdmin
   * scope : MerchantTranslationReconciliationScope
@@ -1003,7 +1003,7 @@ entity "MerchantTranslationReconciliationRequest" as MerchantTranslationReconcil
 }
 
 entity "BackgroundRuntimeConfig" as BackgroundRuntimeConfig {
-+ id [PK] : String
++ id [PK] : String 
 --
   * version : Int
   * billingReconciliationIntervalSeconds : Int
@@ -1052,7 +1052,7 @@ entity "BackgroundRuntimeConfig" as BackgroundRuntimeConfig {
 }
 
 entity "BackgroundRuntimeConfigAuditEvent" as BackgroundRuntimeConfigAuditEvent {
-+ id [PK] : String
++ id [PK] : String 
 --
   # configId : [FK] BackgroundRuntimeConfig
   * section : BackgroundRuntimeConfigSection
@@ -1066,7 +1066,7 @@ entity "BackgroundRuntimeConfigAuditEvent" as BackgroundRuntimeConfigAuditEvent 
 }
 
 entity "BackgroundRuntimeLease" as BackgroundRuntimeLease {
-+ name [PK] : BackgroundRuntimeLeaseName
++ name [PK] : BackgroundRuntimeLeaseName 
 --
   * ownerToken : String
   * generation : Int
