@@ -149,6 +149,22 @@ enum "BillingAuditAction" as BillingAuditAction {
   RECOVERY_CREDIT_REFUND
   UPGRADE_ECONOMICS_EVALUATED
 }
+enum "MerchantPricingPlanKind" as MerchantPricingPlanKind {
+  FREE
+  PAID_METERED
+}
+enum "MerchantPricingAllowancePeriod" as MerchantPricingAllowancePeriod {
+  LIFETIME
+  EVERY_30_DAYS
+}
+enum "MerchantPricingBillingPeriod" as MerchantPricingBillingPeriod {
+  EVERY_30_DAYS
+}
+enum "MerchantPricingUsagePricingMode" as MerchantPricingUsagePricingMode {
+  FIXED
+  GRADUATED
+  VOLUME
+}
 enum "PromotionTargetScope" as PromotionTargetScope {
   GLOBAL
   PLAN
@@ -377,6 +393,60 @@ entity "ConversationMessage" as ConversationMessage {
   sentAt : DateTime
   deliveredAt : DateTime
   readAt : DateTime
+}
+
+entity "MerchantPricingPlan" as MerchantPricingPlan {
++ id [PK] : String
+--
+  * shopifyPlanHandle : String
+  * displayName : String
+  * planKind : MerchantPricingPlanKind
+  * isActive : Boolean
+  * cataloguePosition : Int
+  * featured : Boolean
+  * includedRecoveryCredits : Int
+  * allowancePeriod : MerchantPricingAllowancePeriod
+  * billingPeriod : MerchantPricingBillingPeriod
+  * recurringAmountMinor : Int
+  * currency : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantPricingPlanTranslation" as MerchantPricingPlanTranslation {
++ id [PK] : String
+--
+  # merchantPricingPlanId : [FK] MerchantPricingPlan
+  * locale : String
+  * merchantDescription : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantPricingUsageEvent" as MerchantPricingUsageEvent {
++ id [PK] : String
+--
+  # merchantPricingPlanId : [FK] MerchantPricingPlan
+  * eventHandle : String
+  * adminLabel : String
+  * creditsGrantedPerUnit : Int
+  * position : Int
+  * pricingMode : MerchantPricingUsagePricingMode
+  * currency : String
+  fixedUnitAmountMinor : Int
+  maximumUnitsPerBillingPeriod : Int
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantPricingUsageTier" as MerchantPricingUsageTier {
++ id [PK] : String
+--
+  # merchantPricingUsageEventId : [FK] MerchantPricingUsageEvent
+  * position : Int
+  upTo : Int
+  * amountPerUnitMinor : Int
+  * flatAmountMinor : Int
 }
 
 entity "BillingPlan" as BillingPlan {
@@ -900,6 +970,9 @@ Conversation }o--o| Shop
 Conversation }o--o| Customer
 Conversation |o--o| CheckoutRecovery
 ConversationMessage }o--|| Conversation
+MerchantPricingPlanTranslation }o--|| MerchantPricingPlan
+MerchantPricingUsageEvent }o--|| MerchantPricingPlan
+MerchantPricingUsageTier }o--|| MerchantPricingUsageEvent
 BillingUpgradeEconomicsEdge |o--|| BillingPlan
 BillingUpgradeEconomicsEdge |o--|| BillingPlan
 BillingEconomicsSnapshot }o--|| BillingPlan
@@ -970,6 +1043,10 @@ Conversation |o--|| LanguageSource
 ConversationMessage |o--|| MessageDirection
 ConversationMessage |o--|| MessageSenderType
 ConversationMessage |o--|| MessageStatus
+MerchantPricingPlan |o--|| MerchantPricingPlanKind
+MerchantPricingPlan |o--|| MerchantPricingAllowancePeriod
+MerchantPricingPlan |o--|| MerchantPricingBillingPeriod
+MerchantPricingUsageEvent |o--|| MerchantPricingUsagePricingMode
 BillingPlan |o--|| BillingPlanKind
 BillingPlanFeature |o--|| BillingPlanFeatureIdentifier
 Subscription |o--|| SubscriptionProjectionStatus

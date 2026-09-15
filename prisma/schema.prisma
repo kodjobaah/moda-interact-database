@@ -480,6 +480,107 @@ enum BillingAuditAction {
   @@schema("billing")
 }
 
+enum MerchantPricingPlanKind {
+  FREE
+  PAID_METERED
+
+  @@schema("billing")
+}
+
+enum MerchantPricingAllowancePeriod {
+  LIFETIME
+  EVERY_30_DAYS
+
+  @@schema("billing")
+}
+
+enum MerchantPricingBillingPeriod {
+  EVERY_30_DAYS
+
+  @@schema("billing")
+}
+
+enum MerchantPricingUsagePricingMode {
+  FIXED
+  GRADUATED
+  VOLUME
+
+  @@schema("billing")
+}
+
+model MerchantPricingPlan {
+  id String @id @default(cuid())
+  shopifyPlanHandle String @unique
+
+  displayName String
+  planKind MerchantPricingPlanKind
+  isActive Boolean @default(true)
+  cataloguePosition Int
+  featured Boolean @default(false)
+  includedRecoveryCredits Int
+  allowancePeriod MerchantPricingAllowancePeriod
+  billingPeriod MerchantPricingBillingPeriod
+  recurringAmountMinor Int
+  currency String @db.Char(3)
+
+  translations MerchantPricingPlanTranslation[]
+  usageEvents MerchantPricingUsageEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, cataloguePosition])
+  @@index([planKind, isActive])
+  @@schema("billing")
+}
+
+model MerchantPricingPlanTranslation {
+  id String @id @default(cuid())
+  merchantPricingPlanId String
+  merchantPricingPlan MerchantPricingPlan @relation(fields:[merchantPricingPlanId], references:[id], onDelete:Cascade)
+  locale String @db.VarChar(16)
+  merchantDescription String @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([merchantPricingPlanId, locale])
+  @@schema("billing")
+}
+
+model MerchantPricingUsageEvent {
+  id String @id @default(cuid())
+  merchantPricingPlanId String
+  merchantPricingPlan MerchantPricingPlan @relation(fields:[merchantPricingPlanId], references:[id], onDelete:Cascade)
+  eventHandle String
+  adminLabel String
+  creditsGrantedPerUnit Int
+  position Int
+  pricingMode MerchantPricingUsagePricingMode
+  currency String @db.Char(3)
+  fixedUnitAmountMinor Int?
+  maximumUnitsPerBillingPeriod Int?
+  tiers MerchantPricingUsageTier[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([merchantPricingPlanId, eventHandle])
+  @@unique([merchantPricingPlanId, position])
+  @@schema("billing")
+}
+
+model MerchantPricingUsageTier {
+  id String @id @default(cuid())
+  merchantPricingUsageEventId String
+  merchantPricingUsageEvent MerchantPricingUsageEvent @relation(fields:[merchantPricingUsageEventId], references:[id], onDelete:Cascade)
+  position Int
+  upTo Int?
+  amountPerUnitMinor Int
+  flatAmountMinor Int
+
+  @@unique([merchantPricingUsageEventId, position])
+  @@schema("billing")
+}
+
 model BillingPlan {
   id String @id @default(cuid())
 
