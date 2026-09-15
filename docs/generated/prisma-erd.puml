@@ -702,6 +702,17 @@ entity "PromotionCampaign" as PromotionCampaign {
   * version : Int
 }
 
+entity "PromotionCampaignTranslation" as PromotionCampaignTranslation {
++ id [PK] : String
+--
+  # promotionCampaignId : [FK] PromotionCampaign
+  * locale : String
+  * merchantTitle : String
+  * merchantDescription : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 entity "PromotionCampaignEvent" as PromotionCampaignEvent {
 + id [PK] : String
 --
@@ -1027,6 +1038,7 @@ ShopBillingPolicyOverride }o--o| PlatformAdmin
 PromotionCampaign }o--o| BillingPlan
 PromotionCampaign }o--o| Shop
 PromotionCampaign }o--|| PlatformAdmin
+PromotionCampaignTranslation }o--|| PromotionCampaign
 PromotionCampaignEvent }o--|| PromotionCampaign
 PromotionCampaignEvent }o--|| PlatformAdmin
 PromotionalCreditGrant }o--|| Shop

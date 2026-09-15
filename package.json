@@ -12,6 +12,7 @@
     "migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
     "prisma:validate": "prisma validate --schema prisma/schema.prisma",
     "test:first-production-baseline": "node scripts/validate-first-production-baseline.mjs",
+    "test:arch014-promotion-campaign-translations": "node scripts/validate-arch014-promotion-campaign-translations.mjs",
     "test:arch015-fractional-provider-usage": "node scripts/validate-arch015-fractional-provider-usage-snapshots.mjs",
     "erd:puml": "node scripts/generate-erd.mjs",
     "erd:png": "plantuml -tpng docs/generated/prisma-erd.puml",
