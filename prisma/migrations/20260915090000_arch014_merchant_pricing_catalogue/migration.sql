@@ -220,7 +220,16 @@ $$;
 CREATE OR REPLACE FUNCTION billing.validate_arch014_merchant_pricing_translation_trigger()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  PERFORM billing.validate_arch014_merchant_pricing_plan(COALESCE(NEW."merchantPricingPlanId", OLD."merchantPricingPlanId"));
+  IF TG_OP = 'INSERT' THEN
+    PERFORM billing.validate_arch014_merchant_pricing_plan(NEW."merchantPricingPlanId");
+  ELSIF TG_OP = 'DELETE' THEN
+    PERFORM billing.validate_arch014_merchant_pricing_plan(OLD."merchantPricingPlanId");
+  ELSE
+    PERFORM billing.validate_arch014_merchant_pricing_plan(OLD."merchantPricingPlanId");
+    IF OLD."merchantPricingPlanId" IS DISTINCT FROM NEW."merchantPricingPlanId" THEN
+      PERFORM billing.validate_arch014_merchant_pricing_plan(NEW."merchantPricingPlanId");
+    END IF;
+  END IF;
   RETURN COALESCE(NEW, OLD);
 END;
 $$;
@@ -228,15 +237,49 @@ $$;
 CREATE OR REPLACE FUNCTION billing.validate_arch014_merchant_pricing_usage_trigger()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  PERFORM billing.validate_arch014_merchant_pricing_plan(COALESCE(NEW."merchantPricingPlanId", OLD."merchantPricingPlanId"));
+  IF TG_OP = 'INSERT' THEN
+    PERFORM billing.validate_arch014_merchant_pricing_plan(NEW."merchantPricingPlanId");
+  ELSIF TG_OP = 'DELETE' THEN
+    PERFORM billing.validate_arch014_merchant_pricing_plan(OLD."merchantPricingPlanId");
+  ELSE
+    PERFORM billing.validate_arch014_merchant_pricing_plan(OLD."merchantPricingPlanId");
+    IF OLD."merchantPricingPlanId" IS DISTINCT FROM NEW."merchantPricingPlanId" THEN
+      PERFORM billing.validate_arch014_merchant_pricing_plan(NEW."merchantPricingPlanId");
+    END IF;
+  END IF;
   RETURN COALESCE(NEW, OLD);
 END;
 $$;
 
 CREATE OR REPLACE FUNCTION billing.validate_arch014_merchant_pricing_tier_trigger()
 RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  old_plan_id text;
+  new_plan_id text;
 BEGIN
-  PERFORM billing.validate_arch014_merchant_pricing_plan((SELECT "merchantPricingPlanId" FROM "billing"."MerchantPricingUsageEvent" WHERE "id" = COALESCE(NEW."merchantPricingUsageEventId", OLD."merchantPricingUsageEventId")));
+  IF TG_OP = 'INSERT' THEN
+    SELECT "merchantPricingPlanId" INTO new_plan_id
+    FROM "billing"."MerchantPricingUsageEvent"
+    WHERE "id" = NEW."merchantPricingUsageEventId";
+    PERFORM billing.validate_arch014_merchant_pricing_plan(new_plan_id);
+  ELSIF TG_OP = 'DELETE' THEN
+    SELECT "merchantPricingPlanId" INTO old_plan_id
+    FROM "billing"."MerchantPricingUsageEvent"
+    WHERE "id" = OLD."merchantPricingUsageEventId";
+    PERFORM billing.validate_arch014_merchant_pricing_plan(old_plan_id);
+  ELSE
+    SELECT "merchantPricingPlanId" INTO old_plan_id
+    FROM "billing"."MerchantPricingUsageEvent"
+    WHERE "id" = OLD."merchantPricingUsageEventId";
+    SELECT "merchantPricingPlanId" INTO new_plan_id
+    FROM "billing"."MerchantPricingUsageEvent"
+    WHERE "id" = NEW."merchantPricingUsageEventId";
+    PERFORM billing.validate_arch014_merchant_pricing_plan(old_plan_id);
+    IF OLD."merchantPricingUsageEventId" IS DISTINCT FROM NEW."merchantPricingUsageEventId"
+      OR old_plan_id IS DISTINCT FROM new_plan_id THEN
+      PERFORM billing.validate_arch014_merchant_pricing_plan(new_plan_id);
+    END IF;
+  END IF;
   RETURN COALESCE(NEW, OLD);
 END;
 $$;
