@@ -243,6 +243,18 @@ enum "MerchantTranslationReconciliationStatus" as MerchantTranslationReconciliat
   COMPLETED
   FAILED
 }
+enum "BackgroundRuntimeConfigSection" as BackgroundRuntimeConfigSection {
+  OPERATIONAL
+  ADVANCED
+  ABUSE_PROTECTION
+  WORKER_THROUGHPUT
+}
+enum "BackgroundRuntimeLeaseName" as BackgroundRuntimeLeaseName {
+  BILLING_RECONCILIATION
+  RECOVERY_CAPACITY_REPAIR
+  TRANSLATION_RECONCILIATION
+  QUEUE_CONCURRENCY_RECONCILIATION
+}
 entity "Session" as Session {
 + id [PK] : String
 --
@@ -990,6 +1002,80 @@ entity "MerchantTranslationReconciliationRequest" as MerchantTranslationReconcil
   completedAt : DateTime
 }
 
+entity "BackgroundRuntimeConfig" as BackgroundRuntimeConfig {
++ id [PK] : String
+--
+  * version : Int
+  * billingReconciliationIntervalSeconds : Int
+  * billingReconciliationShopBatchSize : Int
+  * shopifyUsagePublishBatchSize : Int
+  * recoveryRepairIntervalSeconds : Int
+  * recoveryRepairShopBatchSize : Int
+  * recoveryResumeBatchSize : Int
+  * translationReconciliationIntervalSeconds : Int
+  * translationBatchMaxRequests : Int
+  * conversationQuietWindowMs : Int
+  * conversationMaxSettleWindowMs : Int
+  * billingFrozenRecheckSeconds : Int
+  * billingProviderRetrySeconds : Int
+  * shopifyUsageRetryBaseSeconds : Int
+  * shopifyUsageRetryMaxSeconds : Int
+  * translationReconciliationPageSize : Int
+  * translationClaimTimeoutSeconds : Int
+  * translationSubmitRetrySeconds : Int
+  * translationInitialPollSeconds : Int
+  * translationPollIntervalSeconds : Int
+  * translationResultRetrySeconds : Int
+  * translationSubmitMaxAttempts : Int
+  * translationMaxAutoRetries : Int
+  * rawSenderLimitPerMinute : Int
+  * rawGlobalLimitPerMinute : Int
+  * turnSenderLimitPerMinute : Int
+  * turnSenderLimitPerTenMinutes : Int
+  * turnConversationLimitPerMinute : Int
+  * turnConversationLimitPerTenMinutes : Int
+  * turnShopLimitPerMinute : Int
+  * turnGlobalLimitPerMinute : Int
+  * discoverySenderLimitPerMinute : Int
+  * discoverySenderLimitPerTenMinutes : Int
+  * discoveryConversationLimitPerMinute : Int
+  * discoveryConversationLimitPerTenMinutes : Int
+  * checkoutQueueGlobalConcurrency : Int
+  * orderQueueGlobalConcurrency : Int
+  * pendingRecoveryQueueGlobalConcurrency : Int
+  * recoveryResumeQueueGlobalConcurrency : Int
+  * whatsappQueueGlobalConcurrency : Int
+  * merchantCommunicationsQueueGlobalConcurrency : Int
+  * billingSubscriptionQueueGlobalConcurrency : Int
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "BackgroundRuntimeConfigAuditEvent" as BackgroundRuntimeConfigAuditEvent {
++ id [PK] : String
+--
+  # configId : [FK] BackgroundRuntimeConfig
+  * section : BackgroundRuntimeConfigSection
+  * expectedVersion : Int
+  * resultingVersion : Int
+  * platformAdminId : String
+  * reason : String
+  * beforeValue : Json
+  * afterValue : Json
+  * createdAt : DateTime
+}
+
+entity "BackgroundRuntimeLease" as BackgroundRuntimeLease {
++ name [PK] : BackgroundRuntimeLeaseName
+--
+  * ownerToken : String
+  * generation : Int
+  * acquiredAt : DateTime
+  * heartbeatAt : DateTime
+  * leaseUntil : DateTime
+  * updatedAt : DateTime
+}
+
 ' Relations
 ShopSettings |o--|| Shop
 ShopBrand |o--|| Shop
@@ -1066,6 +1152,7 @@ MerchantMessageTranslation }o--o| MerchantTranslationBatch
 MerchantTranslationBatchItem }o--|| MerchantTranslationBatch
 MerchantTranslationBatchItem }o--|| MerchantMessageTranslation
 MerchantTranslationReconciliationRequest }o--|| PlatformAdmin
+BackgroundRuntimeConfigAuditEvent }o--|| BackgroundRuntimeConfig
 ' ManyToMany Relations
 ' enum relations
 CheckoutRecoveryStatusHistory |o--|| CheckoutRecoveryStatus
@@ -1113,4 +1200,6 @@ MerchantMessageTranslation |o--|| MerchantMessageTranslationStatus
 MerchantTranslationBatch |o--|| MerchantTranslationBatchStatus
 MerchantTranslationReconciliationRequest |o--|| MerchantTranslationReconciliationScope
 MerchantTranslationReconciliationRequest |o--|| MerchantTranslationReconciliationStatus
+BackgroundRuntimeConfigAuditEvent |o--|| BackgroundRuntimeConfigSection
+BackgroundRuntimeLease |o--|| BackgroundRuntimeLeaseName
 @enduml
