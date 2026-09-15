@@ -423,6 +423,27 @@ entity "MerchantPricingPlanTranslation" as MerchantPricingPlanTranslation {
   * updatedAt : DateTime
 }
 
+entity "MerchantPricingPlanHighlight" as MerchantPricingPlanHighlight {
++ id [PK] : String
+--
+  # merchantPricingPlanId : [FK] MerchantPricingPlan
+  * contentKey : String
+  * position : Int
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantPricingPlanHighlightTranslation" as MerchantPricingPlanHighlightTranslation {
++ id [PK] : String
+--
+  # merchantPricingPlanHighlightId : [FK] MerchantPricingPlanHighlight
+  * locale : String
+  * merchantTitle : String
+  * merchantDescription : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 entity "MerchantPricingUsageEvent" as MerchantPricingUsageEvent {
 + id [PK] : String
 --
@@ -971,6 +992,8 @@ Conversation }o--o| Customer
 Conversation |o--o| CheckoutRecovery
 ConversationMessage }o--|| Conversation
 MerchantPricingPlanTranslation }o--|| MerchantPricingPlan
+MerchantPricingPlanHighlight }o--|| MerchantPricingPlan
+MerchantPricingPlanHighlightTranslation }o--|| MerchantPricingPlanHighlight
 MerchantPricingUsageEvent }o--|| MerchantPricingPlan
 MerchantPricingUsageTier }o--|| MerchantPricingUsageEvent
 BillingUpgradeEconomicsEdge |o--|| BillingPlan

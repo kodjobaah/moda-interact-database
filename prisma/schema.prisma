@@ -525,6 +525,7 @@ model MerchantPricingPlan {
 
   translations MerchantPricingPlanTranslation[]
   usageEvents MerchantPricingUsageEvent[]
+  highlights MerchantPricingPlanHighlight[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -544,6 +545,41 @@ model MerchantPricingPlanTranslation {
   updatedAt DateTime @updatedAt
 
   @@unique([merchantPricingPlanId, locale])
+  @@schema("billing")
+}
+
+model MerchantPricingPlanHighlight {
+  id                    String   @id @default(cuid())
+  merchantPricingPlanId String
+  merchantPricingPlan   MerchantPricingPlan @relation(fields: [merchantPricingPlanId], references: [id], onDelete: Cascade)
+
+  contentKey String @db.Uuid
+  position   Int
+
+  translations MerchantPricingPlanHighlightTranslation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([merchantPricingPlanId, contentKey])
+  @@unique([merchantPricingPlanId, position])
+  @@index([merchantPricingPlanId])
+  @@schema("billing")
+}
+
+model MerchantPricingPlanHighlightTranslation {
+  id                             String @id @default(cuid())
+  merchantPricingPlanHighlightId String
+  merchantPricingPlanHighlight   MerchantPricingPlanHighlight @relation(fields: [merchantPricingPlanHighlightId], references: [id], onDelete: Cascade)
+
+  locale              String @db.VarChar(16)
+  merchantTitle       String @db.VarChar(120)
+  merchantDescription String @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([merchantPricingPlanHighlightId, locale])
   @@schema("billing")
 }
 
