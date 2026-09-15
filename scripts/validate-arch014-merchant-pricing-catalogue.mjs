@@ -66,13 +66,32 @@ const locales = ["cs", "da", "de", "en", "es", "fi", "fr", "it", "ja", "ko", "nb
 expect(locales.every((locale) => migration.includes(`'${locale}'`)), "migration is missing a canonical locale literal");
 expect(/ck_merchant_pricing_translation_locale[\s\S]*IN \('cs', 'da', 'de', 'en', 'es', 'fi', 'fr', 'it', 'ja', 'ko', 'nb', 'nl', 'pl', 'pt-BR', 'pt-PT', 'sv', 'th', 'tr', 'zh-Hans', 'zh-Hant'\)/.test(migration), "locale CHECK does not contain the exact canonical set");
 
-const checkNames = [
-  "ck_merchant_pricing_plan_handle_nonblank", "ck_merchant_pricing_plan_display_name_nonblank", "ck_merchant_pricing_plan_catalogue_position",
-  "ck_merchant_pricing_plan_included_credits_nonnegative", "ck_merchant_pricing_plan_recurring_amount_nonnegative", "ck_merchant_pricing_plan_currency",
-  "ck_merchant_pricing_translation_locale", "ck_merchant_pricing_translation_description", "ck_merchant_pricing_usage_handle_nonblank",
-  "ck_merchant_pricing_usage_admin_label", "ck_merchant_pricing_usage_credits_positive", "ck_merchant_pricing_usage_position", "ck_merchant_pricing_usage_currency",
-  "ck_merchant_pricing_usage_fixed_amount", "ck_merchant_pricing_usage_maximum_units", "ck_merchant_pricing_tier_position", "ck_merchant_pricing_tier_up_to", "ck_merchant_pricing_tier_amounts",
-];
+const exactChecks = {
+  ck_merchant_pricing_plan_handle_nonblank: `btrim("shopifyPlanHandle") <> ''`,
+  ck_merchant_pricing_plan_display_name_nonblank: `btrim("displayName") <> ''`,
+  ck_merchant_pricing_plan_catalogue_position: `"cataloguePosition" >= 0`,
+  ck_merchant_pricing_plan_included_credits_nonnegative: `"includedRecoveryCredits" >= 0`,
+  ck_merchant_pricing_plan_recurring_amount_nonnegative: `"recurringAmountMinor" >= 0`,
+  ck_merchant_pricing_plan_currency: `"currency" ~ '^[A-Z]{3}$'`,
+  ck_merchant_pricing_translation_locale: `"locale" IN ('cs', 'da', 'de', 'en', 'es', 'fi', 'fr', 'it', 'ja', 'ko', 'nb', 'nl', 'pl', 'pt-BR', 'pt-PT', 'sv', 'th', 'tr', 'zh-Hans', 'zh-Hant')`,
+  ck_merchant_pricing_translation_description: `btrim("merchantDescription") <> '' AND char_length("merchantDescription") <= 2000`,
+  ck_merchant_pricing_usage_handle_nonblank: `btrim("eventHandle") <> ''`,
+  ck_merchant_pricing_usage_admin_label: `btrim("adminLabel") <> '' AND char_length("adminLabel") <= 255`,
+  ck_merchant_pricing_usage_credits_positive: `"creditsGrantedPerUnit" > 0`,
+  ck_merchant_pricing_usage_position: `"position" BETWEEN 0 AND 4`,
+  ck_merchant_pricing_usage_currency: `"currency" ~ '^[A-Z]{3}$'`,
+  ck_merchant_pricing_usage_fixed_amount: `"fixedUnitAmountMinor" IS NULL OR "fixedUnitAmountMinor" >= 0`,
+  ck_merchant_pricing_usage_maximum_units: `"maximumUnitsPerBillingPeriod" IS NULL OR "maximumUnitsPerBillingPeriod" > 0`,
+  ck_merchant_pricing_tier_position: `"position" BETWEEN 0 AND 5`,
+  ck_merchant_pricing_tier_up_to: `"upTo" IS NULL OR "upTo" > 0`,
+  ck_merchant_pricing_tier_amounts: `"amountPerUnitMinor" >= 0 AND "flatAmountMinor" >= 0`,
+};
+
+for (const [name, expression] of Object.entries(exactChecks)) {
+  expect(migration.includes(`CONSTRAINT "${name}" CHECK (${expression})`), `check ${name} does not have the exact required expression`);
+}
+
+const checkNames = Object.keys(exactChecks);
 for (const name of checkNames) expect(migration.includes(`CONSTRAINT "${name}"`), `missing named check ${name}`);
 expect(/CONSTRAINT "uq_merchant_pricing_plan_catalogue_position" UNIQUE \("cataloguePosition"\) DEFERRABLE INITIALLY DEFERRED/.test(migration), "missing deferred catalogue-position uniqueness");
 expect(migration.includes("billing.validate_arch014_merchant_pricing_plan(plan_id text)"), "missing per-plan validation function");
@@ -84,6 +103,18 @@ const allowedMigrationTargets = new Set(["MerchantPricingPlan", "MerchantPricing
 for (const match of migration.matchAll(/ALTER TABLE\s+"(?:billing|public|commerce|shopify|whatsapp|support)"\."([^"]+)"/g)) {
   expect(allowedMigrationTargets.has(match[1]), `migration alters non-ARCH-014 table ${match[1]}`);
 }
+for (const match of migration.matchAll(/CREATE TABLE\s+"(?:billing|public|commerce|shopify|whatsapp|support)"\."([^"]+)"/g)) {
+  expect(allowedMigrationTargets.has(match[1]), `migration creates non-ARCH-014 table ${match[1]}`);
+}
+for (const match of migration.matchAll(/CREATE TYPE\s+"(?:billing|public|commerce|shopify|whatsapp|support)"\."([^"]+)"/g)) {
+  expect(match[1].startsWith("MerchantPricing"), `migration creates non-ARCH-014 type ${match[1]}`);
+}
+for (const match of migration.matchAll(/CREATE(?: OR REPLACE)? FUNCTION\s+billing\.([a-zA-Z0-9_]+)\s*\(/g)) {
+  expect(match[1].startsWith("validate_arch014_merchant_pricing_"), `migration creates non-ARCH-014 function ${match[1]}`);
+}
+for (const match of migration.matchAll(/ON\s+"billing"\."([^"]+)"\s+DEFERRABLE/g)) {
+  expect(allowedMigrationTargets.has(match[1]), `migration creates a deferred trigger on non-ARCH-014 table ${match[1]}`);
+}
 for (const forbidden of ["BillingPlan", "BillingEconomicsSnapshot", "BillingUpgradeEconomicsEdge", "PlatformAdmin"]) {
   expect(!migration.includes(`"${forbidden}"`), `migration references pre-existing table ${forbidden}`);
 }
@@ -92,9 +123,15 @@ for (const forbiddenModel of ["BillingPlan", "BillingEconomicsSnapshot", "Billin
   const current = modelBlock(forbiddenModel);
   let original = "";
   try {
-    original = execFileSync("git", ["show", `HEAD:prisma/schema.prisma`], { cwd: repositoryRoot, encoding: "utf8" }).match(new RegExp(`model ${forbiddenModel} \\{([\\s\\S]*?)\\n\\}`))?.[1] ?? "";
+    let baselineRef;
+    try {
+      baselineRef = execFileSync("git", ["rev-parse", "--verify", "origin/main^{commit}"], { cwd: repositoryRoot, encoding: "utf8" }).trim();
+    } catch {
+      baselineRef = execFileSync("git", ["rev-parse", "--verify", "HEAD^"], { cwd: repositoryRoot, encoding: "utf8" }).trim();
+    }
+    original = execFileSync("git", ["show", `${baselineRef}:prisma/schema.prisma`], { cwd: repositoryRoot, encoding: "utf8" }).match(new RegExp(`model ${forbiddenModel} \\{([\\s\\S]*?)\\n\\}`))?.[1] ?? "";
   } catch {
-    failures.push("unable to inspect HEAD schema for additive-only model comparison");
+    failures.push("unable to inspect baseline schema for additive-only model comparison");
   }
   expect(current === original, `pre-existing model ${forbiddenModel} changed`);
 }
@@ -110,6 +147,15 @@ const allowedFiles = new Set([
 for (const file of changedFiles) {
   const normalizedFile = file.endsWith("/") ? `${file}migration.sql` : file;
   expect(allowedFiles.has(normalizedFile), `unauthorized changed file ${file}`);
+}
+
+try {
+  const baselineRef = execFileSync("git", ["rev-parse", "--verify", "origin/main^{commit}"], { cwd: repositoryRoot, encoding: "utf8" }).trim();
+  const committedFiles = execFileSync("git", ["diff", "--name-only", `${baselineRef}...HEAD`], { cwd: repositoryRoot, encoding: "utf8" })
+    .split("\n").filter(Boolean);
+  for (const file of committedFiles) expect(allowedFiles.has(file), `unauthorized committed file ${file}`);
+} catch {
+  failures.push("unable to inspect committed diff for additive-only file scope");
 }
 
 if (failures.length > 0) {
