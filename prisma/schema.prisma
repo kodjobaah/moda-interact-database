@@ -43,13 +43,150 @@ model ShopSettings {
 
   onboardingCompleted  Boolean  @default(false)
   plan                 String?
-  recoveryDelayMinutes Int      @default(30)
-  defaultLanguageTag   String?
+  recoveryDelayMinutes   Int                  @default(30)
+  recoveryOfferMode      RecoveryOfferMode    @default(NONE)
+  fixedShopifyDiscountId String?
+  fixedShopifyDiscount   ShopifyDiscount?     @relation("ShopSettingsFixedDiscount", fields: [fixedShopifyDiscountId], references: [id], onDelete: SetNull)
+  followUpEnabled        Boolean              @default(false)
+  followUpDelayMinutes   Int?
+  defaultLanguageTag     String?
   defaultTimeZone      String?
   defaultCountryCode   String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
+  @@schema("shopify")
+}
+
+enum RecoveryOfferMode {
+  NONE
+  FIXED
+  AI_BEST_APPLICABLE
+
+  @@schema("shopify")
+}
+
+enum ShopifyDiscountCatalogueStatus {
+  UNAVAILABLE
+  SYNC_REQUIRED
+  SYNCING
+  CURRENT
+  ERROR
+
+  @@schema("shopify")
+}
+
+enum ShopifyDiscountMethod {
+  AUTOMATIC
+  CODE
+
+  @@schema("shopify")
+}
+
+model ShopifyDiscountCatalogue {
+  id String @id @default(cuid())
+
+  shopId String @unique
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  status               ShopifyDiscountCatalogueStatus @default(UNAVAILABLE)
+  syncGeneration       Int @default(0)
+  activeSyncToken      String?
+  syncRequestedAt      DateTime?
+  syncStartedAt        DateTime?
+  lastSuccessfulSyncAt DateTime?
+  lastErrorAt          DateTime?
+  lastErrorCode        String? @db.VarChar(128)
+  unavailableAt        DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  discounts ShopifyDiscount[] @relation("ShopifyDiscountCatalogue")
+
+  @@schema("shopify")
+}
+
+model ShopifyDiscount {
+  id String @id @default(cuid())
+
+  shopId String
+  shop   Shop   @relation("ShopifyDiscountShop", fields: [shopId], references: [id], onDelete: Cascade, map: "ShopifyDiscount_shop_fkey")
+
+  shopifyDiscountNodeId  String
+  providerType           String @db.VarChar(128)
+  method                 ShopifyDiscountMethod
+  providerStatus         String @db.VarChar(64)
+  title                  String
+  summary                String?
+  startsAt               DateTime?
+  endsAt                 DateTime?
+  codeCount              Int?
+  singleRedeemCode       String?
+  fixedSelectable        Boolean @default(false)
+  providerSnapshot       Json
+  isAvailable            Boolean @default(false)
+  lastSeenSyncGeneration Int
+  lastSyncedAt           DateTime
+  unavailableAt          DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  catalogue                  ShopifyDiscountCatalogue @relation("ShopifyDiscountCatalogue", fields: [shopId], references: [shopId], onDelete: Cascade, map: "ShopifyDiscount_catalogue_fkey")
+  settingsUsingFixed         ShopSettings[] @relation("ShopSettingsFixedDiscount")
+  policyOverridesUsingFixed ShopRecoveryPolicyOverride[] @relation("PolicyOverrideFixedDiscount")
+  outreachAttemptsUsingFixed RecoveryOutreachAttempt[] @relation("OutreachAttemptFixedDiscount")
+
+  @@unique([shopId, shopifyDiscountNodeId])
+  @@index([shopId, isAvailable, providerStatus])
+  @@index([shopId, fixedSelectable, isAvailable])
+  @@index([shopId, startsAt, endsAt])
+  @@schema("shopify")
+}
+
+model ShopRecoveryPolicyOverride {
+  id String @id @default(cuid())
+
+  shopId String @unique
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  recoveryDelayMinutes      Int
+  recoveryOfferMode         RecoveryOfferMode
+  fixedShopifyDiscountId    String?
+  fixedShopifyDiscount      ShopifyDiscount? @relation("PolicyOverrideFixedDiscount", fields: [fixedShopifyDiscountId], references: [id], onDelete: SetNull)
+  followUpEnabled           Boolean
+  followUpDelayMinutes      Int?
+  reason                    String @db.VarChar(1000)
+  expiresAt                 DateTime?
+  updatedByPlatformAdminId  String
+  updatedByPlatformAdmin    PlatformAdmin @relation(fields: [updatedByPlatformAdminId], references: [id])
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@schema("shopify")
+}
+
+enum ShopRecoveryPolicyOverrideAuditAction {
+  UPSERT
+  CLEAR
+
+  @@schema("shopify")
+}
+
+model ShopRecoveryPolicyOverrideAuditEvent {
+  id String @id @default(cuid())
+
+  shopId          String
+  shop            Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  platformAdminId String
+  platformAdmin   PlatformAdmin @relation(fields: [platformAdminId], references: [id])
+  action          ShopRecoveryPolicyOverrideAuditAction
+  reason          String @db.VarChar(1000)
+  beforeValue     Json?
+  afterValue      Json?
+  occurredAt      DateTime @default(now())
+
+  @@index([shopId, occurredAt])
+  @@index([platformAdminId, occurredAt])
   @@schema("shopify")
 }
 
@@ -170,14 +307,16 @@ model CheckoutRecovery {
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id])
 
-  status CheckoutRecoveryStatus @default(DETECTED)
+  status     CheckoutRecoveryStatus @default(DETECTED)
+  generation Int                  @default(1)
 
   currency    String?
   totalPrice  Decimal?
   checkoutUrl String?
   lineItems   Json?
 
-  detectedAt    DateTime  @default(now())
+  detectedAt             DateTime  @default(now())
+  lastExternalActivityAt DateTime
   messageSentAt DateTime?
   engagedAt     DateTime?
   completedAt   DateTime?
@@ -189,12 +328,65 @@ model CheckoutRecovery {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  conversation  Conversation?
-  statusHistory CheckoutRecoveryStatusHistory[]
+  conversation     Conversation?
+  statusHistory    CheckoutRecoveryStatusHistory[]
+  outreachAttempts RecoveryOutreachAttempt[]
 
-  @@unique([shopId, checkoutToken])
+  @@unique([shopId, checkoutToken, generation])
+  @@index([shopId, checkoutToken, generation])
+  @@index([status, lastExternalActivityAt])
   @@index([customerId])
   @@index([shopId, admissionBlockReason, status, detectedAt])
+  @@schema("commerce")
+}
+
+enum RecoveryOutreachTrigger {
+  INITIAL
+  NO_RESPONSE_FOLLOW_UP
+
+  @@schema("commerce")
+}
+
+enum RecoveryOutreachStatus {
+  PENDING
+  WAITING_FOR_RESPONSE
+  ENGAGED
+  NO_RESPONSE
+  CAPACITY_BLOCKED
+  CANCELLED
+  FAILED
+
+  @@schema("commerce")
+}
+
+model RecoveryOutreachAttempt {
+  id String @id @default(cuid())
+
+  checkoutRecoveryId String
+  checkoutRecovery  CheckoutRecovery @relation(fields: [checkoutRecoveryId], references: [id], onDelete: Cascade)
+  sequence          Int
+  trigger           RecoveryOutreachTrigger
+  status            RecoveryOutreachStatus @default(PENDING)
+
+  configuredOfferMode    RecoveryOfferMode
+  fixedShopifyDiscountId String?
+  fixedShopifyDiscount   ShopifyDiscount? @relation("OutreachAttemptFixedDiscount", fields: [fixedShopifyDiscountId], references: [id], onDelete: SetNull)
+  offerSnapshot          Json?
+
+  outboundMessageId String? @unique
+  outboundMessage   ConversationMessage? @relation(fields: [outboundMessageId], references: [id], onDelete: SetNull)
+
+  followUpDueAt       DateTime?
+  sentAt              DateTime?
+  customerRespondedAt DateTime?
+  closedAt            DateTime?
+  failureCode         String? @db.VarChar(128)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([checkoutRecoveryId, sequence])
+  @@index([checkoutRecoveryId, status, sequence])
+  @@index([status, followUpDueAt])
   @@schema("commerce")
 }
 
@@ -318,6 +510,8 @@ model ConversationMessage {
   content String
 
   createdAt DateTime @default(now())
+
+  recoveryOutreachAttempt RecoveryOutreachAttempt?
 
   sentAt      DateTime?
   deliveredAt DateTime?
@@ -1211,6 +1405,10 @@ model Shop {
   merchantPromotionSelection       MerchantPromotionSelection?
   promotionCampaigns               PromotionCampaign[]               @relation("PromotionCampaignTargetShop")
   recoveryCreditRefunds            RecoveryCreditRefund[]
+  discountCatalogue                ShopifyDiscountCatalogue?
+  shopifyDiscounts                 ShopifyDiscount[] @relation("ShopifyDiscountShop")
+  recoveryPolicyOverride           ShopRecoveryPolicyOverride?
+  recoveryPolicyOverrideAuditEvents ShopRecoveryPolicyOverrideAuditEvent[]
   whatsappTemplateVariants         WhatsAppTemplateVariant[]
   merchantSupportThread            MerchantSupportThread?
 
@@ -1321,6 +1519,8 @@ model PlatformAdmin {
   approvedRecoveryCreditRefunds             RecoveryCreditRefund[]                     @relation("ApprovedRecoveryCreditRefunds")
   confirmedRecoveryCreditRefunds            RecoveryCreditRefund[]                     @relation("ConfirmedRecoveryCreditRefunds")
   billingEconomicsSnapshots                 BillingEconomicsSnapshot[]
+  recoveryPolicyOverrides                   ShopRecoveryPolicyOverride[]
+  recoveryPolicyOverrideAuditEvents         ShopRecoveryPolicyOverrideAuditEvent[]
 
   @@unique([provider, providerSubject])
   @@index([active, role])
@@ -1630,6 +1830,7 @@ enum BackgroundRuntimeLeaseName {
   RECOVERY_CAPACITY_REPAIR
   TRANSLATION_RECONCILIATION
   QUEUE_CONCURRENCY_RECONCILIATION
+  CHECKOUT_RECOVERY_EXPIRY
 
   @@schema("public")
 }
@@ -1645,6 +1846,7 @@ model BackgroundRuntimeConfig {
   recoveryRepairIntervalSeconds Int @default(300)
   recoveryRepairShopBatchSize   Int @default(100)
   recoveryResumeBatchSize       Int @default(25)
+  checkoutRecoveryLifetimeDays  Int @default(21)
 
   translationReconciliationIntervalSeconds Int @default(300)
   translationBatchMaxRequests              Int @default(100)

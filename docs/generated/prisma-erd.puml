@@ -1,5 +1,25 @@
 @startuml erd
 skinparam linetype ortho
+enum "RecoveryOfferMode" as RecoveryOfferMode {
+  NONE
+  FIXED
+  AI_BEST_APPLICABLE
+}
+enum "ShopifyDiscountCatalogueStatus" as ShopifyDiscountCatalogueStatus {
+  UNAVAILABLE
+  SYNC_REQUIRED
+  SYNCING
+  CURRENT
+  ERROR
+}
+enum "ShopifyDiscountMethod" as ShopifyDiscountMethod {
+  AUTOMATIC
+  CODE
+}
+enum "ShopRecoveryPolicyOverrideAuditAction" as ShopRecoveryPolicyOverrideAuditAction {
+  UPSERT
+  CLEAR
+}
 enum "CheckoutRecoveryStatus" as CheckoutRecoveryStatus {
   DETECTED
   MESSAGE_SENT
@@ -10,6 +30,19 @@ enum "CheckoutRecoveryStatus" as CheckoutRecoveryStatus {
 }
 enum "RecoveryAdmissionBlockReason" as RecoveryAdmissionBlockReason {
   RECOVERY_CAPACITY_EXHAUSTED
+}
+enum "RecoveryOutreachTrigger" as RecoveryOutreachTrigger {
+  INITIAL
+  NO_RESPONSE_FOLLOW_UP
+}
+enum "RecoveryOutreachStatus" as RecoveryOutreachStatus {
+  PENDING
+  WAITING_FOR_RESPONSE
+  ENGAGED
+  NO_RESPONSE
+  CAPACITY_BLOCKED
+  CANCELLED
+  FAILED
 }
 enum "ConversationType" as ConversationType {
   RECOVERY
@@ -254,9 +287,10 @@ enum "BackgroundRuntimeLeaseName" as BackgroundRuntimeLeaseName {
   RECOVERY_CAPACITY_REPAIR
   TRANSLATION_RECONCILIATION
   QUEUE_CONCURRENCY_RECONCILIATION
+  CHECKOUT_RECOVERY_EXPIRY
 }
 entity "Session" as Session {
-+ id [PK] : String 
++ id [PK] : String
 --
   * shop : String
   * state : String
@@ -277,12 +311,16 @@ entity "Session" as Session {
 }
 
 entity "ShopSettings" as ShopSettings {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   * onboardingCompleted : Boolean
   plan : String
   * recoveryDelayMinutes : Int
+  * recoveryOfferMode : RecoveryOfferMode
+  # fixedShopifyDiscountId : [FK] ShopifyDiscount
+  * followUpEnabled : Boolean
+  followUpDelayMinutes : Int
   defaultLanguageTag : String
   defaultTimeZone : String
   defaultCountryCode : String
@@ -290,8 +328,77 @@ entity "ShopSettings" as ShopSettings {
   * updatedAt : DateTime
 }
 
+entity "ShopifyDiscountCatalogue" as ShopifyDiscountCatalogue {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  * status : ShopifyDiscountCatalogueStatus
+  * syncGeneration : Int
+  activeSyncToken : String
+  syncRequestedAt : DateTime
+  syncStartedAt : DateTime
+  lastSuccessfulSyncAt : DateTime
+  lastErrorAt : DateTime
+  lastErrorCode : String
+  unavailableAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "ShopifyDiscount" as ShopifyDiscount {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  * shopifyDiscountNodeId : String
+  * providerType : String
+  * method : ShopifyDiscountMethod
+  * providerStatus : String
+  * title : String
+  summary : String
+  startsAt : DateTime
+  endsAt : DateTime
+  codeCount : Int
+  singleRedeemCode : String
+  * fixedSelectable : Boolean
+  * providerSnapshot : Json
+  * isAvailable : Boolean
+  * lastSeenSyncGeneration : Int
+  * lastSyncedAt : DateTime
+  unavailableAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "ShopRecoveryPolicyOverride" as ShopRecoveryPolicyOverride {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  * recoveryDelayMinutes : Int
+  * recoveryOfferMode : RecoveryOfferMode
+  # fixedShopifyDiscountId : [FK] ShopifyDiscount
+  * followUpEnabled : Boolean
+  followUpDelayMinutes : Int
+  * reason : String
+  expiresAt : DateTime
+  # updatedByPlatformAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "ShopRecoveryPolicyOverrideAuditEvent" as ShopRecoveryPolicyOverrideAuditEvent {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # platformAdminId : [FK] PlatformAdmin
+  * action : ShopRecoveryPolicyOverrideAuditAction
+  * reason : String
+  beforeValue : Json
+  afterValue : Json
+  * occurredAt : DateTime
+}
+
 entity "ShopBrand" as ShopBrand {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   brandName : String
@@ -307,7 +414,7 @@ entity "ShopBrand" as ShopBrand {
 }
 
 entity "Customer" as Customer {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   phone : String
@@ -320,7 +427,7 @@ entity "Customer" as Customer {
 }
 
 entity "CustomerPhone" as CustomerPhone {
-+ id [PK] : String 
++ id [PK] : String
 --
   # customerId : [FK] Customer
   * phone : String
@@ -331,7 +438,7 @@ entity "CustomerPhone" as CustomerPhone {
 }
 
 entity "CheckoutRecoveryStatusHistory" as CheckoutRecoveryStatusHistory {
-+ id [PK] : String 
++ id [PK] : String
 --
   # checkoutRecoveryId : [FK] CheckoutRecovery
   fromStatus : CheckoutRecoveryStatus
@@ -343,18 +450,20 @@ entity "CheckoutRecoveryStatusHistory" as CheckoutRecoveryStatusHistory {
 }
 
 entity "CheckoutRecovery" as CheckoutRecovery {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   * checkoutToken : String
   cartToken : String
   # customerId : [FK] Customer
   * status : CheckoutRecoveryStatus
+  * generation : Int
   currency : String
   totalPrice : Decimal
   checkoutUrl : String
   lineItems : Json
   * detectedAt : DateTime
+  * lastExternalActivityAt : DateTime
   messageSentAt : DateTime
   engagedAt : DateTime
   completedAt : DateTime
@@ -365,8 +474,28 @@ entity "CheckoutRecovery" as CheckoutRecovery {
   * updatedAt : DateTime
 }
 
+entity "RecoveryOutreachAttempt" as RecoveryOutreachAttempt {
++ id [PK] : String
+--
+  # checkoutRecoveryId : [FK] CheckoutRecovery
+  * sequence : Int
+  * trigger : RecoveryOutreachTrigger
+  * status : RecoveryOutreachStatus
+  * configuredOfferMode : RecoveryOfferMode
+  # fixedShopifyDiscountId : [FK] ShopifyDiscount
+  offerSnapshot : Json
+  # outboundMessageId : [FK] ConversationMessage
+  followUpDueAt : DateTime
+  sentAt : DateTime
+  customerRespondedAt : DateTime
+  closedAt : DateTime
+  failureCode : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 entity "Conversation" as Conversation {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # customerId : [FK] Customer
@@ -392,7 +521,7 @@ entity "Conversation" as Conversation {
 }
 
 entity "ConversationMessage" as ConversationMessage {
-+ id [PK] : String 
++ id [PK] : String
 --
   # conversationId : [FK] Conversation
   providerMessageId : String
@@ -408,7 +537,7 @@ entity "ConversationMessage" as ConversationMessage {
 }
 
 entity "MerchantPricingPlan" as MerchantPricingPlan {
-+ id [PK] : String 
++ id [PK] : String
 --
   * shopifyPlanHandle : String
   * displayName : String
@@ -426,7 +555,7 @@ entity "MerchantPricingPlan" as MerchantPricingPlan {
 }
 
 entity "MerchantPricingPlanTranslation" as MerchantPricingPlanTranslation {
-+ id [PK] : String 
++ id [PK] : String
 --
   # merchantPricingPlanId : [FK] MerchantPricingPlan
   * locale : String
@@ -436,7 +565,7 @@ entity "MerchantPricingPlanTranslation" as MerchantPricingPlanTranslation {
 }
 
 entity "MerchantPricingPlanHighlight" as MerchantPricingPlanHighlight {
-+ id [PK] : String 
++ id [PK] : String
 --
   # merchantPricingPlanId : [FK] MerchantPricingPlan
   * contentKey : String
@@ -446,7 +575,7 @@ entity "MerchantPricingPlanHighlight" as MerchantPricingPlanHighlight {
 }
 
 entity "MerchantPricingPlanHighlightTranslation" as MerchantPricingPlanHighlightTranslation {
-+ id [PK] : String 
++ id [PK] : String
 --
   # merchantPricingPlanHighlightId : [FK] MerchantPricingPlanHighlight
   * locale : String
@@ -457,7 +586,7 @@ entity "MerchantPricingPlanHighlightTranslation" as MerchantPricingPlanHighlight
 }
 
 entity "MerchantPricingUsageEvent" as MerchantPricingUsageEvent {
-+ id [PK] : String 
++ id [PK] : String
 --
   # merchantPricingPlanId : [FK] MerchantPricingPlan
   * eventHandle : String
@@ -473,7 +602,7 @@ entity "MerchantPricingUsageEvent" as MerchantPricingUsageEvent {
 }
 
 entity "MerchantPricingUsageTier" as MerchantPricingUsageTier {
-+ id [PK] : String 
++ id [PK] : String
 --
   # merchantPricingUsageEventId : [FK] MerchantPricingUsageEvent
   * position : Int
@@ -483,7 +612,7 @@ entity "MerchantPricingUsageTier" as MerchantPricingUsageTier {
 }
 
 entity "BillingPlan" as BillingPlan {
-+ id [PK] : String 
++ id [PK] : String
 --
   * shopifyPlanHandle : String
   * name : String
@@ -502,7 +631,7 @@ entity "BillingPlan" as BillingPlan {
 }
 
 entity "BillingUpgradeEconomicsEdge" as BillingUpgradeEconomicsEdge {
-+ id [PK] : String 
++ id [PK] : String
 --
   # lowerPlanId : [FK] BillingPlan
   # higherPlanId : [FK] BillingPlan
@@ -512,7 +641,7 @@ entity "BillingUpgradeEconomicsEdge" as BillingUpgradeEconomicsEdge {
 }
 
 entity "BillingEconomicsSnapshot" as BillingEconomicsSnapshot {
-+ id [PK] : String 
++ id [PK] : String
 --
   # billingPlanId : [FK] BillingPlan
   * shopifyPlanHandleSnapshot : String
@@ -530,7 +659,7 @@ entity "BillingEconomicsSnapshot" as BillingEconomicsSnapshot {
 }
 
 entity "BillingPlanFeature" as BillingPlanFeature {
-+ id [PK] : String 
++ id [PK] : String
 --
   # planId : [FK] BillingPlan
   * feature : BillingPlanFeatureIdentifier
@@ -538,7 +667,7 @@ entity "BillingPlanFeature" as BillingPlanFeature {
 }
 
 entity "Subscription" as Subscription {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # planId : [FK] BillingPlan
@@ -565,7 +694,7 @@ entity "Subscription" as Subscription {
 }
 
 entity "UsageEvent" as UsageEvent {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # billingPeriodId : [FK] BillingPeriod
@@ -590,7 +719,7 @@ entity "UsageEvent" as UsageEvent {
 }
 
 entity "ShopEntitlementCounter" as ShopEntitlementCounter {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   * counter : EntitlementCounter
@@ -604,7 +733,7 @@ entity "ShopEntitlementCounter" as ShopEntitlementCounter {
 }
 
 entity "BillingPeriodEntitlementCounter" as BillingPeriodEntitlementCounter {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # billingPeriodId : [FK] BillingPeriod
@@ -619,7 +748,7 @@ entity "BillingPeriodEntitlementCounter" as BillingPeriodEntitlementCounter {
 }
 
 entity "RecoveryCreditPurchase" as RecoveryCreditPurchase {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # planId : [FK] BillingPlan
@@ -649,7 +778,7 @@ entity "RecoveryCreditPurchase" as RecoveryCreditPurchase {
 }
 
 entity "UsageReservation" as UsageReservation {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # counterId : [FK] ShopEntitlementCounter
@@ -667,7 +796,7 @@ entity "UsageReservation" as UsageReservation {
 }
 
 entity "PlatformBillingPolicy" as PlatformBillingPolicy {
-+ id [PK] : String 
++ id [PK] : String
 --
   * globalPauseNewRecoveries : Boolean
   * globalPauseAutomatedWhatsapp : Boolean
@@ -681,7 +810,7 @@ entity "PlatformBillingPolicy" as PlatformBillingPolicy {
 }
 
 entity "ShopBillingPolicyOverride" as ShopBillingPolicyOverride {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   outboundSoftLimit : Int
@@ -697,7 +826,7 @@ entity "ShopBillingPolicyOverride" as ShopBillingPolicyOverride {
 }
 
 entity "PromotionCampaign" as PromotionCampaign {
-+ id [PK] : String 
++ id [PK] : String
 --
   * name : String
   merchantDescription : String
@@ -715,7 +844,7 @@ entity "PromotionCampaign" as PromotionCampaign {
 }
 
 entity "PromotionCampaignTranslation" as PromotionCampaignTranslation {
-+ id [PK] : String 
++ id [PK] : String
 --
   # promotionCampaignId : [FK] PromotionCampaign
   * locale : String
@@ -726,7 +855,7 @@ entity "PromotionCampaignTranslation" as PromotionCampaignTranslation {
 }
 
 entity "PromotionCampaignEvent" as PromotionCampaignEvent {
-+ id [PK] : String 
++ id [PK] : String
 --
   # campaignId : [FK] PromotionCampaign
   * kind : PromotionCampaignEventType
@@ -737,7 +866,7 @@ entity "PromotionCampaignEvent" as PromotionCampaignEvent {
 }
 
 entity "PromotionalCreditGrant" as PromotionalCreditGrant {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # campaignId : [FK] PromotionCampaign
@@ -755,7 +884,7 @@ entity "PromotionalCreditGrant" as PromotionalCreditGrant {
 }
 
 entity "MerchantPromotionSelection" as MerchantPromotionSelection {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # promotionalCreditGrantId : [FK] PromotionalCreditGrant
@@ -765,7 +894,7 @@ entity "MerchantPromotionSelection" as MerchantPromotionSelection {
 }
 
 entity "BillingAuditEvent" as BillingAuditEvent {
-+ id [PK] : String 
++ id [PK] : String
 --
   * action : BillingAuditAction
   # shopId : [FK] Shop
@@ -779,7 +908,7 @@ entity "BillingAuditEvent" as BillingAuditEvent {
 }
 
 entity "BillingPeriod" as BillingPeriod {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # subscriptionId : [FK] Subscription
@@ -798,7 +927,7 @@ entity "BillingPeriod" as BillingPeriod {
 }
 
 entity "Shop" as Shop {
-+ id [PK] : String 
++ id [PK] : String
 --
   * domain : String
   shopifyShopId : String
@@ -811,7 +940,7 @@ entity "Shop" as Shop {
 }
 
 entity "WhatsAppTemplateVariant" as WhatsAppTemplateVariant {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   * providerAccountId : String
@@ -827,7 +956,7 @@ entity "WhatsAppTemplateVariant" as WhatsAppTemplateVariant {
 }
 
 entity "Tour" as Tour {
-+ id [PK] : String 
++ id [PK] : String
 --
   * createdAt : DateTime
   * updatedAt : DateTime
@@ -840,7 +969,7 @@ entity "Tour" as Tour {
 }
 
 entity "RagSearchResults" as RagSearchResults {
-+ id [PK] : String 
++ id [PK] : String
 --
   * createdAt : DateTime
   * updatedAt : DateTime
@@ -850,7 +979,7 @@ entity "RagSearchResults" as RagSearchResults {
 }
 
 entity "PlatformAdmin" as PlatformAdmin {
-+ id [PK] : String 
++ id [PK] : String
 --
   * provider : String
   providerSubject : String
@@ -864,7 +993,7 @@ entity "PlatformAdmin" as PlatformAdmin {
 }
 
 entity "MerchantSupportThread" as MerchantSupportThread {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   lastMessageAt : DateTime
@@ -879,7 +1008,7 @@ entity "MerchantSupportThread" as MerchantSupportThread {
 }
 
 entity "MerchantSupportMessage" as MerchantSupportMessage {
-+ id [PK] : String 
++ id [PK] : String
 --
   # threadId : [FK] MerchantSupportThread
   * kind : MerchantSupportMessageKind
@@ -900,7 +1029,7 @@ entity "MerchantSupportMessage" as MerchantSupportMessage {
 }
 
 entity "RecoveryCreditRefund" as RecoveryCreditRefund {
-+ id [PK] : String 
++ id [PK] : String
 --
   # shopId : [FK] Shop
   # purchaseId : [FK] RecoveryCreditPurchase
@@ -944,7 +1073,7 @@ entity "RecoveryCreditRefund" as RecoveryCreditRefund {
 }
 
 entity "MerchantMessageTranslation" as MerchantMessageTranslation {
-+ id [PK] : String 
++ id [PK] : String
 --
   # messageId : [FK] MerchantSupportMessage
   * direction : MerchantTranslationDirection
@@ -962,7 +1091,7 @@ entity "MerchantMessageTranslation" as MerchantMessageTranslation {
 }
 
 entity "MerchantTranslationBatch" as MerchantTranslationBatch {
-+ id [PK] : String 
++ id [PK] : String
 --
   * provider : String
   * model : String
@@ -986,7 +1115,7 @@ entity "MerchantTranslationBatch" as MerchantTranslationBatch {
 }
 
 entity "MerchantTranslationBatchItem" as MerchantTranslationBatchItem {
-+ id [PK] : String 
++ id [PK] : String
 --
   # batchId : [FK] MerchantTranslationBatch
   # translationId : [FK] MerchantMessageTranslation
@@ -995,7 +1124,7 @@ entity "MerchantTranslationBatchItem" as MerchantTranslationBatchItem {
 }
 
 entity "MerchantTranslationReconciliationRequest" as MerchantTranslationReconciliationRequest {
-+ id [PK] : String 
++ id [PK] : String
 --
   # requestedByPlatformAdminId : [FK] PlatformAdmin
   * scope : MerchantTranslationReconciliationScope
@@ -1008,7 +1137,7 @@ entity "MerchantTranslationReconciliationRequest" as MerchantTranslationReconcil
 }
 
 entity "BackgroundRuntimeConfig" as BackgroundRuntimeConfig {
-+ id [PK] : String 
++ id [PK] : String
 --
   * version : Int
   * billingReconciliationIntervalSeconds : Int
@@ -1017,6 +1146,7 @@ entity "BackgroundRuntimeConfig" as BackgroundRuntimeConfig {
   * recoveryRepairIntervalSeconds : Int
   * recoveryRepairShopBatchSize : Int
   * recoveryResumeBatchSize : Int
+  * checkoutRecoveryLifetimeDays : Int
   * translationReconciliationIntervalSeconds : Int
   * translationBatchMaxRequests : Int
   * conversationQuietWindowMs : Int
@@ -1057,7 +1187,7 @@ entity "BackgroundRuntimeConfig" as BackgroundRuntimeConfig {
 }
 
 entity "BackgroundRuntimeConfigAuditEvent" as BackgroundRuntimeConfigAuditEvent {
-+ id [PK] : String 
++ id [PK] : String
 --
   # configId : [FK] BackgroundRuntimeConfig
   * section : BackgroundRuntimeConfigSection
@@ -1071,7 +1201,7 @@ entity "BackgroundRuntimeConfigAuditEvent" as BackgroundRuntimeConfigAuditEvent 
 }
 
 entity "BackgroundRuntimeLease" as BackgroundRuntimeLease {
-+ name [PK] : BackgroundRuntimeLeaseName 
++ name [PK] : BackgroundRuntimeLeaseName
 --
   * ownerToken : String
   * generation : Int
@@ -1084,12 +1214,24 @@ entity "BackgroundRuntimeLease" as BackgroundRuntimeLease {
 
 ' Relations
 ShopSettings |o--|| Shop
+ShopSettings }o--o| ShopifyDiscount
+ShopifyDiscountCatalogue |o--|| Shop
+ShopifyDiscount }o--|| Shop
+ShopifyDiscount }o--|| ShopifyDiscountCatalogue
+ShopRecoveryPolicyOverride |o--|| Shop
+ShopRecoveryPolicyOverride }o--o| ShopifyDiscount
+ShopRecoveryPolicyOverride }o--|| PlatformAdmin
+ShopRecoveryPolicyOverrideAuditEvent }o--|| Shop
+ShopRecoveryPolicyOverrideAuditEvent }o--|| PlatformAdmin
 ShopBrand |o--|| Shop
 Customer }o--|| Shop
 CustomerPhone }o--|| Customer
 CheckoutRecoveryStatusHistory }o--|| CheckoutRecovery
 CheckoutRecovery }o--|| Shop
 CheckoutRecovery }o--o| Customer
+RecoveryOutreachAttempt }o--|| CheckoutRecovery
+RecoveryOutreachAttempt }o--o| ShopifyDiscount
+RecoveryOutreachAttempt |o--o| ConversationMessage
 Conversation }o--o| Shop
 Conversation }o--o| Customer
 Conversation |o--o| CheckoutRecovery
@@ -1162,10 +1304,18 @@ MerchantTranslationReconciliationRequest }o--|| PlatformAdmin
 BackgroundRuntimeConfigAuditEvent }o--|| BackgroundRuntimeConfig
 ' ManyToMany Relations
 ' enum relations
+ShopSettings |o--|| RecoveryOfferMode
+ShopifyDiscountCatalogue |o--|| ShopifyDiscountCatalogueStatus
+ShopifyDiscount |o--|| ShopifyDiscountMethod
+ShopRecoveryPolicyOverride |o--|| RecoveryOfferMode
+ShopRecoveryPolicyOverrideAuditEvent |o--|| ShopRecoveryPolicyOverrideAuditAction
 CheckoutRecoveryStatusHistory |o--|| CheckoutRecoveryStatus
 CheckoutRecoveryStatusHistory |o--|| CheckoutRecoveryStatus
 CheckoutRecovery |o--|| CheckoutRecoveryStatus
 CheckoutRecovery |o--|| RecoveryAdmissionBlockReason
+RecoveryOutreachAttempt |o--|| RecoveryOutreachTrigger
+RecoveryOutreachAttempt |o--|| RecoveryOutreachStatus
+RecoveryOutreachAttempt |o--|| RecoveryOfferMode
 Conversation |o--|| ConversationType
 Conversation |o--|| ConversationOutcome
 Conversation |o--|| LanguageSource
