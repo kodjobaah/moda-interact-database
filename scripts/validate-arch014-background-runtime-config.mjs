@@ -208,6 +208,15 @@ for (const [name, expression] of Object.entries(requiredCheckExpressions)) {
 }
 expect(migration.includes('CONSTRAINT "BackgroundRuntimeConfig_pkey"'), "config primary key is missing");
 expect(migration.includes("INSERT INTO \"public\".\"BackgroundRuntimeConfig\""), "default config seed is missing");
+const normalizedMigration = migration.replace(/\s+/g, " ");
+expect(
+  normalizedMigration.includes('"billingSubscriptionQueueGlobalConcurrency", "updatedAt" ) VALUES'),
+  "default config seed does not supply updatedAt",
+);
+expect(
+  normalizedMigration.includes("10, 5, 10, 10, 20, 10, 10, CURRENT_TIMESTAMP ) ON CONFLICT (\"id\") DO NOTHING"),
+  "default config seed updatedAt value is not CURRENT_TIMESTAMP",
+);
 expect(migration.replace(/\s+/g, " ").includes("'default', 0, 60, 50, 50, 300, 100, 25, 300, 100, 3000, 10000, 3600, 300, 60, 3600, 100, 900, 300, 300, 300, 300, 3, 3, 60, 20000, 12, 60, 12, 60, 600, 5000, 4, 12, 4, 12, 10, 5, 10, 10, 20, 10, 10"), "default config seed values are not exact");
 expect(migration.includes('ON CONFLICT ("id") DO NOTHING'), "default config seed is not idempotent");
 expect(!migration.includes('INSERT INTO "public"."BackgroundRuntimeLease"'), "migration must not seed lease rows");
