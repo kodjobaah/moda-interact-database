@@ -12,9 +12,17 @@ const migrationPath = join(
   "20260916000000_arch014_background_runtime_config_and_leases",
   "migration.sql",
 );
+const cadenceMigrationPath = join(
+  repositoryRoot,
+  "prisma",
+  "migrations",
+  "20260916110000_arch014_background_runtime_lease_cadence",
+  "migration.sql",
+);
 const erdPath = join(repositoryRoot, "docs", "generated", "prisma-erd.puml");
 const schema = readFileSync(schemaPath, "utf8");
 const migration = readFileSync(migrationPath, "utf8");
+const cadenceMigration = readFileSync(cadenceMigrationPath, "utf8");
 const erd = readFileSync(erdPath, "utf8");
 const failures = [];
 const expect = (condition, message) => {
@@ -112,6 +120,7 @@ for (const requirement of [
   "acquiredAt  DateTime",
   "heartbeatAt DateTime",
   "leaseUntil  DateTime",
+  "lastFinishedAt DateTime?",
   "updatedAt   DateTime @updatedAt",
   "@@index([leaseUntil])",
   '@@schema("public")',
@@ -230,11 +239,39 @@ expect(configModel.indexOf("translationResultRetrySeconds") !== configModel.inde
 for (const model of ["BackgroundRuntimeConfig", "BackgroundRuntimeConfigAuditEvent", "BackgroundRuntimeLease"]) {
   expect(erd.includes(`entity \"${model}\"`), `ERD is missing ${model}`);
 }
+expect(
+  cadenceMigration.replace(/\s+/g, " ").trim() ===
+    'ALTER TABLE "public"."BackgroundRuntimeLease" ADD COLUMN "lastFinishedAt" TIMESTAMP(3);',
+  "cadence migration must contain only the additive lease column change",
+);
+for (const table of [
+  "BackgroundRuntimeConfig",
+  "BackgroundRuntimeConfigAuditEvent",
+  "BillingPlan",
+  "Subscription",
+  "UsageEvent",
+  "Promotion",
+  "PromotionCampaign",
+  "PromotionCampaignTranslation",
+  "MerchantPricing",
+  "MerchantPricingPlan",
+  "Support",
+  "Shop",
+  "WhatsApp",
+]) {
+  expect(!cadenceMigration.includes(`\"${table}\"`), `cadence migration must not alter ${table}`);
+}
+expect(!/DEFAULT|NOT NULL|INSERT|UPDATE|CREATE INDEX|CREATE UNIQUE INDEX|SEED|BACKFILL/i.test(cadenceMigration), "cadence migration must not add defaults, backfills, seeds, or indexes");
+expect(erd.includes("lastFinishedAt : DateTime"), "ERD is missing BackgroundRuntimeLease.lastFinishedAt");
 
 const baseline = execFileSync("git", ["show", "HEAD:prisma/schema.prisma"], { cwd: repositoryRoot, encoding: "utf8" });
 for (const match of baseline.matchAll(/\b(model|enum)\s+(\w+)\s*\{([\s\S]*?)\n\}/g)) {
   const [, kind, name, originalBlock] = match;
-  expect(normalizeSchema(block(schema, kind, name)) === normalizeSchema(originalBlock), `pre-existing ${kind} ${name} changed`);
+  const currentBlock = block(schema, kind, name);
+  const comparableBlock = name === "BackgroundRuntimeLease"
+    ? currentBlock.replace(/\n\s*lastFinishedAt DateTime\?\s*/, "\n")
+    : currentBlock;
+  expect(normalizeSchema(comparableBlock) === normalizeSchema(originalBlock), `pre-existing ${kind} ${name} changed`);
 }
 
 const changedFiles = execFileSync("git", ["status", "--short"], { cwd: repositoryRoot, encoding: "utf8" })
@@ -242,6 +279,7 @@ const changedFiles = execFileSync("git", ["status", "--short"], { cwd: repositor
 const allowedFiles = new Set([
   "prisma/schema.prisma",
   "prisma/migrations/20260916000000_arch014_background_runtime_config_and_leases/migration.sql",
+  "prisma/migrations/20260916110000_arch014_background_runtime_lease_cadence/migration.sql",
   "scripts/validate-arch014-background-runtime-config.mjs",
   "docs/generated/prisma-erd.puml",
   "docs/generated/erd.png",
