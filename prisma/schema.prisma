@@ -787,7 +787,8 @@ model UsageEvent {
 
   provider String @default("SHOPIFY")
 
-  recoveryCreditPurchase RecoveryCreditPurchase?
+  recoveryCreditPurchase        RecoveryCreditPurchase?
+  automaticRecoveryCreditRefund RecoveryCreditRefund?   @relation("RecoveryCreditRefundAutomaticCorrection")
 
   createdAt DateTime @default(now())
 
@@ -1431,6 +1432,13 @@ model RecoveryCreditRefund {
   finalCreditQuantity              Int?
   expectedProviderAmount           Decimal?
   expectedProviderCurrency         String?  @db.VarChar(3)
+
+  automaticCorrectionUsageEventId              String?     @unique
+  automaticCorrectionUsageEvent                UsageEvent? @relation("RecoveryCreditRefundAutomaticCorrection", fields: [automaticCorrectionUsageEventId], references: [id], onDelete: Restrict)
+  providerUsageQuantityBeforeCorrection        Decimal?
+  providerUsageCostBeforeCorrection            Decimal?
+  expectedProviderUsageQuantityAfterCorrection Decimal?
+  expectedProviderUsageCostAfterCorrection     Decimal?
 
   status RecoveryCreditRefundStatus @default(REQUESTED)
 

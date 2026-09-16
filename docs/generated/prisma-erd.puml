@@ -920,6 +920,11 @@ entity "RecoveryCreditRefund" as RecoveryCreditRefund {
   finalCreditQuantity : Int
   expectedProviderAmount : Decimal
   expectedProviderCurrency : String
+  # automaticCorrectionUsageEventId : [FK] UsageEvent
+  providerUsageQuantityBeforeCorrection : Decimal
+  providerUsageCostBeforeCorrection : Decimal
+  expectedProviderUsageQuantityAfterCorrection : Decimal
+  expectedProviderUsageCostAfterCorrection : Decimal
   * status : RecoveryCreditRefundStatus
   * requestKey : String
   reason : String
@@ -1145,6 +1150,7 @@ MerchantSupportMessage }o--o| PlatformAdmin
 RecoveryCreditRefund }o--|| Shop
 RecoveryCreditRefund }o--|| RecoveryCreditPurchase
 RecoveryCreditRefund }o--o| MerchantSupportMessage
+RecoveryCreditRefund |o--o| UsageEvent
 RecoveryCreditRefund }o--o| PlatformAdmin
 RecoveryCreditRefund }o--o| PlatformAdmin
 MerchantMessageTranslation }o--|| MerchantSupportMessage
