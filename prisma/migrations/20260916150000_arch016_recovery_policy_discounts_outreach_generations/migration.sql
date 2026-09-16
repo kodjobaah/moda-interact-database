@@ -168,8 +168,9 @@ ALTER TABLE "shopify"."ShopSettings"
     ADD CONSTRAINT "ShopSettings_fixedShopifyDiscountId_fkey"
         FOREIGN KEY ("fixedShopifyDiscountId") REFERENCES "shopify"."ShopifyDiscount"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+DROP INDEX "commerce"."CheckoutRecovery_shopId_checkoutToken_key";
+
 ALTER TABLE "commerce"."CheckoutRecovery"
-    DROP CONSTRAINT "CheckoutRecovery_shopId_checkoutToken_key",
     ADD COLUMN "generation" INTEGER NOT NULL DEFAULT 1,
     ADD COLUMN "lastExternalActivityAt" TIMESTAMP(3);
 
@@ -197,8 +198,10 @@ ALTER TABLE "shopify"."ShopSettings"
     ADD CONSTRAINT "ck_arch016_shop_settings_recovery_delay"
         CHECK ("recoveryDelayMinutes" BETWEEN 0 AND 10080),
     ADD CONSTRAINT "ck_arch016_shop_settings_follow_up"
-        CHECK ((NOT "followUpEnabled" AND "followUpDelayMinutes" IS NULL)
-            OR ("followUpEnabled" AND "followUpDelayMinutes" BETWEEN 1 AND 10080)),
+        CHECK (("followUpEnabled" = false AND "followUpDelayMinutes" IS NULL)
+            OR ("followUpEnabled" = true
+                AND "followUpDelayMinutes" IS NOT NULL
+                AND "followUpDelayMinutes" BETWEEN 1 AND 10080)),
     ADD CONSTRAINT "ck_arch016_shop_settings_fixed_offer"
         CHECK (("recoveryOfferMode" = 'FIXED' AND "fixedShopifyDiscountId" IS NOT NULL)
             OR ("recoveryOfferMode" <> 'FIXED' AND "fixedShopifyDiscountId" IS NULL));
@@ -207,8 +210,10 @@ ALTER TABLE "shopify"."ShopRecoveryPolicyOverride"
     ADD CONSTRAINT "ck_arch016_policy_override_recovery_delay"
         CHECK ("recoveryDelayMinutes" BETWEEN 0 AND 10080),
     ADD CONSTRAINT "ck_arch016_policy_override_follow_up"
-        CHECK ((NOT "followUpEnabled" AND "followUpDelayMinutes" IS NULL)
-            OR ("followUpEnabled" AND "followUpDelayMinutes" BETWEEN 1 AND 10080)),
+        CHECK (("followUpEnabled" = false AND "followUpDelayMinutes" IS NULL)
+            OR ("followUpEnabled" = true
+                AND "followUpDelayMinutes" IS NOT NULL
+                AND "followUpDelayMinutes" BETWEEN 1 AND 10080)),
     ADD CONSTRAINT "ck_arch016_policy_override_fixed_offer"
         CHECK (("recoveryOfferMode" = 'FIXED' AND "fixedShopifyDiscountId" IS NOT NULL)
             OR ("recoveryOfferMode" <> 'FIXED' AND "fixedShopifyDiscountId" IS NULL));
@@ -228,9 +233,14 @@ ALTER TABLE "shopify"."ShopifyDiscount"
     ADD CONSTRAINT "ck_arch016_discount_automatic_code"
         CHECK ("method" <> 'AUTOMATIC' OR "singleRedeemCode" IS NULL),
     ADD CONSTRAINT "ck_arch016_discount_single_code"
-        CHECK ("singleRedeemCode" IS NULL OR "codeCount" = 1),
+        CHECK ("singleRedeemCode" IS NULL
+            OR ("codeCount" IS NOT NULL AND "codeCount" = 1)),
     ADD CONSTRAINT "ck_arch016_discount_fixed_selectable"
-        CHECK (NOT "fixedSelectable" OR "method" <> 'CODE' OR ("codeCount" = 1 AND "singleRedeemCode" IS NOT NULL));
+        CHECK (NOT "fixedSelectable"
+            OR "method" <> 'CODE'
+            OR ("codeCount" IS NOT NULL
+                AND "codeCount" = 1
+                AND "singleRedeemCode" IS NOT NULL));
 
 ALTER TABLE "commerce"."RecoveryOutreachAttempt"
     ADD CONSTRAINT "ck_arch016_outreach_sequence"

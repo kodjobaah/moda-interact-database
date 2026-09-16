@@ -35,8 +35,33 @@ for (const required of [
 
 for (const required of [
   'UPDATE "commerce"."CheckoutRecovery"',
+  'DROP INDEX "commerce"."CheckoutRecovery_shopId_checkoutToken_key"',
 ]) {
   expect(migration.includes(required), `migration missing ${required}`);
+}
+expect(!migration.includes('DROP CONSTRAINT "CheckoutRecovery_shopId_checkoutToken_key"'),
+  "migration must drop the legacy CheckoutRecovery unique index, not a constraint");
+for (const constraint of [
+  'CONSTRAINT "ck_arch016_shop_settings_follow_up"',
+  'CONSTRAINT "ck_arch016_policy_override_follow_up"',
+]) {
+  const constraintStart = migration.indexOf(constraint);
+  const constraintEnd = migration.indexOf('\n    ADD CONSTRAINT', constraintStart + constraint.length);
+  const definition = migration.slice(constraintStart, constraintEnd === -1 ? undefined : constraintEnd);
+  expect(definition.includes('"followUpDelayMinutes" IS NOT NULL'),
+    `${constraint} must reject enabled follow-up with a NULL delay`);
+  expect(definition.includes('"followUpDelayMinutes" BETWEEN 1 AND 10080'),
+    `${constraint} must enforce the follow-up delay bounds`);
+}
+for (const constraint of [
+  'CONSTRAINT "ck_arch016_discount_single_code"',
+  'CONSTRAINT "ck_arch016_discount_fixed_selectable"',
+]) {
+  const constraintStart = migration.indexOf(constraint);
+  const constraintEnd = migration.indexOf(';', constraintStart);
+  const definition = migration.slice(constraintStart, constraintEnd === -1 ? undefined : constraintEnd);
+  expect(definition.includes('"codeCount" IS NOT NULL'),
+    `${constraint} must reject an unknown code count`);
 }
 for (const required of [
   'CREATE UNIQUE INDEX "CheckoutRecovery_active_generation_key"',
