@@ -1725,10 +1725,11 @@ model BackgroundRuntimeLease {
   ownerToken String
   generation Int    @default(0)
 
-  acquiredAt  DateTime
-  heartbeatAt DateTime
-  leaseUntil  DateTime
-  updatedAt   DateTime @updatedAt
+  acquiredAt     DateTime
+  heartbeatAt    DateTime
+  leaseUntil     DateTime
+  lastFinishedAt DateTime?
+  updatedAt      DateTime  @updatedAt
 
   @@index([leaseUntil])
   @@schema("public")

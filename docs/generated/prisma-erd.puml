@@ -1078,6 +1078,7 @@ entity "BackgroundRuntimeLease" as BackgroundRuntimeLease {
   * acquiredAt : DateTime
   * heartbeatAt : DateTime
   * leaseUntil : DateTime
+  lastFinishedAt : DateTime
   * updatedAt : DateTime
 }
 
