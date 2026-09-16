@@ -509,23 +509,23 @@ enum MerchantPricingUsagePricingMode {
 }
 
 model MerchantPricingPlan {
-  id String @id @default(cuid())
+  id                String @id @default(cuid())
   shopifyPlanHandle String @unique
 
-  displayName String
-  planKind MerchantPricingPlanKind
-  isActive Boolean @default(true)
-  cataloguePosition Int
-  featured Boolean @default(false)
+  displayName             String
+  planKind                MerchantPricingPlanKind
+  isActive                Boolean                        @default(true)
+  cataloguePosition       Int
+  featured                Boolean                        @default(false)
   includedRecoveryCredits Int
-  allowancePeriod MerchantPricingAllowancePeriod
-  billingPeriod MerchantPricingBillingPeriod
-  recurringAmountMinor Int
-  currency String @db.Char(3)
+  allowancePeriod         MerchantPricingAllowancePeriod
+  billingPeriod           MerchantPricingBillingPeriod
+  recurringAmountMinor    Int
+  currency                String                         @db.Char(3)
 
   translations MerchantPricingPlanTranslation[]
-  usageEvents MerchantPricingUsageEvent[]
-  highlights MerchantPricingPlanHighlight[]
+  usageEvents  MerchantPricingUsageEvent[]
+  highlights   MerchantPricingPlanHighlight[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -536,20 +536,20 @@ model MerchantPricingPlan {
 }
 
 model MerchantPricingPlanTranslation {
-  id String @id @default(cuid())
+  id                    String              @id @default(cuid())
   merchantPricingPlanId String
-  merchantPricingPlan MerchantPricingPlan @relation(fields:[merchantPricingPlanId], references:[id], onDelete:Cascade)
-  locale String @db.VarChar(16)
-  merchantDescription String @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  merchantPricingPlan   MerchantPricingPlan @relation(fields: [merchantPricingPlanId], references: [id], onDelete: Cascade)
+  locale                String              @db.VarChar(16)
+  merchantDescription   String              @db.Text
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
 
   @@unique([merchantPricingPlanId, locale])
   @@schema("billing")
 }
 
 model MerchantPricingPlanHighlight {
-  id                    String   @id @default(cuid())
+  id                    String              @id @default(cuid())
   merchantPricingPlanId String
   merchantPricingPlan   MerchantPricingPlan @relation(fields: [merchantPricingPlanId], references: [id], onDelete: Cascade)
 
@@ -568,7 +568,7 @@ model MerchantPricingPlanHighlight {
 }
 
 model MerchantPricingPlanHighlightTranslation {
-  id                             String @id @default(cuid())
+  id                             String                       @id @default(cuid())
   merchantPricingPlanHighlightId String
   merchantPricingPlanHighlight   MerchantPricingPlanHighlight @relation(fields: [merchantPricingPlanHighlightId], references: [id], onDelete: Cascade)
 
@@ -584,20 +584,20 @@ model MerchantPricingPlanHighlightTranslation {
 }
 
 model MerchantPricingUsageEvent {
-  id String @id @default(cuid())
-  merchantPricingPlanId String
-  merchantPricingPlan MerchantPricingPlan @relation(fields:[merchantPricingPlanId], references:[id], onDelete:Cascade)
-  eventHandle String
-  adminLabel String
-  creditsGrantedPerUnit Int
-  position Int
-  pricingMode MerchantPricingUsagePricingMode
-  currency String @db.Char(3)
-  fixedUnitAmountMinor Int?
+  id                           String                          @id @default(cuid())
+  merchantPricingPlanId        String
+  merchantPricingPlan          MerchantPricingPlan             @relation(fields: [merchantPricingPlanId], references: [id], onDelete: Cascade)
+  eventHandle                  String
+  adminLabel                   String
+  creditsGrantedPerUnit        Int
+  position                     Int
+  pricingMode                  MerchantPricingUsagePricingMode
+  currency                     String                          @db.Char(3)
+  fixedUnitAmountMinor         Int?
   maximumUnitsPerBillingPeriod Int?
-  tiers MerchantPricingUsageTier[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  tiers                        MerchantPricingUsageTier[]
+  createdAt                    DateTime                        @default(now())
+  updatedAt                    DateTime                        @updatedAt
 
   @@unique([merchantPricingPlanId, eventHandle])
   @@unique([merchantPricingPlanId, position])
@@ -605,13 +605,13 @@ model MerchantPricingUsageEvent {
 }
 
 model MerchantPricingUsageTier {
-  id String @id @default(cuid())
+  id                          String                    @id @default(cuid())
   merchantPricingUsageEventId String
-  merchantPricingUsageEvent MerchantPricingUsageEvent @relation(fields:[merchantPricingUsageEventId], references:[id], onDelete:Cascade)
-  position Int
-  upTo Int?
-  amountPerUnitMinor Int
-  flatAmountMinor Int
+  merchantPricingUsageEvent   MerchantPricingUsageEvent @relation(fields: [merchantPricingUsageEventId], references: [id], onDelete: Cascade)
+  position                    Int
+  upTo                        Int?
+  amountPerUnitMinor          Int
+  flatAmountMinor             Int
 
   @@unique([merchantPricingUsageEventId, position])
   @@schema("billing")
@@ -1606,4 +1606,122 @@ model MerchantTranslationReconciliationRequest {
   @@index([status, requestedAt])
   @@index([translationId, status])
   @@schema("support")
+}
+
+enum BackgroundRuntimeConfigSection {
+  OPERATIONAL
+  ADVANCED
+  ABUSE_PROTECTION
+  WORKER_THROUGHPUT
+
+  @@schema("public")
+}
+
+enum BackgroundRuntimeLeaseName {
+  BILLING_RECONCILIATION
+  RECOVERY_CAPACITY_REPAIR
+  TRANSLATION_RECONCILIATION
+  QUEUE_CONCURRENCY_RECONCILIATION
+
+  @@schema("public")
+}
+
+model BackgroundRuntimeConfig {
+  id      String @id @default("default")
+  version Int    @default(0)
+
+  billingReconciliationIntervalSeconds Int @default(60)
+  billingReconciliationShopBatchSize   Int @default(50)
+  shopifyUsagePublishBatchSize         Int @default(50)
+
+  recoveryRepairIntervalSeconds Int @default(300)
+  recoveryRepairShopBatchSize   Int @default(100)
+  recoveryResumeBatchSize       Int @default(25)
+
+  translationReconciliationIntervalSeconds Int @default(300)
+  translationBatchMaxRequests              Int @default(100)
+
+  conversationQuietWindowMs     Int @default(3000)
+  conversationMaxSettleWindowMs Int @default(10000)
+
+  billingFrozenRecheckSeconds Int @default(3600)
+  billingProviderRetrySeconds Int @default(300)
+
+  shopifyUsageRetryBaseSeconds Int @default(60)
+  shopifyUsageRetryMaxSeconds  Int @default(3600)
+
+  translationReconciliationPageSize Int @default(100)
+  translationClaimTimeoutSeconds    Int @default(900)
+  translationSubmitRetrySeconds     Int @default(300)
+  translationInitialPollSeconds     Int @default(300)
+  translationPollIntervalSeconds    Int @default(300)
+  translationResultRetrySeconds     Int @default(300)
+  translationSubmitMaxAttempts      Int @default(3)
+  translationMaxAutoRetries         Int @default(3)
+
+  rawSenderLimitPerMinute                 Int @default(60)
+  rawGlobalLimitPerMinute                 Int @default(20000)
+  turnSenderLimitPerMinute                Int @default(12)
+  turnSenderLimitPerTenMinutes            Int @default(60)
+  turnConversationLimitPerMinute          Int @default(12)
+  turnConversationLimitPerTenMinutes      Int @default(60)
+  turnShopLimitPerMinute                  Int @default(600)
+  turnGlobalLimitPerMinute                Int @default(5000)
+  discoverySenderLimitPerMinute           Int @default(4)
+  discoverySenderLimitPerTenMinutes       Int @default(12)
+  discoveryConversationLimitPerMinute     Int @default(4)
+  discoveryConversationLimitPerTenMinutes Int @default(12)
+
+  checkoutQueueGlobalConcurrency               Int @default(10)
+  orderQueueGlobalConcurrency                  Int @default(5)
+  pendingRecoveryQueueGlobalConcurrency        Int @default(10)
+  recoveryResumeQueueGlobalConcurrency         Int @default(10)
+  whatsappQueueGlobalConcurrency               Int @default(20)
+  merchantCommunicationsQueueGlobalConcurrency Int @default(10)
+  billingSubscriptionQueueGlobalConcurrency    Int @default(10)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditEvents BackgroundRuntimeConfigAuditEvent[]
+
+  @@schema("public")
+}
+
+model BackgroundRuntimeConfigAuditEvent {
+  id String @id @default(cuid())
+
+  configId String
+  config   BackgroundRuntimeConfig @relation(fields: [configId], references: [id], onDelete: Restrict)
+
+  section          BackgroundRuntimeConfigSection
+  expectedVersion  Int
+  resultingVersion Int
+
+  platformAdminId String
+  reason          String @db.VarChar(1000)
+
+  beforeValue Json
+  afterValue  Json
+
+  createdAt DateTime @default(now())
+
+  @@index([configId, createdAt])
+  @@index([platformAdminId, createdAt])
+  @@schema("public")
+}
+
+model BackgroundRuntimeLease {
+  name BackgroundRuntimeLeaseName @id
+
+  ownerToken String
+  generation Int    @default(0)
+
+  acquiredAt  DateTime
+  heartbeatAt DateTime
+  leaseUntil  DateTime
+  updatedAt   DateTime @updatedAt
+
+  @@index([leaseUntil])
+  @@schema("public")
 }
