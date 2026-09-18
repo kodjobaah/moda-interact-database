@@ -79,10 +79,10 @@ const seededRecoveries = [...demoRecoveries, ...additionalHistoricalRecoveries];
 
 async function main() {
   const features = [
-    { key: "checkout_recovery", displayName: "Checkout Recovery", activationMode: "ALWAYS_ENABLED", systemRequired: true },
-    { key: "ai_conversations", displayName: "AI Conversations", activationMode: "MERCHANT_OPT_IN", systemRequired: false },
-    { key: "product_search", displayName: "Product Search", activationMode: "MERCHANT_OPT_IN", systemRequired: false },
-    { key: "order_support", displayName: "Order Support", activationMode: "MERCHANT_OPT_IN", systemRequired: false },
+    { key: "checkout_recovery", displayName: "Checkout Recovery", activationMode: "ALWAYS_ENABLED", systemRequired: true, active: true },
+    { key: "ai_conversations", displayName: "AI Conversations", activationMode: "MERCHANT_OPT_IN", systemRequired: false, active: true },
+    { key: "product_search", displayName: "Product Search", activationMode: "MERCHANT_OPT_IN", systemRequired: false, active: true },
+    { key: "order_support", displayName: "Order Support", activationMode: "MERCHANT_OPT_IN", systemRequired: false, active: true },
   ];
   for (const feature of features) await prisma.feature.upsert({ where: { key: feature.key }, create: feature, update: feature });
   console.log("Seeding billing plans...");
