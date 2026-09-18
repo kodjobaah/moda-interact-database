@@ -97,11 +97,9 @@ enum "BillingPlanKind" as BillingPlanKind {
   FREE
   PAID_METERED
 }
-enum "BillingPlanFeatureIdentifier" as BillingPlanFeatureIdentifier {
-  CHECKOUT_RECOVERY
-  AI_CONVERSATIONS
-  PRODUCT_SEARCH
-  ORDER_SUPPORT
+enum "FeatureActivationMode" as FeatureActivationMode {
+  ALWAYS_ENABLED
+  MERCHANT_OPT_IN
 }
 enum "SubscriptionProjectionStatus" as SubscriptionProjectionStatus {
   ACTIVE
@@ -558,6 +556,19 @@ entity "ConversationMessage" as ConversationMessage {
   readAt : DateTime
 }
 
+entity "Feature" as Feature {
++ id [PK] : String
+--
+  * key : String
+  * displayName : String
+  description : String
+  * active : Boolean
+  * activationMode : FeatureActivationMode
+  * systemRequired : Boolean
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 entity "MerchantPricingPlan" as MerchantPricingPlan {
 + id [PK] : String
 --
@@ -572,6 +583,14 @@ entity "MerchantPricingPlan" as MerchantPricingPlan {
   * billingPeriod : MerchantPricingBillingPeriod
   * recurringAmountMinor : Int
   * currency : String
+  * economicsOverrideEnabled : Boolean
+  economicsOverrideReason : String
+  economicsOverrideApprovedAt : DateTime
+  economicsOverrideApprovedByAdminId : String
+  * economicsOverrideFailureCodes : String
+  economicsOverrideFingerprint : String
+  shopifyRecoveryUsageEventHandle : String
+  materializedAt : DateTime
   * createdAt : DateTime
   * updatedAt : DateTime
 }
@@ -645,9 +664,6 @@ entity "BillingPlan" as BillingPlan {
   * recoveryCreditPackEnabled : Boolean
   recoveryCreditsPerPack : Int
   shopifyRecoveryCreditPackEventHandle : String
-  * defaultOutboundSoftLimit : Int
-  * defaultOutboundHardLimit : Int
-  * terminalMessageReservedSlots : Int
   * createdAt : DateTime
   * updatedAt : DateTime
 }
@@ -684,8 +700,25 @@ entity "BillingPlanFeature" as BillingPlanFeature {
 + id [PK] : String
 --
   # planId : [FK] BillingPlan
-  * feature : BillingPlanFeatureIdentifier
+  # featureId : [FK] Feature
   * enabled : Boolean
+}
+
+entity "MerchantPricingPlanFeature" as MerchantPricingPlanFeature {
+--
+  # merchantPricingPlanId : [FK] MerchantPricingPlan
+  # featureId : [FK] Feature
+  * createdAt : DateTime
+}
+
+entity "ShopFeaturePreference" as ShopFeaturePreference {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # featureId : [FK] Feature
+  * enabled : Boolean
+  * createdAt : DateTime
+  * updatedAt : DateTime
 }
 
 entity "Subscription" as Subscription {
@@ -826,6 +859,9 @@ entity "PlatformBillingPolicy" as PlatformBillingPolicy {
   * minimumUpgradePremiumBps : Int
   * absoluteOutboundHardLimit : Int
   * defaultWarningPercent : Int
+  * defaultOutboundSoftLimit : Int
+  * defaultOutboundHardLimit : Int
+  * terminalMessageReservedSlots : Int
   * version : Int
   * createdAt : DateTime
   * updatedAt : DateTime
@@ -840,6 +876,7 @@ entity "ShopBillingPolicyOverride" as ShopBillingPolicyOverride {
   pauseNewRecoveries : Boolean
   pauseAutomatedWhatsapp : Boolean
   recoverySafetyCeiling : Int
+  terminalMessageReservedSlots : Int
   * reason : String
   expiresAt : DateTime
   # updatedByPlatformAdminId : [FK] PlatformAdmin
@@ -1268,6 +1305,11 @@ BillingUpgradeEconomicsEdge |o--|| BillingPlan
 BillingEconomicsSnapshot }o--|| BillingPlan
 BillingEconomicsSnapshot }o--|| PlatformAdmin
 BillingPlanFeature }o--|| BillingPlan
+BillingPlanFeature }o--|| Feature
+MerchantPricingPlanFeature }o--|| MerchantPricingPlan
+MerchantPricingPlanFeature }o--|| Feature
+ShopFeaturePreference }o--|| Shop
+ShopFeaturePreference }o--|| Feature
 Subscription |o--|| Shop
 Subscription }o--o| BillingPlan
 Subscription }o--o| BillingPeriod
@@ -1346,12 +1388,12 @@ ConversationMessage |o--|| MessageSenderType
 ConversationMessage |o--|| MessageStatus
 ConversationMessage |o--|| MessageContentType
 ConversationMessage |o--|| MessageTranscriptionStatus
+Feature |o--|| FeatureActivationMode
 MerchantPricingPlan |o--|| MerchantPricingPlanKind
 MerchantPricingPlan |o--|| MerchantPricingAllowancePeriod
 MerchantPricingPlan |o--|| MerchantPricingBillingPeriod
 MerchantPricingUsageEvent |o--|| MerchantPricingUsagePricingMode
 BillingPlan |o--|| BillingPlanKind
-BillingPlanFeature |o--|| BillingPlanFeatureIdentifier
 Subscription |o--|| SubscriptionProjectionStatus
 Subscription |o--|| ProviderSubscriptionLifecycleState
 UsageEvent |o--|| UsageMetric

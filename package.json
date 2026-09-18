@@ -15,6 +15,7 @@
     "test:arch014-promotion-campaign-translations": "node scripts/validate-arch014-promotion-campaign-translations.mjs",
     "test:arch015-fractional-provider-usage": "node scripts/validate-arch015-fractional-provider-usage-snapshots.mjs",
     "test:arch015-refund-correction-evidence": "node scripts/validate-arch015-refund-correction-evidence.mjs",
+    "test:arch017-billing-materialisation": "node scripts/validate-arch017-billing-materialisation-schema.mjs",
     "test:arch016-recovery-schema": "node scripts/validate-arch016-recovery-schema.mjs",
     "erd:puml": "node scripts/generate-erd.mjs",
     "erd:png": "plantuml -tpng docs/generated/prisma-erd.puml",
