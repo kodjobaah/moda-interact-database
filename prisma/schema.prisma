@@ -491,6 +491,24 @@ enum MessageStatus {
   @@schema("whatsapp")
 }
 
+enum MessageContentType {
+  TEXT
+  AUDIO
+  UNSUPPORTED
+
+  @@schema("whatsapp")
+}
+
+enum MessageTranscriptionStatus {
+  NOT_REQUIRED
+  PENDING
+  COMPLETED
+  REJECTED
+  FAILED
+
+  @@schema("whatsapp")
+}
+
 model ConversationMessage {
   id String @id @default(cuid())
 
@@ -507,7 +525,17 @@ model ConversationMessage {
   senderType MessageSenderType
   status     MessageStatus     @default(PENDING)
 
-  content String
+  content                    String
+  contentType                MessageContentType        @default(TEXT)
+  providerMediaId            String?
+  providerMediaMimeType      String?
+  providerMediaSha256        String?
+  mediaDurationMs            Int?
+  transcriptionStatus        MessageTranscriptionStatus @default(NOT_REQUIRED)
+  transcriptionProvider      String?
+  transcriptionModel         String?
+  transcriptionFailureCode   String?
+  transcriptionCompletedAt   DateTime?
 
   createdAt DateTime @default(now())
 

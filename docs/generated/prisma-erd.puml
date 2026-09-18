@@ -81,6 +81,18 @@ enum "MessageStatus" as MessageStatus {
   READ
   FAILED
 }
+enum "MessageContentType" as MessageContentType {
+  TEXT
+  AUDIO
+  UNSUPPORTED
+}
+enum "MessageTranscriptionStatus" as MessageTranscriptionStatus {
+  NOT_REQUIRED
+  PENDING
+  COMPLETED
+  REJECTED
+  FAILED
+}
 enum "BillingPlanKind" as BillingPlanKind {
   FREE
   PAID_METERED
@@ -530,6 +542,16 @@ entity "ConversationMessage" as ConversationMessage {
   * senderType : MessageSenderType
   * status : MessageStatus
   * content : String
+  * contentType : MessageContentType
+  providerMediaId : String
+  providerMediaMimeType : String
+  providerMediaSha256 : String
+  mediaDurationMs : Int
+  * transcriptionStatus : MessageTranscriptionStatus
+  transcriptionProvider : String
+  transcriptionModel : String
+  transcriptionFailureCode : String
+  transcriptionCompletedAt : DateTime
   * createdAt : DateTime
   sentAt : DateTime
   deliveredAt : DateTime
@@ -1322,6 +1344,8 @@ Conversation |o--|| LanguageSource
 ConversationMessage |o--|| MessageDirection
 ConversationMessage |o--|| MessageSenderType
 ConversationMessage |o--|| MessageStatus
+ConversationMessage |o--|| MessageContentType
+ConversationMessage |o--|| MessageTranscriptionStatus
 MerchantPricingPlan |o--|| MerchantPricingPlanKind
 MerchantPricingPlan |o--|| MerchantPricingAllowancePeriod
 MerchantPricingPlan |o--|| MerchantPricingBillingPeriod
