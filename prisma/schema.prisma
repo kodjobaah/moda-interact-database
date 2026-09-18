@@ -716,6 +716,12 @@ model MerchantPricingPlan {
   billingPeriod           MerchantPricingBillingPeriod
   recurringAmountMinor    Int
   currency                String                         @db.Char(3)
+  economicsOverrideEnabled           Boolean   @default(false)
+  economicsOverrideReason            String?   @db.Text
+  economicsOverrideApprovedAt        DateTime?
+  economicsOverrideApprovedByAdminId String?
+  economicsOverrideFailureCodes      String[]  @default([])
+  economicsOverrideFingerprint       String?   @db.VarChar(64)
 
   translations MerchantPricingPlanTranslation[]
   usageEvents  MerchantPricingUsageEvent[]
