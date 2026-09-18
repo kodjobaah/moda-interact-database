@@ -41,19 +41,19 @@ model ShopSettings {
   shopId String @unique
   shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  onboardingCompleted  Boolean  @default(false)
-  plan                 String?
-  recoveryDelayMinutes   Int                  @default(30)
-  recoveryOfferMode      RecoveryOfferMode    @default(NONE)
+  onboardingCompleted    Boolean           @default(false)
+  plan                   String?
+  recoveryDelayMinutes   Int               @default(30)
+  recoveryOfferMode      RecoveryOfferMode @default(NONE)
   fixedShopifyDiscountId String?
-  fixedShopifyDiscount   ShopifyDiscount?     @relation("ShopSettingsFixedDiscount", fields: [fixedShopifyDiscountId], references: [id], onDelete: SetNull)
-  followUpEnabled        Boolean              @default(false)
+  fixedShopifyDiscount   ShopifyDiscount?  @relation("ShopSettingsFixedDiscount", fields: [fixedShopifyDiscountId], references: [id], onDelete: SetNull)
+  followUpEnabled        Boolean           @default(false)
   followUpDelayMinutes   Int?
   defaultLanguageTag     String?
-  defaultTimeZone      String?
-  defaultCountryCode   String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  defaultTimeZone        String?
+  defaultCountryCode     String?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
   @@schema("shopify")
 }
@@ -90,16 +90,16 @@ model ShopifyDiscountCatalogue {
   shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
   status               ShopifyDiscountCatalogueStatus @default(UNAVAILABLE)
-  syncGeneration       Int @default(0)
+  syncGeneration       Int                            @default(0)
   activeSyncToken      String?
   syncRequestedAt      DateTime?
   syncStartedAt        DateTime?
   lastSuccessfulSyncAt DateTime?
   lastErrorAt          DateTime?
-  lastErrorCode        String? @db.VarChar(128)
+  lastErrorCode        String?                        @db.VarChar(128)
   unavailableAt        DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
 
   discounts ShopifyDiscount[] @relation("ShopifyDiscountCatalogue")
 
@@ -113,28 +113,28 @@ model ShopifyDiscount {
   shop   Shop   @relation("ShopifyDiscountShop", fields: [shopId], references: [id], onDelete: Cascade, map: "ShopifyDiscount_shop_fkey")
 
   shopifyDiscountNodeId  String
-  providerType           String @db.VarChar(128)
+  providerType           String                @db.VarChar(128)
   method                 ShopifyDiscountMethod
-  providerStatus         String @db.VarChar(64)
+  providerStatus         String                @db.VarChar(64)
   title                  String
   summary                String?
   startsAt               DateTime?
   endsAt                 DateTime?
   codeCount              Int?
   singleRedeemCode       String?
-  fixedSelectable        Boolean @default(false)
+  fixedSelectable        Boolean               @default(false)
   providerSnapshot       Json
-  isAvailable            Boolean @default(false)
+  isAvailable            Boolean               @default(false)
   lastSeenSyncGeneration Int
   lastSyncedAt           DateTime
   unavailableAt          DateTime?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
 
-  catalogue                  ShopifyDiscountCatalogue @relation("ShopifyDiscountCatalogue", fields: [shopId], references: [shopId], onDelete: Cascade, map: "ShopifyDiscount_catalogue_fkey")
-  settingsUsingFixed         ShopSettings[] @relation("ShopSettingsFixedDiscount")
-  policyOverridesUsingFixed ShopRecoveryPolicyOverride[] @relation("PolicyOverrideFixedDiscount")
-  outreachAttemptsUsingFixed RecoveryOutreachAttempt[] @relation("OutreachAttemptFixedDiscount")
+  catalogue                  ShopifyDiscountCatalogue     @relation("ShopifyDiscountCatalogue", fields: [shopId], references: [shopId], onDelete: Cascade, map: "ShopifyDiscount_catalogue_fkey")
+  settingsUsingFixed         ShopSettings[]               @relation("ShopSettingsFixedDiscount")
+  policyOverridesUsingFixed  ShopRecoveryPolicyOverride[] @relation("PolicyOverrideFixedDiscount")
+  outreachAttemptsUsingFixed RecoveryOutreachAttempt[]    @relation("OutreachAttemptFixedDiscount")
 
   @@unique([shopId, shopifyDiscountNodeId])
   @@index([shopId, isAvailable, providerStatus])
@@ -149,18 +149,18 @@ model ShopRecoveryPolicyOverride {
   shopId String @unique
   shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  recoveryDelayMinutes      Int
-  recoveryOfferMode         RecoveryOfferMode
-  fixedShopifyDiscountId    String?
-  fixedShopifyDiscount      ShopifyDiscount? @relation("PolicyOverrideFixedDiscount", fields: [fixedShopifyDiscountId], references: [id], onDelete: SetNull)
-  followUpEnabled           Boolean
-  followUpDelayMinutes      Int?
-  reason                    String @db.VarChar(1000)
-  expiresAt                 DateTime?
-  updatedByPlatformAdminId  String
-  updatedByPlatformAdmin    PlatformAdmin @relation(fields: [updatedByPlatformAdminId], references: [id])
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  recoveryDelayMinutes     Int
+  recoveryOfferMode        RecoveryOfferMode
+  fixedShopifyDiscountId   String?
+  fixedShopifyDiscount     ShopifyDiscount?  @relation("PolicyOverrideFixedDiscount", fields: [fixedShopifyDiscountId], references: [id], onDelete: SetNull)
+  followUpEnabled          Boolean
+  followUpDelayMinutes     Int?
+  reason                   String            @db.VarChar(1000)
+  expiresAt                DateTime?
+  updatedByPlatformAdminId String
+  updatedByPlatformAdmin   PlatformAdmin     @relation(fields: [updatedByPlatformAdminId], references: [id])
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
 
   @@schema("shopify")
 }
@@ -176,14 +176,14 @@ model ShopRecoveryPolicyOverrideAuditEvent {
   id String @id @default(cuid())
 
   shopId          String
-  shop            Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shop            Shop                                  @relation(fields: [shopId], references: [id], onDelete: Cascade)
   platformAdminId String
-  platformAdmin   PlatformAdmin @relation(fields: [platformAdminId], references: [id])
+  platformAdmin   PlatformAdmin                         @relation(fields: [platformAdminId], references: [id])
   action          ShopRecoveryPolicyOverrideAuditAction
-  reason          String @db.VarChar(1000)
+  reason          String                                @db.VarChar(1000)
   beforeValue     Json?
   afterValue      Json?
-  occurredAt      DateTime @default(now())
+  occurredAt      DateTime                              @default(now())
 
   @@index([shopId, occurredAt])
   @@index([platformAdminId, occurredAt])
@@ -308,7 +308,7 @@ model CheckoutRecovery {
   customer   Customer? @relation(fields: [customerId], references: [id])
 
   status     CheckoutRecoveryStatus @default(DETECTED)
-  generation Int                  @default(1)
+  generation Int                    @default(1)
 
   currency    String?
   totalPrice  Decimal?
@@ -317,10 +317,10 @@ model CheckoutRecovery {
 
   detectedAt             DateTime  @default(now())
   lastExternalActivityAt DateTime
-  messageSentAt DateTime?
-  engagedAt     DateTime?
-  completedAt   DateTime?
-  expiredAt     DateTime?
+  messageSentAt          DateTime?
+  engagedAt              DateTime?
+  completedAt            DateTime?
+  expiredAt              DateTime?
 
   admissionBlockedAt   DateTime?
   admissionBlockReason RecoveryAdmissionBlockReason?
@@ -363,26 +363,26 @@ model RecoveryOutreachAttempt {
   id String @id @default(cuid())
 
   checkoutRecoveryId String
-  checkoutRecovery  CheckoutRecovery @relation(fields: [checkoutRecoveryId], references: [id], onDelete: Cascade)
-  sequence          Int
-  trigger           RecoveryOutreachTrigger
-  status            RecoveryOutreachStatus @default(PENDING)
+  checkoutRecovery   CheckoutRecovery        @relation(fields: [checkoutRecoveryId], references: [id], onDelete: Cascade)
+  sequence           Int
+  trigger            RecoveryOutreachTrigger
+  status             RecoveryOutreachStatus  @default(PENDING)
 
   configuredOfferMode    RecoveryOfferMode
   fixedShopifyDiscountId String?
-  fixedShopifyDiscount   ShopifyDiscount? @relation("OutreachAttemptFixedDiscount", fields: [fixedShopifyDiscountId], references: [id], onDelete: SetNull)
+  fixedShopifyDiscount   ShopifyDiscount?  @relation("OutreachAttemptFixedDiscount", fields: [fixedShopifyDiscountId], references: [id], onDelete: SetNull)
   offerSnapshot          Json?
 
-  outboundMessageId String? @unique
+  outboundMessageId String?              @unique
   outboundMessage   ConversationMessage? @relation(fields: [outboundMessageId], references: [id], onDelete: SetNull)
 
   followUpDueAt       DateTime?
   sentAt              DateTime?
   customerRespondedAt DateTime?
   closedAt            DateTime?
-  failureCode         String? @db.VarChar(128)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  failureCode         String?   @db.VarChar(128)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@unique([checkoutRecoveryId, sequence])
   @@index([checkoutRecoveryId, status, sequence])
@@ -525,17 +525,17 @@ model ConversationMessage {
   senderType MessageSenderType
   status     MessageStatus     @default(PENDING)
 
-  content                    String
-  contentType                MessageContentType        @default(TEXT)
-  providerMediaId            String?
-  providerMediaMimeType      String?
-  providerMediaSha256        String?
-  mediaDurationMs            Int?
-  transcriptionStatus        MessageTranscriptionStatus @default(NOT_REQUIRED)
-  transcriptionProvider      String?
-  transcriptionModel         String?
-  transcriptionFailureCode   String?
-  transcriptionCompletedAt   DateTime?
+  content                  String
+  contentType              MessageContentType         @default(TEXT)
+  providerMediaId          String?
+  providerMediaMimeType    String?
+  providerMediaSha256      String?
+  mediaDurationMs          Int?
+  transcriptionStatus      MessageTranscriptionStatus @default(NOT_REQUIRED)
+  transcriptionProvider    String?
+  transcriptionModel       String?
+  transcriptionFailureCode String?
+  transcriptionCompletedAt DateTime?
 
   createdAt DateTime @default(now())
 
@@ -557,12 +557,31 @@ enum BillingPlanKind {
   @@schema("billing")
 }
 
-enum BillingPlanFeatureIdentifier {
-  CHECKOUT_RECOVERY
-  AI_CONVERSATIONS
-  PRODUCT_SEARCH
-  ORDER_SUPPORT
+enum FeatureActivationMode {
+  ALWAYS_ENABLED
+  MERCHANT_OPT_IN
 
+  @@schema("billing")
+}
+
+model Feature {
+  id String @id @default(cuid())
+
+  key            String                @unique @db.VarChar(128)
+  displayName    String                @db.VarChar(255)
+  description    String?               @db.Text
+  active         Boolean               @default(true)
+  activationMode FeatureActivationMode
+  systemRequired Boolean               @default(false)
+
+  merchantPricingPlans MerchantPricingPlanFeature[]
+  billingPlans         BillingPlanFeature[]
+  shopPreferences      ShopFeaturePreference[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, displayName])
   @@schema("billing")
 }
 
@@ -734,26 +753,29 @@ model MerchantPricingPlan {
   id                String @id @default(cuid())
   shopifyPlanHandle String @unique
 
-  displayName             String
-  planKind                MerchantPricingPlanKind
-  isActive                Boolean                        @default(true)
-  cataloguePosition       Int
-  featured                Boolean                        @default(false)
-  includedRecoveryCredits Int
-  allowancePeriod         MerchantPricingAllowancePeriod
-  billingPeriod           MerchantPricingBillingPeriod
-  recurringAmountMinor    Int
-  currency                String                         @db.Char(3)
-  economicsOverrideEnabled           Boolean   @default(false)
-  economicsOverrideReason            String?   @db.Text
+  displayName                        String
+  planKind                           MerchantPricingPlanKind
+  isActive                           Boolean                        @default(true)
+  cataloguePosition                  Int
+  featured                           Boolean                        @default(false)
+  includedRecoveryCredits            Int
+  allowancePeriod                    MerchantPricingAllowancePeriod
+  billingPeriod                      MerchantPricingBillingPeriod
+  recurringAmountMinor               Int
+  currency                           String                         @db.Char(3)
+  economicsOverrideEnabled           Boolean                        @default(false)
+  economicsOverrideReason            String?                        @db.Text
   economicsOverrideApprovedAt        DateTime?
   economicsOverrideApprovedByAdminId String?
-  economicsOverrideFailureCodes      String[]  @default([])
-  economicsOverrideFingerprint       String?   @db.VarChar(64)
+  economicsOverrideFailureCodes      String[]                       @default([])
+  economicsOverrideFingerprint       String?                        @db.VarChar(64)
+  shopifyRecoveryUsageEventHandle    String?                        @db.VarChar(255)
+  materializedAt                     DateTime?
 
   translations MerchantPricingPlanTranslation[]
   usageEvents  MerchantPricingUsageEvent[]
   highlights   MerchantPricingPlanHighlight[]
+  features     MerchantPricingPlanFeature[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -858,9 +880,6 @@ model BillingPlan {
   recoveryCreditPackEnabled             Boolean @default(false)
   recoveryCreditsPerPack                Int?
   shopifyRecoveryCreditPackEventHandle  String?
-  defaultOutboundSoftLimit              Int
-  defaultOutboundHardLimit              Int
-  terminalMessageReservedSlots          Int     @default(1)
 
   features                BillingPlanFeature[]
   subscriptions           Subscription[]
@@ -924,12 +943,49 @@ model BillingEconomicsSnapshot {
 model BillingPlanFeature {
   id String @id @default(cuid())
 
-  planId  String
-  plan    BillingPlan                  @relation(fields: [planId], references: [id], onDelete: Cascade)
-  feature BillingPlanFeatureIdentifier
-  enabled Boolean                      @default(true)
+  planId String
+  plan   BillingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
-  @@unique([planId, feature])
+  featureId String
+  feature   Feature @relation(fields: [featureId], references: [id], onDelete: Restrict)
+
+  enabled Boolean @default(true)
+
+  @@unique([planId, featureId])
+  @@index([featureId])
+  @@schema("billing")
+}
+
+model MerchantPricingPlanFeature {
+  merchantPricingPlanId String
+  merchantPricingPlan   MerchantPricingPlan @relation(fields: [merchantPricingPlanId], references: [id], onDelete: Cascade)
+
+  featureId String
+  feature   Feature @relation(fields: [featureId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@id([merchantPricingPlanId, featureId])
+  @@index([featureId])
+  @@schema("billing")
+}
+
+model ShopFeaturePreference {
+  id String @id @default(cuid())
+
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  featureId String
+  feature   Feature @relation(fields: [featureId], references: [id], onDelete: Restrict)
+
+  enabled Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([shopId, featureId])
+  @@index([featureId, enabled])
   @@schema("billing")
 }
 
@@ -1174,6 +1230,9 @@ model PlatformBillingPolicy {
   minimumUpgradePremiumBps      Int     @default(2000)
   absoluteOutboundHardLimit     Int
   defaultWarningPercent         Int
+  defaultOutboundSoftLimit      Int     @default(1000)
+  defaultOutboundHardLimit      Int     @default(2000)
+  terminalMessageReservedSlots  Int     @default(1)
   version                       Int     @default(0)
 
   createdAt DateTime @default(now())
@@ -1188,13 +1247,14 @@ model ShopBillingPolicyOverride {
   shopId String @unique
   shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  outboundSoftLimit      Int?
-  outboundHardLimit      Int?
-  pauseNewRecoveries     Boolean?
-  pauseAutomatedWhatsapp Boolean?
-  recoverySafetyCeiling  Int?
-  reason                 String    @db.VarChar(1000)
-  expiresAt              DateTime?
+  outboundSoftLimit            Int?
+  outboundHardLimit            Int?
+  pauseNewRecoveries           Boolean?
+  pauseAutomatedWhatsapp       Boolean?
+  recoverySafetyCeiling        Int?
+  terminalMessageReservedSlots Int?
+  reason                       String    @db.VarChar(1000)
+  expiresAt                    DateTime?
 
   updatedByPlatformAdminId String?
   updatedByPlatformAdmin   PlatformAdmin? @relation(fields: [updatedByPlatformAdminId], references: [id], onDelete: SetNull)
@@ -1424,27 +1484,28 @@ model Shop {
   reinstallPendingAt DateTime?
 
   // Configuration / billing
-  settings                         ShopSettings?
-  brand                            ShopBrand?
-  subscription                     Subscription?
-  usageEvents                      UsageEvent[]
-  billingPeriods                   BillingPeriod[]
-  entitlementCounters              ShopEntitlementCounter[]
-  billingPeriodEntitlementCounters BillingPeriodEntitlementCounter[]
-  usageReservations                UsageReservation[]
-  billingPolicyOverride            ShopBillingPolicyOverride?
-  billingAuditEvents               BillingAuditEvent[]
-  recoveryCreditPurchases          RecoveryCreditPurchase[]
-  promotionalCreditGrants          PromotionalCreditGrant[]
-  merchantPromotionSelection       MerchantPromotionSelection?
-  promotionCampaigns               PromotionCampaign[]               @relation("PromotionCampaignTargetShop")
-  recoveryCreditRefunds            RecoveryCreditRefund[]
-  discountCatalogue                ShopifyDiscountCatalogue?
-  shopifyDiscounts                 ShopifyDiscount[] @relation("ShopifyDiscountShop")
-  recoveryPolicyOverride           ShopRecoveryPolicyOverride?
+  settings                          ShopSettings?
+  brand                             ShopBrand?
+  subscription                      Subscription?
+  usageEvents                       UsageEvent[]
+  billingPeriods                    BillingPeriod[]
+  entitlementCounters               ShopEntitlementCounter[]
+  billingPeriodEntitlementCounters  BillingPeriodEntitlementCounter[]
+  usageReservations                 UsageReservation[]
+  billingPolicyOverride             ShopBillingPolicyOverride?
+  billingAuditEvents                BillingAuditEvent[]
+  recoveryCreditPurchases           RecoveryCreditPurchase[]
+  promotionalCreditGrants           PromotionalCreditGrant[]
+  merchantPromotionSelection        MerchantPromotionSelection?
+  promotionCampaigns                PromotionCampaign[]                    @relation("PromotionCampaignTargetShop")
+  recoveryCreditRefunds             RecoveryCreditRefund[]
+  discountCatalogue                 ShopifyDiscountCatalogue?
+  shopifyDiscounts                  ShopifyDiscount[]                      @relation("ShopifyDiscountShop")
+  recoveryPolicyOverride            ShopRecoveryPolicyOverride?
   recoveryPolicyOverrideAuditEvents ShopRecoveryPolicyOverrideAuditEvent[]
-  whatsappTemplateVariants         WhatsAppTemplateVariant[]
-  merchantSupportThread            MerchantSupportThread?
+  featurePreferences                ShopFeaturePreference[]
+  whatsappTemplateVariants          WhatsAppTemplateVariant[]
+  merchantSupportThread             MerchantSupportThread?
 
   // Commerce domain
   customers               Customer[]

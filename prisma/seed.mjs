@@ -9,15 +9,12 @@ const plans = [
     name: "Starter",
     kind: "FREE",
     shopifyUsageEventHandle: null,
-    defaultOutboundSoftLimit: 100,
-    defaultOutboundHardLimit: 200,
-    terminalMessageReservedSlots: 1,
     features: {
       create: [
-        { feature: "CHECKOUT_RECOVERY", enabled: true },
-        { feature: "PRODUCT_SEARCH", enabled: true },
-        { feature: "AI_CONVERSATIONS", enabled: true },
-        { feature: "ORDER_SUPPORT", enabled: false },
+        { feature: "checkout_recovery", enabled: true },
+        { feature: "product_search", enabled: true },
+        { feature: "ai_conversations", enabled: true },
+        { feature: "order_support", enabled: false },
       ],
     },
   },
@@ -27,15 +24,12 @@ const plans = [
     name: "Growth",
     kind: "PAID_METERED",
     shopifyUsageEventHandle: "growth-recovery-conversation",
-    defaultOutboundSoftLimit: 1000,
-    defaultOutboundHardLimit: 2000,
-    terminalMessageReservedSlots: 1,
     features: {
       create: [
-        { feature: "CHECKOUT_RECOVERY", enabled: true },
-        { feature: "PRODUCT_SEARCH", enabled: true },
-        { feature: "AI_CONVERSATIONS", enabled: true },
-        { feature: "ORDER_SUPPORT", enabled: true },
+        { feature: "checkout_recovery", enabled: true },
+        { feature: "product_search", enabled: true },
+        { feature: "ai_conversations", enabled: true },
+        { feature: "order_support", enabled: true },
       ],
     },
   },
@@ -45,15 +39,12 @@ const plans = [
     name: "Pro",
     kind: "PAID_METERED",
     shopifyUsageEventHandle: "pro-recovery-conversation",
-    defaultOutboundSoftLimit: 5000,
-    defaultOutboundHardLimit: 10000,
-    terminalMessageReservedSlots: 1,
     features: {
       create: [
-        { feature: "CHECKOUT_RECOVERY", enabled: true },
-        { feature: "PRODUCT_SEARCH", enabled: true },
-        { feature: "AI_CONVERSATIONS", enabled: true },
-        { feature: "ORDER_SUPPORT", enabled: true },
+        { feature: "checkout_recovery", enabled: true },
+        { feature: "product_search", enabled: true },
+        { feature: "ai_conversations", enabled: true },
+        { feature: "order_support", enabled: true },
       ],
     },
   },
@@ -87,6 +78,13 @@ const additionalHistoricalRecoveries = Array.from({ length: 12 }, (_, index) => 
 const seededRecoveries = [...demoRecoveries, ...additionalHistoricalRecoveries];
 
 async function main() {
+  const features = [
+    { key: "checkout_recovery", displayName: "Checkout Recovery", activationMode: "ALWAYS_ENABLED", systemRequired: true, active: true },
+    { key: "ai_conversations", displayName: "AI Conversations", activationMode: "MERCHANT_OPT_IN", systemRequired: false, active: true },
+    { key: "product_search", displayName: "Product Search", activationMode: "MERCHANT_OPT_IN", systemRequired: false, active: true },
+    { key: "order_support", displayName: "Order Support", activationMode: "MERCHANT_OPT_IN", systemRequired: false, active: true },
+  ];
+  for (const feature of features) await prisma.feature.upsert({ where: { key: feature.key }, create: feature, update: feature });
   console.log("Seeding billing plans...");
 
   for (const plan of plans) {
@@ -96,7 +94,11 @@ async function main() {
       },
 
       create: {
-        ...plan,
+        shopifyPlanHandle: plan.shopifyPlanHandle,
+        name: plan.name,
+        kind: plan.kind,
+        shopifyUsageEventHandle: plan.shopifyUsageEventHandle,
+        features: { create: plan.features.create.map(({ feature, enabled }) => ({ feature: { connect: { key: feature } }, enabled })) },
         active: true,
       },
 
@@ -104,12 +106,9 @@ async function main() {
         name: plan.name,
         kind: plan.kind,
         shopifyUsageEventHandle: plan.shopifyUsageEventHandle,
-        defaultOutboundSoftLimit: plan.defaultOutboundSoftLimit,
-        defaultOutboundHardLimit: plan.defaultOutboundHardLimit,
-        terminalMessageReservedSlots: plan.terminalMessageReservedSlots,
         features: {
           deleteMany: {},
-          create: plan.features.create,
+          create: plan.features.create.map(({ feature, enabled }) => ({ feature: { connect: { key: feature } }, enabled })),
         },
         active: true,
       },
@@ -128,10 +127,16 @@ async function main() {
       minimumUpgradePremiumBps: 2000,
       absoluteOutboundHardLimit: 2000,
       defaultWarningPercent: 80,
+      defaultOutboundSoftLimit: 1000,
+      defaultOutboundHardLimit: 2000,
+      terminalMessageReservedSlots: 1,
     },
     update: {
       lifetimeFreeRecoveryAllowance: 5,
       minimumUpgradePremiumBps: 2000,
+      defaultOutboundSoftLimit: 1000,
+      defaultOutboundHardLimit: 2000,
+      terminalMessageReservedSlots: 1,
     },
   });
   console.log("Platform billing policy seeded.");
