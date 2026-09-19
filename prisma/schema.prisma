@@ -1721,8 +1721,9 @@ model RecoveryCreditRefund {
   billingPeriodIdSnapshot          String
   providerSubscriptionIdSnapshot   String
   planHandleSnapshot               String
-  eventHandleSnapshot              String
-  purchaseProviderAmountSnapshot   Decimal
+  eventHandleSnapshot               String
+  shopifyPartnerDevelopmentSnapshot Boolean  @default(false)
+  purchaseProviderAmountSnapshot    Decimal
   purchaseProviderCurrencySnapshot String   @db.VarChar(3)
   finalCreditQuantity              Int?
   expectedProviderAmount           Decimal?

@@ -20,7 +20,8 @@
     "erd:puml": "node scripts/generate-erd.mjs",
     "erd:png": "plantuml -tpng docs/generated/prisma-erd.puml",
     "erd": "npm run erd:puml && npm run erd:png",
-    "test:arch010-zero-value-recovery-credit-valuation": "node scripts/validate-arch010-zero-value-recovery-credit-valuation.mjs"
+    "test:arch010-zero-value-recovery-credit-valuation": "node scripts/validate-arch010-zero-value-recovery-credit-valuation.mjs",
+    "test:arch015-partner-development-test-refunds": "node scripts/validate-arch015-partner-development-test-refunds.mjs"
   },
   "keywords": [],
   "author": "",
