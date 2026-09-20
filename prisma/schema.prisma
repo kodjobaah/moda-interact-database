@@ -337,6 +337,9 @@ model CheckoutRecovery {
   @@index([status, lastExternalActivityAt])
   @@index([customerId])
   @@index([shopId, admissionBlockReason, status, detectedAt])
+  @@index([shopId, detectedAt, id])
+  @@index([shopId, status, detectedAt, id])
+  @@index([shopId, customerId, detectedAt, id])
   @@schema("commerce")
 }
 
@@ -546,6 +549,7 @@ model ConversationMessage {
   readAt      DateTime?
 
   @@index([conversationId, createdAt])
+  @@index([conversationId, createdAt, id])
   @@index([inReplyToProviderId])
   @@schema("whatsapp")
 }
