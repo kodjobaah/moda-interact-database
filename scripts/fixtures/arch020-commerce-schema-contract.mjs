@@ -4,7 +4,7 @@ const revision='revisionNumber:int4 status:CommerceCapabilityRevisionStatus cont
 export const columns={
  CommerceCapability:`${identity} key:varchar128 displayName:varchar255 description:text? selectionBinding:CommerceCapabilitySelectionBinding featureId:text? enabled:bool`,
  CommerceCapabilityRevision:`${identity} capabilityId:text ${revision} promptTemplate:text configuration:jsonb toolBindings:jsonb`,
- CommerceRelease:'id:text releaseNumber:int4 description:text? runnerCompatibility:varchar128 contractVersion:varchar64 createdByAdminId:text createdAt:timestamptz',
+ CommerceRelease:'id:text releaseNumber:int4 description:text? runnerCompatibility:varchar128 contractVersion:varchar64 responseContract:jsonb responseContractHash:varchar64 createdByAdminId:text createdAt:timestamptz',
  CommerceReleaseCapability:'releaseId:text capabilityId:text capabilityRevisionId:text position:int4',
  CommerceReleasePointer:'environment:CommerceEnvironment releaseId:text editVersion:int4 updatedByAdminId:text updatedAt:timestamptz',
  CommerceAuditEvent:'id:text actorAdminId:text action:CommerceAuditAction capabilityId:text? revisionId:text? releaseId:text? toolId:text? toolRevisionId:text? environment:CommerceEnvironment? reason:varchar1000 metadata:jsonb createdAt:timestamptz',

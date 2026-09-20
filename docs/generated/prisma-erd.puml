@@ -1346,6 +1346,8 @@ entity "CommerceRelease" as CommerceRelease {
   description : String
   * runnerCompatibility : String
   * contractVersion : String
+  * responseContract : Json
+  * responseContractHash : String
   # createdByAdminId : [FK] PlatformAdmin
   * createdAt : DateTime
 }

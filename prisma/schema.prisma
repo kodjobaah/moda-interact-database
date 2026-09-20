@@ -2104,6 +2104,8 @@ model CommerceRelease {
   description         String?                     @db.Text
   runnerCompatibility String                      @db.VarChar(128)
   contractVersion     String                      @db.VarChar(64)
+  responseContract    Json                        @db.JsonB
+  responseContractHash String                     @db.VarChar(64)
   createdByAdminId    String                      @db.Text
   createdAt           DateTime                    @default(now()) @db.Timestamptz(3)
   createdBy           PlatformAdmin               @relation(fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)

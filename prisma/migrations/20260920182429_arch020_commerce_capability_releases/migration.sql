@@ -53,6 +53,8 @@ CREATE TABLE "commerce"."CommerceRelease" (
     "description" TEXT,
     "runnerCompatibility" VARCHAR(128) NOT NULL,
     "contractVersion" VARCHAR(64) NOT NULL,
+    "responseContract" JSONB NOT NULL,
+    "responseContractHash" VARCHAR(64) NOT NULL,
     "createdByAdminId" TEXT NOT NULL,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -355,6 +357,16 @@ LANGUAGE sql IMMUTABLE STRICT AS $$
     AND jsonb_typeof(v->'responseTemplate')='object',false)
 $$;
 
+-- C16 structural validation only. Shared/Commerce own supported-schema
+-- semantics, RFC 8785 canonicalization and hash/content equality.
+CREATE FUNCTION commerce.arch020_response_contract(v jsonb) RETURNS boolean
+LANGUAGE sql IMMUTABLE STRICT AS $$
+  SELECT COALESCE(commerce.arch020_object(v,ARRAY['version','instructions','detailsSchema'])
+    AND v->>'version'='response.v1'
+    AND commerce.arch020_string(v->'instructions',8000)
+    AND jsonb_typeof(v->'detailsSchema')='object',false)
+$$;
+
 ALTER TABLE commerce."CommerceCapability"
   ADD CONSTRAINT arch020_capability_bounds CHECK ("key" ~ '^[a-z][a-z0-9_]{0,127}$' AND "displayName" ~ '[^[:space:]]' AND ("description" IS NULL OR length("description")<=4000)),
   ADD CONSTRAINT arch020_capability_selection CHECK (("selectionBinding"='FEATURE')=("featureId" IS NOT NULL)
@@ -380,6 +392,8 @@ ALTER TABLE commerce."CommerceToolRevision"
     ("status"='PUBLISHED' AND "publishedByAdminId" IS NOT NULL AND "publishedAt" IS NOT NULL AND "contentHash" IS NOT NULL
       AND "contentHash" ~ '^[0-9a-f]{64}$' AND "publishedAt">="createdAt"));
 ALTER TABLE commerce."CommerceRelease"
+  ADD CONSTRAINT arch020_release_response_contract CHECK (commerce.arch020_response_contract("responseContract")),
+  ADD CONSTRAINT arch020_release_response_hash CHECK ("responseContractHash" ~ '^[0-9a-f]{64}$'),
   ADD CONSTRAINT arch020_release_bounds CHECK ("releaseNumber">0 AND ("description" IS NULL OR length("description")<=4000)
     AND "runnerCompatibility" ~ '[^[:space:]]' AND "contractVersion" ~ '[^[:space:]]');
 ALTER TABLE commerce."CommerceReleaseCapability" ADD CONSTRAINT arch020_member_position CHECK ("position">=0);
