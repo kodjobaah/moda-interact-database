@@ -299,6 +299,41 @@ enum "BackgroundRuntimeLeaseName" as BackgroundRuntimeLeaseName {
   QUEUE_CONCURRENCY_RECONCILIATION
   CHECKOUT_RECOVERY_EXPIRY
 }
+enum "CommerceCapabilitySelectionBinding" as CommerceCapabilitySelectionBinding {
+  BASE
+  FEATURE
+  RECOVERY_POLICY
+}
+enum "CommerceCapabilityRevisionStatus" as CommerceCapabilityRevisionStatus {
+  DRAFT
+  PUBLISHED
+}
+enum "CommerceEnvironment" as CommerceEnvironment {
+  LOCAL
+  TEST
+  DEVELOPMENT
+  STAGING
+  PRODUCTION
+}
+enum "CommerceAuditAction" as CommerceAuditAction {
+  CREATE_CAPABILITY
+  UPDATE_CAPABILITY
+  CREATE_DRAFT
+  UPDATE_DRAFT
+  PUBLISH_REVISION
+  CREATE_RELEASE
+  ACTIVATE_RELEASE
+  ROLLBACK_RELEASE
+  ENABLE_CAPABILITY
+  DISABLE_CAPABILITY
+  CREATE_TOOL
+  UPDATE_TOOL
+  CREATE_TOOL_DRAFT
+  UPDATE_TOOL_DRAFT
+  PUBLISH_TOOL_REVISION
+  ENABLE_TOOL
+  DISABLE_TOOL
+}
 entity "Session" as Session {
 + id [PK] : String
 --
@@ -1103,6 +1138,7 @@ entity "RecoveryCreditRefund" as RecoveryCreditRefund {
   * providerSubscriptionIdSnapshot : String
   * planHandleSnapshot : String
   * eventHandleSnapshot : String
+  * shopifyPartnerDevelopmentSnapshot : Boolean
   * purchaseProviderAmountSnapshot : Decimal
   * purchaseProviderCurrencySnapshot : String
   finalCreditQuantity : Int
@@ -1271,6 +1307,125 @@ entity "BackgroundRuntimeLease" as BackgroundRuntimeLease {
   * updatedAt : DateTime
 }
 
+entity "CommerceCapability" as CommerceCapability {
++ id [PK] : String
+--
+  * key : String
+  * displayName : String
+  description : String
+  * selectionBinding : CommerceCapabilitySelectionBinding
+  # featureId : [FK] Feature
+  * enabled : Boolean
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommerceCapabilityRevision" as CommerceCapabilityRevision {
++ id [PK] : String
+--
+  # capabilityId : [FK] CommerceCapability
+  * revisionNumber : Int
+  * status : CommerceCapabilityRevisionStatus
+  * contractVersion : String
+  * editVersion : Int
+  contentHash : String
+  # createdByAdminId : [FK] PlatformAdmin
+  # publishedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+  publishedAt : DateTime
+  * promptTemplate : String
+  * configuration : Json
+  * toolBindings : Json
+}
+
+entity "CommerceRelease" as CommerceRelease {
++ id [PK] : String
+--
+  * releaseNumber : Int
+  description : String
+  * runnerCompatibility : String
+  * contractVersion : String
+  # createdByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+}
+
+entity "CommerceReleaseCapability" as CommerceReleaseCapability {
+--
+  # releaseId : [FK] CommerceRelease
+  # capabilityId : [FK] CommerceCapabilityRevision
+  # capabilityRevisionId : [FK] CommerceCapabilityRevision
+  * position : Int
+}
+
+entity "CommerceReleasePointer" as CommerceReleasePointer {
++ environment [PK] : CommerceEnvironment
+--
+  # releaseId : [FK] CommerceRelease
+  * editVersion : Int
+  # updatedByAdminId : [FK] PlatformAdmin
+  * updatedAt : DateTime
+}
+
+entity "CommerceAuditEvent" as CommerceAuditEvent {
++ id [PK] : String
+--
+  # actorAdminId : [FK] PlatformAdmin
+  * action : CommerceAuditAction
+  # capabilityId : [FK] CommerceCapability
+  # revisionId : [FK] CommerceCapabilityRevision
+  # releaseId : [FK] CommerceRelease
+  # toolId : [FK] CommerceTool
+  # toolRevisionId : [FK] CommerceToolRevision
+  environment : CommerceEnvironment
+  * reason : String
+  * metadata : Json
+  * createdAt : DateTime
+}
+
+entity "CommerceConversationGrant" as CommerceConversationGrant {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # conversationId : [FK] Conversation
+  * initialInboundVersion : Int
+  # releaseId : [FK] CommerceRelease
+  * selectedCapabilityKeys : Json
+  * grantedTools : Json
+  * runnerVersion : String
+  * createdAt : DateTime
+  expiresAt : DateTime
+}
+
+entity "CommerceTool" as CommerceTool {
++ id [PK] : String
+--
+  * name : String
+  * displayName : String
+  description : String
+  * enabled : Boolean
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommerceToolRevision" as CommerceToolRevision {
++ id [PK] : String
+--
+  # toolId : [FK] CommerceTool
+  * revisionNumber : Int
+  * status : CommerceCapabilityRevisionStatus
+  * contractVersion : String
+  * editVersion : Int
+  contentHash : String
+  # createdByAdminId : [FK] PlatformAdmin
+  # publishedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+  publishedAt : DateTime
+  * definitionVersion : String
+  * definition : Json
+}
+
 ' Relations
 ShopSettings |o--|| Shop
 ShopSettings }o--o| ShopifyDiscount
@@ -1366,6 +1521,28 @@ MerchantTranslationBatchItem }o--|| MerchantTranslationBatch
 MerchantTranslationBatchItem }o--|| MerchantMessageTranslation
 MerchantTranslationReconciliationRequest }o--|| PlatformAdmin
 BackgroundRuntimeConfigAuditEvent }o--|| BackgroundRuntimeConfig
+CommerceCapability }o--o| Feature
+CommerceCapabilityRevision }o--|| CommerceCapability
+CommerceCapabilityRevision }o--|| PlatformAdmin
+CommerceCapabilityRevision }o--o| PlatformAdmin
+CommerceRelease }o--|| PlatformAdmin
+CommerceReleaseCapability }o--|| CommerceRelease
+CommerceReleaseCapability }o--|| CommerceCapabilityRevision
+CommerceReleaseCapability }o--|| CommerceCapabilityRevision
+CommerceReleasePointer }o--|| CommerceRelease
+CommerceReleasePointer }o--|| PlatformAdmin
+CommerceAuditEvent }o--|| PlatformAdmin
+CommerceAuditEvent }o--o| CommerceCapability
+CommerceAuditEvent }o--o| CommerceCapabilityRevision
+CommerceAuditEvent }o--o| CommerceRelease
+CommerceAuditEvent }o--o| CommerceTool
+CommerceAuditEvent }o--o| CommerceToolRevision
+CommerceConversationGrant }o--|| Shop
+CommerceConversationGrant |o--|| Conversation
+CommerceConversationGrant }o--|| CommerceRelease
+CommerceToolRevision }o--|| CommerceTool
+CommerceToolRevision }o--|| PlatformAdmin
+CommerceToolRevision }o--o| PlatformAdmin
 ' ManyToMany Relations
 ' enum relations
 ShopSettings |o--|| RecoveryOfferMode
@@ -1425,4 +1602,10 @@ MerchantTranslationReconciliationRequest |o--|| MerchantTranslationReconciliatio
 MerchantTranslationReconciliationRequest |o--|| MerchantTranslationReconciliationStatus
 BackgroundRuntimeConfigAuditEvent |o--|| BackgroundRuntimeConfigSection
 BackgroundRuntimeLease |o--|| BackgroundRuntimeLeaseName
+CommerceCapability |o--|| CommerceCapabilitySelectionBinding
+CommerceCapabilityRevision |o--|| CommerceCapabilityRevisionStatus
+CommerceReleasePointer |o--|| CommerceEnvironment
+CommerceAuditEvent |o--|| CommerceAuditAction
+CommerceAuditEvent |o--|| CommerceEnvironment
+CommerceToolRevision |o--|| CommerceCapabilityRevisionStatus
 @enduml
