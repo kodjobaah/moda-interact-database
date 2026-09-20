@@ -423,6 +423,8 @@ enum ConversationOutcome {
 }
 
 model Conversation {
+  commerceGrant CommerceConversationGrant?
+
   id String @id @default(cuid())
 
   shopId     String?
@@ -569,6 +571,8 @@ enum FeatureActivationMode {
 }
 
 model Feature {
+  commerceCapabilities CommerceCapability[]
+
   id String @id @default(cuid())
 
   key            String                @unique @db.VarChar(128)
@@ -1475,6 +1479,8 @@ enum ShopStatus {
 }
 
 model Shop {
+  commerceConversationGrants CommerceConversationGrant[]
+
   id String @id @default(cuid())
 
   // Shopify identity
@@ -1597,6 +1603,14 @@ enum PlatformAdminRole {
 }
 
 model PlatformAdmin {
+  createdCommerceCapabilityRevisions   CommerceCapabilityRevision[] @relation("CommerceCapabilityRevisionCreator")
+  publishedCommerceCapabilityRevisions CommerceCapabilityRevision[] @relation("CommerceCapabilityRevisionPublisher")
+  createdCommerceToolRevisions         CommerceToolRevision[]       @relation("CommerceToolRevisionCreator")
+  publishedCommerceToolRevisions       CommerceToolRevision[]       @relation("CommerceToolRevisionPublisher")
+  commerceReleases                     CommerceRelease[]
+  commerceReleasePointers              CommerceReleasePointer[]
+  commerceAuditEvents                  CommerceAuditEvent[]
+
   id              String            @id @default(cuid())
   provider        String            @default("google")
   providerSubject String?
@@ -2035,4 +2049,236 @@ model BackgroundRuntimeLease {
 
   @@index([leaseUntil])
   @@schema("public")
+}
+
+// ARCH-020: SQL migration supplies JSON, publication and ownership guards.
+model CommerceCapability {
+  id               String                             @id @default(cuid()) @db.Text
+  key              String                             @unique @db.VarChar(128)
+  displayName      String                             @db.VarChar(255)
+  description      String?                            @db.Text
+  selectionBinding CommerceCapabilitySelectionBinding
+  featureId        String?                            @db.Text
+  enabled          Boolean                            @default(true)
+  createdAt        DateTime                           @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime                           @default(now()) @updatedAt @db.Timestamptz(3)
+  feature          Feature?                           @relation(fields: [featureId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  revisions        CommerceCapabilityRevision[]
+  auditEvents      CommerceAuditEvent[]
+
+  @@index([featureId])
+  @@schema("commerce")
+}
+
+model CommerceCapabilityRevision {
+  id                 String                           @id @default(cuid()) @db.Text
+  capabilityId       String                           @db.Text
+  revisionNumber     Int
+  status             CommerceCapabilityRevisionStatus @default(DRAFT)
+  contractVersion    String                           @db.VarChar(64)
+  editVersion        Int                              @default(0)
+  contentHash        String?                          @db.VarChar(64)
+  createdByAdminId   String                           @db.Text
+  publishedByAdminId String?                          @db.Text
+  createdAt          DateTime                         @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                         @default(now()) @updatedAt @db.Timestamptz(3)
+  publishedAt        DateTime?                        @db.Timestamptz(3)
+  promptTemplate     String                           @db.Text
+  configuration      Json                             @default("{}") @db.JsonB
+  toolBindings       Json                             @default("[]") @db.JsonB
+  capability         CommerceCapability               @relation(fields: [capabilityId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy          PlatformAdmin                    @relation("CommerceCapabilityRevisionCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  publishedBy        PlatformAdmin?                   @relation("CommerceCapabilityRevisionPublisher", fields: [publishedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  releaseMembers     CommerceReleaseCapability[]
+  auditEvents        CommerceAuditEvent[]
+
+  @@unique([capabilityId, revisionNumber])
+  @@unique([id, capabilityId])
+  @@index([capabilityId, status, revisionNumber])
+  @@schema("commerce")
+}
+
+model CommerceRelease {
+  id                  String                      @id @default(cuid()) @db.Text
+  releaseNumber       Int                         @unique @default(autoincrement())
+  description         String?                     @db.Text
+  runnerCompatibility String                      @db.VarChar(128)
+  contractVersion     String                      @db.VarChar(64)
+  responseContract    Json                        @db.JsonB
+  responseContractHash String                     @db.VarChar(64)
+  createdByAdminId    String                      @db.Text
+  createdAt           DateTime                    @default(now()) @db.Timestamptz(3)
+  createdBy           PlatformAdmin               @relation(fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  capabilities        CommerceReleaseCapability[]
+  pointers            CommerceReleasePointer[]
+  auditEvents         CommerceAuditEvent[]
+  grants              CommerceConversationGrant[]
+
+  @@index([createdAt, id])
+  @@schema("commerce")
+}
+
+model CommerceReleaseCapability {
+  releaseId            String                     @db.Text
+  capabilityId         String                     @db.Text
+  capabilityRevisionId String                     @db.Text
+  position             Int
+  release              CommerceRelease            @relation(fields: [releaseId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  revision             CommerceCapabilityRevision @relation(fields: [capabilityRevisionId, capabilityId], references: [id, capabilityId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([releaseId, capabilityId])
+  @@unique([releaseId, position])
+  @@index([capabilityRevisionId, capabilityId])
+  @@schema("commerce")
+}
+
+model CommerceReleasePointer {
+  environment      CommerceEnvironment @id
+  releaseId        String              @db.Text
+  editVersion      Int                 @default(0)
+  updatedByAdminId String              @db.Text
+  updatedAt        DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
+  release          CommerceRelease     @relation(fields: [releaseId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy        PlatformAdmin       @relation(fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([releaseId])
+  @@schema("commerce")
+}
+
+model CommerceAuditEvent {
+  id             String                      @id @default(cuid()) @db.Text
+  actorAdminId   String                      @db.Text
+  action         CommerceAuditAction
+  capabilityId   String?                     @db.Text
+  revisionId     String?                     @db.Text
+  releaseId      String?                     @db.Text
+  toolId         String?                     @db.Text
+  toolRevisionId String?                     @db.Text
+  environment    CommerceEnvironment?
+  reason         String                      @db.VarChar(1000)
+  metadata       Json                        @default("{}") @db.JsonB
+  createdAt      DateTime                    @default(now()) @db.Timestamptz(3)
+  actor          PlatformAdmin               @relation(fields: [actorAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  capability     CommerceCapability?         @relation(fields: [capabilityId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  revision       CommerceCapabilityRevision? @relation(fields: [revisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  release        CommerceRelease?            @relation(fields: [releaseId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  tool           CommerceTool?               @relation(fields: [toolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  toolRevision   CommerceToolRevision?       @relation(fields: [toolRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([createdAt, id])
+  @@index([capabilityId, createdAt, id])
+  @@index([releaseId, createdAt, id])
+  @@index([actorAdminId, createdAt, id])
+  @@index([toolId, createdAt, id])
+  @@schema("commerce")
+}
+
+model CommerceConversationGrant {
+  id                     String          @id @default(cuid()) @db.Text
+  shopId                 String          @db.Text
+  conversationId         String          @unique @db.Text
+  initialInboundVersion  Int
+  releaseId              String          @db.Text
+  selectedCapabilityKeys Json            @db.JsonB
+  grantedTools           Json            @db.JsonB
+  runnerVersion          String          @db.VarChar(64)
+  createdAt              DateTime        @default(now()) @db.Timestamptz(3)
+  expiresAt              DateTime?       @db.Timestamptz(3)
+  shop                   Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  conversation           Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  release                CommerceRelease @relation(fields: [releaseId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([shopId, createdAt, id])
+  @@index([releaseId])
+  @@index([expiresAt])
+  @@schema("commerce")
+}
+
+model CommerceTool {
+  id          String                 @id @default(cuid()) @db.Text
+  name        String                 @unique @db.VarChar(128)
+  displayName String                 @db.VarChar(255)
+  description String?                @db.Text
+  enabled     Boolean                @default(true)
+  createdAt   DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime               @default(now()) @updatedAt @db.Timestamptz(3)
+  revisions   CommerceToolRevision[]
+  auditEvents CommerceAuditEvent[]
+
+  @@index([createdAt, id])
+  @@schema("commerce")
+}
+
+model CommerceToolRevision {
+  id                 String                           @id @default(cuid()) @db.Text
+  toolId             String                           @db.Text
+  revisionNumber     Int
+  status             CommerceCapabilityRevisionStatus @default(DRAFT)
+  contractVersion    String                           @db.VarChar(64)
+  editVersion        Int                              @default(0)
+  contentHash        String?                          @db.VarChar(64)
+  createdByAdminId   String                           @db.Text
+  publishedByAdminId String?                          @db.Text
+  createdAt          DateTime                         @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                         @default(now()) @updatedAt @db.Timestamptz(3)
+  publishedAt        DateTime?                        @db.Timestamptz(3)
+  definitionVersion  String                           @db.VarChar(64)
+  definition         Json                             @db.JsonB
+  tool               CommerceTool                     @relation(fields: [toolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy          PlatformAdmin                    @relation("CommerceToolRevisionCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  publishedBy        PlatformAdmin?                   @relation("CommerceToolRevisionPublisher", fields: [publishedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  auditEvents        CommerceAuditEvent[]
+
+  @@unique([toolId, revisionNumber])
+  @@unique([toolId, definitionVersion])
+  @@unique([id, toolId])
+  @@index([toolId, status, revisionNumber])
+  @@schema("commerce")
+}
+
+enum CommerceCapabilitySelectionBinding {
+  BASE
+  FEATURE
+  RECOVERY_POLICY
+
+  @@schema("commerce")
+}
+
+enum CommerceCapabilityRevisionStatus {
+  DRAFT
+  PUBLISHED
+
+  @@schema("commerce")
+}
+
+enum CommerceEnvironment {
+  LOCAL
+  TEST
+  DEVELOPMENT
+  STAGING
+  PRODUCTION
+
+  @@schema("commerce")
+}
+
+enum CommerceAuditAction {
+  CREATE_CAPABILITY
+  UPDATE_CAPABILITY
+  CREATE_DRAFT
+  UPDATE_DRAFT
+  PUBLISH_REVISION
+  CREATE_RELEASE
+  ACTIVATE_RELEASE
+  ROLLBACK_RELEASE
+  ENABLE_CAPABILITY
+  DISABLE_CAPABILITY
+  CREATE_TOOL
+  UPDATE_TOOL
+  CREATE_TOOL_DRAFT
+  UPDATE_TOOL_DRAFT
+  PUBLISH_TOOL_REVISION
+  ENABLE_TOOL
+  DISABLE_TOOL
+
+  @@schema("commerce")
 }
