@@ -1570,8 +1570,8 @@ model CommerceExternalConnection {
   revisions CommerceExternalConnectionRevision[]
   audits    CommerceExternalConnectionAudit[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@schema("commerce")
 }
@@ -1592,7 +1592,7 @@ model CommerceExternalConnectionRevision {
 
   credentials CommerceExternalCredential[]
   audits      CommerceExternalConnectionAudit[]
-  createdAt   DateTime                          @default(now())
+  createdAt   DateTime                          @default(now()) @db.Timestamptz(3)
 
   @@unique([connectionId, revisionNumber])
   @@unique([id, connectionId])
@@ -1614,8 +1614,8 @@ model CommerceExternalCredential {
   updatedByAdminId     String
   updatedByAdmin       PlatformAdmin                      @relation("CommerceExternalCredentialUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@schema("commerce")
 }
@@ -1637,7 +1637,7 @@ model CommerceExternalConnectionAudit {
   reason               String                              @db.VarChar(1000)
   result               Json
 
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   @@unique([actorAdminId, operationId])
   @@index([connectionId, createdAt, id])
