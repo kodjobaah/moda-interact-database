@@ -24,7 +24,8 @@
     "test:arch015-partner-development-test-refunds": "node scripts/validate-arch015-partner-development-test-refunds.mjs",
     "test:arch019-recovery-indexes": "node scripts/validate-arch019-recovery-indexes.mjs",
     "test:arch020-commerce-capability-schema": "node scripts/validate-arch020-commerce-capability-schema.mjs",
-    "test:arch020-commerce-capability-migration": "node scripts/validate-arch020-commerce-capability-migration.mjs"
+    "test:arch020-commerce-capability-migration": "node scripts/validate-arch020-commerce-capability-migration.mjs",
+    "test:arch020-external-connections:database": "node scripts/validate-arch020-external-connections.mjs"
   },
   "keywords": [],
   "author": "",
