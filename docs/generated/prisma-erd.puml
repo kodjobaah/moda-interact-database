@@ -230,6 +230,23 @@ enum "ShopStatus" as ShopStatus {
   UNINSTALLED
   SUSPENDED
 }
+enum "CommerceExternalConnectionScope" as CommerceExternalConnectionScope {
+  PLATFORM
+  PER_SHOP
+}
+enum "CommerceExternalAuthMode" as CommerceExternalAuthMode {
+  NONE
+  BEARER
+  API_KEY
+}
+enum "CommerceExternalConnectionAction" as CommerceExternalConnectionAction {
+  CREATE_CONNECTION
+  UPDATE_METADATA
+  CREATE_REVISION
+  SET_ENABLED
+  SET_CREDENTIAL
+  REMOVE_CREDENTIAL
+}
 enum "WhatsAppTemplateStatus" as WhatsAppTemplateStatus {
   APPROVED
   IN_APPEAL
@@ -1033,6 +1050,62 @@ entity "Shop" as Shop {
   * updatedAt : DateTime
 }
 
+entity "CommerceExternalConnection" as CommerceExternalConnection {
++ id [PK] : String
+--
+  * key : String
+  * displayName : String
+  * description : String
+  * enabled : Boolean
+  * editVersion : Int
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommerceExternalConnectionRevision" as CommerceExternalConnectionRevision {
++ id [PK] : String
+--
+  # connectionId : [FK] CommerceExternalConnection
+  * revisionNumber : Int
+  * origin : String
+  * scope : CommerceExternalConnectionScope
+  * authMode : CommerceExternalAuthMode
+  authHeader : String
+  * documentation : String
+  # createdByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+}
+
+entity "CommerceExternalCredential" as CommerceExternalCredential {
++ id [PK] : String
+--
+  # connectionRevisionId : [FK] CommerceExternalConnectionRevision
+  # shopId : [FK] Shop
+  * ciphertext : Bytes
+  * nonce : Bytes
+  * authTag : Bytes
+  * keyId : String
+  * editVersion : Int
+  # updatedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommerceExternalConnectionAudit" as CommerceExternalConnectionAudit {
++ id [PK] : String
+--
+  # actorAdminId : [FK] PlatformAdmin
+  * operationId : String
+  * action : CommerceExternalConnectionAction
+  * requestDigest : String
+  # connectionId : [FK] CommerceExternalConnection
+  # connectionRevisionId : [FK] CommerceExternalConnectionRevision
+  # shopId : [FK] Shop
+  * reason : String
+  * result : Json
+  * createdAt : DateTime
+}
+
 entity "WhatsAppTemplateVariant" as WhatsAppTemplateVariant {
 + id [PK] : String
 --
@@ -1506,6 +1579,15 @@ BillingAuditEvent }o--|| PlatformAdmin
 BillingPeriod }o--|| Shop
 BillingPeriod }o--|| Subscription
 BillingPeriod }o--o| BillingPlan
+CommerceExternalConnectionRevision }o--|| CommerceExternalConnection
+CommerceExternalConnectionRevision }o--|| PlatformAdmin
+CommerceExternalCredential }o--|| CommerceExternalConnectionRevision
+CommerceExternalCredential }o--o| Shop
+CommerceExternalCredential }o--|| PlatformAdmin
+CommerceExternalConnectionAudit }o--|| PlatformAdmin
+CommerceExternalConnectionAudit }o--|| CommerceExternalConnection
+CommerceExternalConnectionAudit }o--o| CommerceExternalConnectionRevision
+CommerceExternalConnectionAudit }o--o| Shop
 WhatsAppTemplateVariant }o--|| Shop
 MerchantSupportThread |o--|| Shop
 MerchantSupportThread }o--o| PlatformAdmin
@@ -1590,6 +1672,9 @@ BillingPeriod |o--|| BillingPlanKind
 BillingPeriod |o--|| BillingPeriodStatus
 BillingPeriod |o--|| BillingPeriodCloseReason
 Shop |o--|| ShopStatus
+CommerceExternalConnectionRevision |o--|| CommerceExternalConnectionScope
+CommerceExternalConnectionRevision |o--|| CommerceExternalAuthMode
+CommerceExternalConnectionAudit |o--|| CommerceExternalConnectionAction
 WhatsAppTemplateVariant |o--|| WhatsAppTemplateStatus
 PlatformAdmin |o--|| PlatformAdminRole
 MerchantSupportMessage |o--|| MerchantSupportMessageKind

@@ -88,6 +88,14 @@ try {
   ).catch(() => {});
 }
 
+const generatedErd = await readFile(
+  `${outputDirectory}/prisma-erd.puml`,
+  "utf8",
+);
+await writeFile(
+  `${outputDirectory}/prisma-erd.puml`,
+  generatedErd.replace(/[ \t]+$/gm, ""),
+);
 
 console.log(
   "\nPlantUML ERD generated at docs/generated/prisma-erd.puml",

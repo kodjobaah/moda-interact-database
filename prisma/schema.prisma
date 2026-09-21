@@ -1480,6 +1480,8 @@ enum ShopStatus {
 
 model Shop {
   commerceConversationGrants CommerceConversationGrant[]
+  externalCredentials        CommerceExternalCredential[]
+  externalConnectionAudits   CommerceExternalConnectionAudit[]
 
   id String @id @default(cuid())
 
@@ -1527,6 +1529,118 @@ model Shop {
 
   @@index([status])
   @@index([status, reinstallPendingAt])
+  @@schema("commerce")
+}
+
+enum CommerceExternalConnectionScope {
+  PLATFORM
+  PER_SHOP
+
+  @@schema("commerce")
+}
+
+enum CommerceExternalAuthMode {
+  NONE
+  BEARER
+  API_KEY
+
+  @@schema("commerce")
+}
+
+enum CommerceExternalConnectionAction {
+  CREATE_CONNECTION
+  UPDATE_METADATA
+  CREATE_REVISION
+  SET_ENABLED
+  SET_CREDENTIAL
+  REMOVE_CREDENTIAL
+
+  @@schema("commerce")
+}
+
+model CommerceExternalConnection {
+  id String @id @default(cuid())
+
+  key         String  @unique @db.VarChar(128)
+  displayName String  @db.VarChar(255)
+  description String  @default("") @db.Text
+  enabled     Boolean @default(true)
+  editVersion Int     @default(1)
+
+  revisions CommerceExternalConnectionRevision[]
+  audits    CommerceExternalConnectionAudit[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("commerce")
+}
+
+model CommerceExternalConnectionRevision {
+  id String @id @default(cuid())
+
+  connectionId     String
+  connection       CommerceExternalConnection      @relation(fields: [connectionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  revisionNumber   Int
+  origin           String                          @db.VarChar(2048)
+  scope            CommerceExternalConnectionScope
+  authMode         CommerceExternalAuthMode
+  authHeader       String?                         @db.VarChar(128)
+  documentation    String                          @default("") @db.Text
+  createdByAdminId String
+  createdByAdmin   PlatformAdmin                   @relation("CommerceExternalConnectionRevisionCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  credentials CommerceExternalCredential[]
+  audits      CommerceExternalConnectionAudit[]
+  createdAt   DateTime                          @default(now())
+
+  @@unique([connectionId, revisionNumber])
+  @@unique([id, connectionId])
+  @@schema("commerce")
+}
+
+model CommerceExternalCredential {
+  id String @id @default(cuid())
+
+  connectionRevisionId String
+  connectionRevision   CommerceExternalConnectionRevision @relation(fields: [connectionRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  shopId               String?
+  shop                 Shop?                              @relation(fields: [shopId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  ciphertext           Bytes
+  nonce                Bytes
+  authTag              Bytes
+  keyId                String                             @db.VarChar(64)
+  editVersion          Int                                @default(1)
+  updatedByAdminId     String
+  updatedByAdmin       PlatformAdmin                      @relation("CommerceExternalCredentialUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("commerce")
+}
+
+model CommerceExternalConnectionAudit {
+  id String @id @default(cuid())
+
+  actorAdminId         String
+  actorAdmin           PlatformAdmin                       @relation("CommerceExternalConnectionAuditActor", fields: [actorAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  operationId          String                              @db.VarChar(128)
+  action               CommerceExternalConnectionAction
+  requestDigest        String                              @db.Char(64)
+  connectionId         String
+  connection           CommerceExternalConnection          @relation(fields: [connectionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  connectionRevisionId String?
+  connectionRevision   CommerceExternalConnectionRevision? @relation(fields: [connectionRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  shopId               String?
+  shop                 Shop?                               @relation(fields: [shopId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  reason               String                              @db.VarChar(1000)
+  result               Json
+
+  createdAt DateTime @default(now())
+
+  @@unique([actorAdminId, operationId])
+  @@index([connectionId, createdAt, id])
   @@schema("commerce")
 }
 
@@ -1603,13 +1717,16 @@ enum PlatformAdminRole {
 }
 
 model PlatformAdmin {
-  createdCommerceCapabilityRevisions   CommerceCapabilityRevision[] @relation("CommerceCapabilityRevisionCreator")
-  publishedCommerceCapabilityRevisions CommerceCapabilityRevision[] @relation("CommerceCapabilityRevisionPublisher")
-  createdCommerceToolRevisions         CommerceToolRevision[]       @relation("CommerceToolRevisionCreator")
-  publishedCommerceToolRevisions       CommerceToolRevision[]       @relation("CommerceToolRevisionPublisher")
+  createdCommerceCapabilityRevisions   CommerceCapabilityRevision[]         @relation("CommerceCapabilityRevisionCreator")
+  publishedCommerceCapabilityRevisions CommerceCapabilityRevision[]         @relation("CommerceCapabilityRevisionPublisher")
+  createdCommerceToolRevisions         CommerceToolRevision[]               @relation("CommerceToolRevisionCreator")
+  publishedCommerceToolRevisions       CommerceToolRevision[]               @relation("CommerceToolRevisionPublisher")
   commerceReleases                     CommerceRelease[]
   commerceReleasePointers              CommerceReleasePointer[]
   commerceAuditEvents                  CommerceAuditEvent[]
+  externalConnectionRevisionCreators   CommerceExternalConnectionRevision[] @relation("CommerceExternalConnectionRevisionCreator")
+  externalCredentialUpdaters           CommerceExternalCredential[]         @relation("CommerceExternalCredentialUpdater")
+  externalConnectionAuditActors        CommerceExternalConnectionAudit[]    @relation("CommerceExternalConnectionAuditActor")
 
   id              String            @id @default(cuid())
   provider        String            @default("google")
@@ -1732,20 +1849,20 @@ model RecoveryCreditRefund {
 
   requestedByShopifyUserId String?
 
-  purchaseCreditsGrantedSnapshot   Int
-  currentAmountAtRequestSnapshot   Int
-  reservedAmountAtRequestSnapshot  Int
-  availableAmountAtRequestSnapshot Int
-  billingPeriodIdSnapshot          String
-  providerSubscriptionIdSnapshot   String
-  planHandleSnapshot               String
+  purchaseCreditsGrantedSnapshot    Int
+  currentAmountAtRequestSnapshot    Int
+  reservedAmountAtRequestSnapshot   Int
+  availableAmountAtRequestSnapshot  Int
+  billingPeriodIdSnapshot           String
+  providerSubscriptionIdSnapshot    String
+  planHandleSnapshot                String
   eventHandleSnapshot               String
   shopifyPartnerDevelopmentSnapshot Boolean  @default(false)
   purchaseProviderAmountSnapshot    Decimal
-  purchaseProviderCurrencySnapshot String   @db.VarChar(3)
-  finalCreditQuantity              Int?
-  expectedProviderAmount           Decimal?
-  expectedProviderCurrency         String?  @db.VarChar(3)
+  purchaseProviderCurrencySnapshot  String   @db.VarChar(3)
+  finalCreditQuantity               Int?
+  expectedProviderAmount            Decimal?
+  expectedProviderCurrency          String?  @db.VarChar(3)
 
   automaticCorrectionUsageEventId              String?     @unique
   automaticCorrectionUsageEvent                UsageEvent? @relation("RecoveryCreditRefundAutomaticCorrection", fields: [automaticCorrectionUsageEventId], references: [id], onDelete: Restrict)
@@ -2099,20 +2216,20 @@ model CommerceCapabilityRevision {
 }
 
 model CommerceRelease {
-  id                  String                      @id @default(cuid()) @db.Text
-  releaseNumber       Int                         @unique @default(autoincrement())
-  description         String?                     @db.Text
-  runnerCompatibility String                      @db.VarChar(128)
-  contractVersion     String                      @db.VarChar(64)
-  responseContract    Json                        @db.JsonB
-  responseContractHash String                     @db.VarChar(64)
-  createdByAdminId    String                      @db.Text
-  createdAt           DateTime                    @default(now()) @db.Timestamptz(3)
-  createdBy           PlatformAdmin               @relation(fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  capabilities        CommerceReleaseCapability[]
-  pointers            CommerceReleasePointer[]
-  auditEvents         CommerceAuditEvent[]
-  grants              CommerceConversationGrant[]
+  id                   String                      @id @default(cuid()) @db.Text
+  releaseNumber        Int                         @unique @default(autoincrement())
+  description          String?                     @db.Text
+  runnerCompatibility  String                      @db.VarChar(128)
+  contractVersion      String                      @db.VarChar(64)
+  responseContract     Json                        @db.JsonB
+  responseContractHash String                      @db.VarChar(64)
+  createdByAdminId     String                      @db.Text
+  createdAt            DateTime                    @default(now()) @db.Timestamptz(3)
+  createdBy            PlatformAdmin               @relation(fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  capabilities         CommerceReleaseCapability[]
+  pointers             CommerceReleasePointer[]
+  auditEvents          CommerceAuditEvent[]
+  grants               CommerceConversationGrant[]
 
   @@index([createdAt, id])
   @@schema("commerce")

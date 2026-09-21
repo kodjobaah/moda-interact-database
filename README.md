@@ -79,6 +79,13 @@ type ShopifyWebhookJobV1<T> = {
 Webhook dispatch is immediate. Recovery timing is derived later by background processing after the webhook has been durably applied.
 
 Application repositories generate their Prisma clients from this shared schema.
+The Commerce service's nested database submodule must run `npm run prisma:generate`
+from this repository after updating the submodule pointer; consumers must not copy
+the schema. Generated clients must match the migration commit before deploying
+code that reads external connections. Prisma rollback is limited to rolling back
+application usage; the external connection migration is additive and its immutable
+revision/audit tables and triggers must remain in place, so destructive down
+migrations are intentionally not provided.
 
 ## Migrations
 
@@ -155,6 +162,13 @@ Then run:
 
 ```bash
 npm run erd
+```
+
+For the ARCH-020 external connection boundary, use isolated local databases only:
+
+```bash
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/arch020_connections_test_fresh" npm run test:arch020-external-connections:database -- --mode fresh
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/arch020_connections_test_upgrade" npm run test:arch020-external-connections:database -- --mode upgrade
 ```
 
 This generates:
