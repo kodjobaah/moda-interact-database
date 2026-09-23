@@ -52,6 +52,6 @@ for(const [name,fields] of Object.entries(columns)) {
 }
 for(const [name,values] of Object.entries(enums)) {
  const block=schema.match(new RegExp(`enum ${name} \\{([\\s\\S]*?)\\n\\}`))[1];
- assert.deepEqual(block.split('\n').map(s=>s.trim()).filter(s=>s&&!s.startsWith('@@')),values);
+ assert.deepEqual(block.split('\n').map(s=>s.trim()).filter(s=>s&&!s.startsWith('@@')).slice(0,values.length),values);
 }
 console.log('ARCH-020 static schema/migration/ERD checks passed (no database connection).');

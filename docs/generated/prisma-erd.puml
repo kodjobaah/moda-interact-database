@@ -325,6 +325,18 @@ enum "CommerceCapabilityRevisionStatus" as CommerceCapabilityRevisionStatus {
   DRAFT
   PUBLISHED
 }
+enum "CommerceModelProvider" as CommerceModelProvider {
+  OPENAI
+  GROQ
+}
+enum "CommerceAgentPromptScope" as CommerceAgentPromptScope {
+  PLATFORM
+  SHOP
+}
+enum "CommercePromptRevisionStatus" as CommercePromptRevisionStatus {
+  DRAFT
+  PUBLISHED
+}
 enum "CommerceEnvironment" as CommerceEnvironment {
   LOCAL
   TEST
@@ -350,6 +362,32 @@ enum "CommerceAuditAction" as CommerceAuditAction {
   PUBLISH_TOOL_REVISION
   ENABLE_TOOL
   DISABLE_TOOL
+  CREATE_MODEL_CATALOGUE_ENTRY
+  UPDATE_MODEL_CATALOGUE_ENTRY
+  ENABLE_MODEL_CATALOGUE_ENTRY
+  DISABLE_MODEL_CATALOGUE_ENTRY
+  SET_PLATFORM_MODEL_SELECTION
+  SET_SHOP_MODEL_SELECTION
+  CLEAR_SHOP_MODEL_SELECTION
+  CREATE_PROMPT_TEMPLATE_CATEGORY
+  UPDATE_PROMPT_TEMPLATE_CATEGORY
+  ENABLE_PROMPT_TEMPLATE_CATEGORY
+  DISABLE_PROMPT_TEMPLATE_CATEGORY
+  CREATE_PROMPT_TEMPLATE
+  UPDATE_PROMPT_TEMPLATE
+  ENABLE_PROMPT_TEMPLATE
+  DISABLE_PROMPT_TEMPLATE
+  CREATE_PROMPT_TEMPLATE_DRAFT
+  UPDATE_PROMPT_TEMPLATE_DRAFT
+  PUBLISH_PROMPT_TEMPLATE_REVISION
+  CREATE_AGENT_PROMPT
+  CREATE_AGENT_PROMPT_DRAFT
+  CREATE_AGENT_PROMPT_DRAFT_FROM_TEMPLATE
+  UPDATE_AGENT_PROMPT_DRAFT
+  PUBLISH_AGENT_PROMPT_REVISION
+  SET_PLATFORM_PROMPT_POINTER
+  SET_SHOP_PROMPT_POINTER
+  CLEAR_SHOP_PROMPT_POINTER
 }
 entity "Session" as Session {
 + id [PK] : String
@@ -1452,6 +1490,13 @@ entity "CommerceAuditEvent" as CommerceAuditEvent {
   # releaseId : [FK] CommerceRelease
   # toolId : [FK] CommerceTool
   # toolRevisionId : [FK] CommerceToolRevision
+  # shopId : [FK] Shop
+  # modelCatalogueEntryId : [FK] CommerceModelCatalogueEntry
+  # promptTemplateCategoryId : [FK] CommercePromptTemplateCategory
+  # promptTemplateId : [FK] CommercePromptTemplate
+  # promptTemplateRevisionId : [FK] CommercePromptTemplateRevision
+  # agentPromptId : [FK] CommerceAgentPrompt
+  # agentPromptRevisionId : [FK] CommerceAgentPromptRevision
   environment : CommerceEnvironment
   * reason : String
   * metadata : Json
@@ -1499,6 +1544,139 @@ entity "CommerceToolRevision" as CommerceToolRevision {
   publishedAt : DateTime
   * definitionVersion : String
   * definition : Json
+}
+
+entity "CommerceModelCatalogueEntry" as CommerceModelCatalogueEntry {
++ id [PK] : String
+--
+  * provider : CommerceModelProvider
+  * providerModelId : String
+  * displayName : String
+  * description : String
+  * enabled : Boolean
+  * editVersion : Int
+  # createdByAdminId : [FK] PlatformAdmin
+  # updatedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommercePlatformModelSelection" as CommercePlatformModelSelection {
++ environment [PK] : CommerceEnvironment
+--
+  # modelId : [FK] CommerceModelCatalogueEntry
+  * editVersion : Int
+  # updatedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommerceShopModelSelection" as CommerceShopModelSelection {
+--
+  * environment : CommerceEnvironment
+  # shopId : [FK] Shop
+  # modelId : [FK] CommerceModelCatalogueEntry
+  * generationId : String
+  * editVersion : Int
+  # updatedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommercePromptTemplateCategory" as CommercePromptTemplateCategory {
++ id [PK] : String
+--
+  * slug : String
+  * displayName : String
+  * description : String
+  * enabled : Boolean
+  * displayOrder : Int
+  * editVersion : Int
+  # createdByAdminId : [FK] PlatformAdmin
+  # updatedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommercePromptTemplate" as CommercePromptTemplate {
++ id [PK] : String
+--
+  * key : String
+  # categoryId : [FK] CommercePromptTemplateCategory
+  * displayName : String
+  * description : String
+  * enabled : Boolean
+  * editVersion : Int
+  # createdByAdminId : [FK] PlatformAdmin
+  # updatedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommercePromptTemplateRevision" as CommercePromptTemplateRevision {
++ id [PK] : String
+--
+  # templateId : [FK] CommercePromptTemplate
+  * revisionNumber : Int
+  * status : CommercePromptRevisionStatus
+  * editVersion : Int
+  * promptText : String
+  contentHash : String
+  # createdByAdminId : [FK] PlatformAdmin
+  # publishedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+  publishedAt : DateTime
+}
+
+entity "CommerceAgentPrompt" as CommerceAgentPrompt {
++ id [PK] : String
+--
+  * scope : CommerceAgentPromptScope
+  # shopId : [FK] Shop
+  # createdByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+}
+
+entity "CommerceAgentPromptRevision" as CommerceAgentPromptRevision {
++ id [PK] : String
+--
+  # promptId : [FK] CommerceAgentPrompt
+  * revisionNumber : Int
+  * status : CommercePromptRevisionStatus
+  * editVersion : Int
+  * promptText : String
+  contentHash : String
+  # sourceTemplateRevisionId : [FK] CommercePromptTemplateRevision
+  # createdByAdminId : [FK] PlatformAdmin
+  # publishedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+  publishedAt : DateTime
+}
+
+entity "CommercePlatformPromptPointer" as CommercePlatformPromptPointer {
++ environment [PK] : CommerceEnvironment
+--
+  # promptId : [FK] CommerceAgentPromptRevision
+  # promptRevisionId : [FK] CommerceAgentPromptRevision
+  * editVersion : Int
+  # updatedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommerceShopPromptPointer" as CommerceShopPromptPointer {
+--
+  * environment : CommerceEnvironment
+  # shopId : [FK] Shop
+  # promptId : [FK] CommerceAgentPromptRevision
+  # promptRevisionId : [FK] CommerceAgentPromptRevision
+  * generationId : String
+  * editVersion : Int
+  # updatedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
 }
 
 ' Relations
@@ -1621,12 +1799,47 @@ CommerceAuditEvent }o--o| CommerceCapabilityRevision
 CommerceAuditEvent }o--o| CommerceRelease
 CommerceAuditEvent }o--o| CommerceTool
 CommerceAuditEvent }o--o| CommerceToolRevision
+CommerceAuditEvent }o--o| Shop
+CommerceAuditEvent }o--o| CommerceModelCatalogueEntry
+CommerceAuditEvent }o--o| CommercePromptTemplateCategory
+CommerceAuditEvent }o--o| CommercePromptTemplate
+CommerceAuditEvent }o--o| CommercePromptTemplateRevision
+CommerceAuditEvent }o--o| CommerceAgentPrompt
+CommerceAuditEvent }o--o| CommerceAgentPromptRevision
 CommerceConversationGrant }o--|| Shop
 CommerceConversationGrant |o--|| Conversation
 CommerceConversationGrant }o--|| CommerceRelease
 CommerceToolRevision }o--|| CommerceTool
 CommerceToolRevision }o--|| PlatformAdmin
 CommerceToolRevision }o--o| PlatformAdmin
+CommerceModelCatalogueEntry }o--|| PlatformAdmin
+CommerceModelCatalogueEntry }o--|| PlatformAdmin
+CommercePlatformModelSelection }o--|| CommerceModelCatalogueEntry
+CommercePlatformModelSelection }o--|| PlatformAdmin
+CommerceShopModelSelection }o--|| Shop
+CommerceShopModelSelection }o--|| CommerceModelCatalogueEntry
+CommerceShopModelSelection }o--|| PlatformAdmin
+CommercePromptTemplateCategory }o--|| PlatformAdmin
+CommercePromptTemplateCategory }o--|| PlatformAdmin
+CommercePromptTemplate }o--|| CommercePromptTemplateCategory
+CommercePromptTemplate }o--|| PlatformAdmin
+CommercePromptTemplate }o--|| PlatformAdmin
+CommercePromptTemplateRevision }o--|| CommercePromptTemplate
+CommercePromptTemplateRevision }o--|| PlatformAdmin
+CommercePromptTemplateRevision }o--o| PlatformAdmin
+CommerceAgentPrompt }o--o| Shop
+CommerceAgentPrompt }o--|| PlatformAdmin
+CommerceAgentPromptRevision }o--|| CommerceAgentPrompt
+CommerceAgentPromptRevision }o--o| CommercePromptTemplateRevision
+CommerceAgentPromptRevision }o--|| PlatformAdmin
+CommerceAgentPromptRevision }o--o| PlatformAdmin
+CommercePlatformPromptPointer }o--|| CommerceAgentPromptRevision
+CommercePlatformPromptPointer }o--|| CommerceAgentPromptRevision
+CommercePlatformPromptPointer }o--|| PlatformAdmin
+CommerceShopPromptPointer }o--|| Shop
+CommerceShopPromptPointer }o--|| CommerceAgentPromptRevision
+CommerceShopPromptPointer }o--|| CommerceAgentPromptRevision
+CommerceShopPromptPointer }o--|| PlatformAdmin
 ' ManyToMany Relations
 ' enum relations
 ShopSettings |o--|| RecoveryOfferMode
@@ -1695,4 +1908,12 @@ CommerceReleasePointer |o--|| CommerceEnvironment
 CommerceAuditEvent |o--|| CommerceAuditAction
 CommerceAuditEvent |o--|| CommerceEnvironment
 CommerceToolRevision |o--|| CommerceCapabilityRevisionStatus
+CommerceModelCatalogueEntry |o--|| CommerceModelProvider
+CommercePlatformModelSelection |o--|| CommerceEnvironment
+CommerceShopModelSelection |o--|| CommerceEnvironment
+CommercePromptTemplateRevision |o--|| CommercePromptRevisionStatus
+CommerceAgentPrompt |o--|| CommerceAgentPromptScope
+CommerceAgentPromptRevision |o--|| CommercePromptRevisionStatus
+CommercePlatformPromptPointer |o--|| CommerceEnvironment
+CommerceShopPromptPointer |o--|| CommerceEnvironment
 @enduml

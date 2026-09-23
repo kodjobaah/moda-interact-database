@@ -1482,6 +1482,10 @@ model Shop {
   commerceConversationGrants CommerceConversationGrant[]
   externalCredentials        CommerceExternalCredential[]
   externalConnectionAudits   CommerceExternalConnectionAudit[]
+  commerceModelSelections    CommerceShopModelSelection[]
+  commerceAgentPrompts       CommerceAgentPrompt[]
+  commercePromptPointers     CommerceShopPromptPointer[]
+  commerceAuditEvents        CommerceAuditEvent[]
 
   id String @id @default(cuid())
 
@@ -1727,6 +1731,21 @@ model PlatformAdmin {
   externalConnectionRevisionCreators   CommerceExternalConnectionRevision[] @relation("CommerceExternalConnectionRevisionCreator")
   externalCredentialUpdaters           CommerceExternalCredential[]         @relation("CommerceExternalCredentialUpdater")
   externalConnectionAuditActors        CommerceExternalConnectionAudit[]    @relation("CommerceExternalConnectionAuditActor")
+  createdCommerceModelCatalogueEntries    CommerceModelCatalogueEntry[]    @relation("CommerceModelCatalogueEntryCreator")
+  updatedCommerceModelCatalogueEntries    CommerceModelCatalogueEntry[]    @relation("CommerceModelCatalogueEntryUpdater")
+  updatedCommercePlatformModelSelections  CommercePlatformModelSelection[] @relation("CommercePlatformModelSelectionUpdater")
+  updatedCommerceShopModelSelections      CommerceShopModelSelection[]     @relation("CommerceShopModelSelectionUpdater")
+  createdCommercePromptTemplateCategories CommercePromptTemplateCategory[] @relation("CommercePromptTemplateCategoryCreator")
+  updatedCommercePromptTemplateCategories CommercePromptTemplateCategory[] @relation("CommercePromptTemplateCategoryUpdater")
+  createdCommercePromptTemplates          CommercePromptTemplate[]         @relation("CommercePromptTemplateCreator")
+  updatedCommercePromptTemplates          CommercePromptTemplate[]         @relation("CommercePromptTemplateUpdater")
+  createdCommercePromptTemplateRevisions  CommercePromptTemplateRevision[] @relation("CommercePromptTemplateRevisionCreator")
+  publishedCommercePromptTemplateRevisions CommercePromptTemplateRevision[] @relation("CommercePromptTemplateRevisionPublisher")
+  createdCommerceAgentPrompts             CommerceAgentPrompt[]            @relation("CommerceAgentPromptCreator")
+  createdCommerceAgentPromptRevisions     CommerceAgentPromptRevision[]    @relation("CommerceAgentPromptRevisionCreator")
+  publishedCommerceAgentPromptRevisions   CommerceAgentPromptRevision[]    @relation("CommerceAgentPromptRevisionPublisher")
+  updatedCommercePlatformPromptPointers   CommercePlatformPromptPointer[]  @relation("CommercePlatformPromptPointerUpdater")
+  updatedCommerceShopPromptPointers       CommerceShopPromptPointer[]      @relation("CommerceShopPromptPointerUpdater")
 
   id              String            @id @default(cuid())
   provider        String            @default("google")
@@ -2271,6 +2290,13 @@ model CommerceAuditEvent {
   releaseId      String?                     @db.Text
   toolId         String?                     @db.Text
   toolRevisionId String?                     @db.Text
+  shopId                   String? @db.Text
+  modelCatalogueEntryId    String? @db.Text
+  promptTemplateCategoryId String? @db.Text
+  promptTemplateId         String? @db.Text
+  promptTemplateRevisionId String? @db.Text
+  agentPromptId            String? @db.Text
+  agentPromptRevisionId    String? @db.Text
   environment    CommerceEnvironment?
   reason         String                      @db.VarChar(1000)
   metadata       Json                        @default("{}") @db.JsonB
@@ -2281,12 +2307,24 @@ model CommerceAuditEvent {
   release        CommerceRelease?            @relation(fields: [releaseId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   tool           CommerceTool?               @relation(fields: [toolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   toolRevision   CommerceToolRevision?       @relation(fields: [toolRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  shop                   Shop?                           @relation(fields: [shopId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  modelCatalogueEntry    CommerceModelCatalogueEntry?    @relation(fields: [modelCatalogueEntryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  promptTemplateCategory CommercePromptTemplateCategory? @relation(fields: [promptTemplateCategoryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  promptTemplate         CommercePromptTemplate?         @relation(fields: [promptTemplateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  promptTemplateRevision CommercePromptTemplateRevision? @relation(fields: [promptTemplateRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  agentPrompt            CommerceAgentPrompt?            @relation(fields: [agentPromptId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  agentPromptRevision    CommerceAgentPromptRevision?    @relation(fields: [agentPromptRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@index([createdAt, id])
   @@index([capabilityId, createdAt, id])
   @@index([releaseId, createdAt, id])
   @@index([actorAdminId, createdAt, id])
   @@index([toolId, createdAt, id])
+  @@index([shopId, createdAt, id])
+  @@index([modelCatalogueEntryId, createdAt, id])
+  @@index([promptTemplateCategoryId, createdAt, id])
+  @@index([promptTemplateId, createdAt, id])
+  @@index([agentPromptId, createdAt, id])
   @@schema("commerce")
 }
 
@@ -2353,6 +2391,200 @@ model CommerceToolRevision {
   @@schema("commerce")
 }
 
+model CommerceModelCatalogueEntry {
+  id               String                @id @default(cuid()) @db.Text
+  provider         CommerceModelProvider
+  providerModelId  String                @db.VarChar(255)
+  displayName      String                @db.VarChar(255)
+  description      String                @default("") @db.Text
+  enabled          Boolean               @default(true)
+  editVersion      Int                   @default(1)
+  createdByAdminId String                @db.Text
+  updatedByAdminId String                @db.Text
+  createdAt        DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime              @default(now()) @updatedAt @db.Timestamptz(3)
+  createdBy          PlatformAdmin                   @relation("CommerceModelCatalogueEntryCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy          PlatformAdmin                   @relation("CommerceModelCatalogueEntryUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  platformSelections CommercePlatformModelSelection[]
+  shopSelections     CommerceShopModelSelection[]
+  auditEvents        CommerceAuditEvent[]
+  @@unique([provider, providerModelId])
+  @@index([enabled, provider, displayName, id])
+  @@schema("commerce")
+}
+
+model CommercePlatformModelSelection {
+  environment      CommerceEnvironment @id
+  modelId          String              @db.Text
+  editVersion      Int                 @default(1)
+  updatedByAdminId String              @db.Text
+  createdAt        DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
+  model     CommerceModelCatalogueEntry @relation(fields: [modelId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy PlatformAdmin               @relation("CommercePlatformModelSelectionUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  @@index([modelId])
+  @@schema("commerce")
+}
+
+model CommerceShopModelSelection {
+  environment      CommerceEnvironment
+  shopId           String              @db.Text
+  modelId          String              @db.Text
+  generationId     String              @default(cuid()) @db.Text
+  editVersion      Int                 @default(1)
+  updatedByAdminId String              @db.Text
+  createdAt        DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
+  shop      Shop                        @relation(fields: [shopId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  model     CommerceModelCatalogueEntry @relation(fields: [modelId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy PlatformAdmin               @relation("CommerceShopModelSelectionUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  @@id([environment, shopId])
+  @@index([modelId])
+  @@index([shopId])
+  @@schema("commerce")
+}
+
+model CommercePromptTemplateCategory {
+  id               String   @id @default(cuid()) @db.Text
+  slug             String   @unique @db.VarChar(128)
+  displayName      String   @db.VarChar(255)
+  description      String   @default("") @db.Text
+  enabled          Boolean  @default(true)
+  displayOrder     Int      @default(0)
+  editVersion      Int      @default(1)
+  createdByAdminId String   @db.Text
+  updatedByAdminId String   @db.Text
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  createdBy   PlatformAdmin             @relation("CommercePromptTemplateCategoryCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy   PlatformAdmin             @relation("CommercePromptTemplateCategoryUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  templates   CommercePromptTemplate[]
+  auditEvents CommerceAuditEvent[]
+  @@index([enabled, displayOrder, displayName, id])
+  @@schema("commerce")
+}
+
+model CommercePromptTemplate {
+  id               String   @id @default(cuid()) @db.Text
+  key              String   @unique @db.VarChar(128)
+  categoryId       String   @db.Text
+  displayName      String   @db.VarChar(255)
+  description      String   @default("") @db.Text
+  enabled          Boolean  @default(true)
+  editVersion      Int      @default(1)
+  createdByAdminId String   @db.Text
+  updatedByAdminId String   @db.Text
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  category    CommercePromptTemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy   PlatformAdmin                  @relation("CommercePromptTemplateCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy   PlatformAdmin                  @relation("CommercePromptTemplateUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  revisions   CommercePromptTemplateRevision[]
+  auditEvents CommerceAuditEvent[]
+  @@index([categoryId, enabled, displayName, id])
+  @@index([enabled, displayName, id])
+  @@schema("commerce")
+}
+
+model CommercePromptTemplateRevision {
+  id                 String                       @id @default(cuid()) @db.Text
+  templateId         String                       @db.Text
+  revisionNumber     Int
+  status             CommercePromptRevisionStatus @default(DRAFT)
+  editVersion        Int                          @default(1)
+  promptText         String                       @db.Text
+  contentHash        String?                      @db.VarChar(64)
+  createdByAdminId   String                       @db.Text
+  publishedByAdminId String?                      @db.Text
+  createdAt          DateTime                     @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                     @default(now()) @updatedAt @db.Timestamptz(3)
+  publishedAt        DateTime?                    @db.Timestamptz(3)
+  template              CommercePromptTemplate     @relation(fields: [templateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy             PlatformAdmin              @relation("CommercePromptTemplateRevisionCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  publishedBy           PlatformAdmin?             @relation("CommercePromptTemplateRevisionPublisher", fields: [publishedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  copiedPromptRevisions CommerceAgentPromptRevision[] @relation("CommerceAgentPromptRevisionSourceTemplate")
+  auditEvents           CommerceAuditEvent[]
+  @@unique([templateId, revisionNumber])
+  @@unique([id, templateId])
+  @@index([templateId, status, revisionNumber])
+  @@schema("commerce")
+}
+
+model CommerceAgentPrompt {
+  id               String                   @id @default(cuid()) @db.Text
+  scope            CommerceAgentPromptScope
+  shopId           String?                  @db.Text
+  createdByAdminId String                   @db.Text
+  createdAt        DateTime                 @default(now()) @db.Timestamptz(3)
+  shop        Shop?                         @relation(fields: [shopId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy   PlatformAdmin                 @relation("CommerceAgentPromptCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  revisions   CommerceAgentPromptRevision[]
+  auditEvents CommerceAuditEvent[]
+  @@index([scope, shopId])
+  @@schema("commerce")
+}
+
+model CommerceAgentPromptRevision {
+  id                       String                       @id @default(cuid()) @db.Text
+  promptId                 String                       @db.Text
+  revisionNumber           Int
+  status                   CommercePromptRevisionStatus @default(DRAFT)
+  editVersion              Int                          @default(1)
+  promptText               String                       @db.Text
+  contentHash              String?                      @db.VarChar(64)
+  sourceTemplateRevisionId String?                      @db.Text
+  createdByAdminId         String                       @db.Text
+  publishedByAdminId       String?                      @db.Text
+  createdAt                DateTime                     @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime                     @default(now()) @updatedAt @db.Timestamptz(3)
+  publishedAt              DateTime?                    @db.Timestamptz(3)
+  prompt                 CommerceAgentPrompt            @relation(fields: [promptId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  sourceTemplateRevision CommercePromptTemplateRevision? @relation("CommerceAgentPromptRevisionSourceTemplate", fields: [sourceTemplateRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy              PlatformAdmin                  @relation("CommerceAgentPromptRevisionCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  publishedBy            PlatformAdmin?                 @relation("CommerceAgentPromptRevisionPublisher", fields: [publishedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  platformPointers       CommercePlatformPromptPointer[]
+  shopPointers           CommerceShopPromptPointer[]
+  auditEvents            CommerceAuditEvent[]
+  @@unique([promptId, revisionNumber])
+  @@unique([id, promptId])
+  @@index([promptId, status, revisionNumber])
+  @@index([sourceTemplateRevisionId])
+  @@schema("commerce")
+}
+
+model CommercePlatformPromptPointer {
+  environment      CommerceEnvironment @id
+  promptId         String              @db.Text
+  promptRevisionId String              @db.Text
+  editVersion      Int                 @default(1)
+  updatedByAdminId String              @db.Text
+  createdAt        DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
+  revision  CommerceAgentPromptRevision @relation(fields: [promptRevisionId, promptId], references: [id, promptId], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy PlatformAdmin               @relation("CommercePlatformPromptPointerUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  @@index([promptRevisionId, promptId])
+  @@schema("commerce")
+}
+
+model CommerceShopPromptPointer {
+  environment      CommerceEnvironment
+  shopId           String              @db.Text
+  promptId         String              @db.Text
+  promptRevisionId String              @db.Text
+  generationId     String              @default(cuid()) @db.Text
+  editVersion      Int                 @default(1)
+  updatedByAdminId String              @db.Text
+  createdAt        DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
+  shop      Shop                        @relation(fields: [shopId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  revision  CommerceAgentPromptRevision @relation(fields: [promptRevisionId, promptId], references: [id, promptId], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy PlatformAdmin               @relation("CommerceShopPromptPointerUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  @@id([environment, shopId])
+  @@index([promptRevisionId, promptId])
+  @@index([shopId])
+  @@schema("commerce")
+}
+
 enum CommerceCapabilitySelectionBinding {
   BASE
   FEATURE
@@ -2365,6 +2597,24 @@ enum CommerceCapabilityRevisionStatus {
   DRAFT
   PUBLISHED
 
+  @@schema("commerce")
+}
+
+enum CommerceModelProvider {
+  OPENAI
+  GROQ
+  @@schema("commerce")
+}
+
+enum CommerceAgentPromptScope {
+  PLATFORM
+  SHOP
+  @@schema("commerce")
+}
+
+enum CommercePromptRevisionStatus {
+  DRAFT
+  PUBLISHED
   @@schema("commerce")
 }
 
@@ -2396,6 +2646,32 @@ enum CommerceAuditAction {
   PUBLISH_TOOL_REVISION
   ENABLE_TOOL
   DISABLE_TOOL
+  CREATE_MODEL_CATALOGUE_ENTRY
+  UPDATE_MODEL_CATALOGUE_ENTRY
+  ENABLE_MODEL_CATALOGUE_ENTRY
+  DISABLE_MODEL_CATALOGUE_ENTRY
+  SET_PLATFORM_MODEL_SELECTION
+  SET_SHOP_MODEL_SELECTION
+  CLEAR_SHOP_MODEL_SELECTION
+  CREATE_PROMPT_TEMPLATE_CATEGORY
+  UPDATE_PROMPT_TEMPLATE_CATEGORY
+  ENABLE_PROMPT_TEMPLATE_CATEGORY
+  DISABLE_PROMPT_TEMPLATE_CATEGORY
+  CREATE_PROMPT_TEMPLATE
+  UPDATE_PROMPT_TEMPLATE
+  ENABLE_PROMPT_TEMPLATE
+  DISABLE_PROMPT_TEMPLATE
+  CREATE_PROMPT_TEMPLATE_DRAFT
+  UPDATE_PROMPT_TEMPLATE_DRAFT
+  PUBLISH_PROMPT_TEMPLATE_REVISION
+  CREATE_AGENT_PROMPT
+  CREATE_AGENT_PROMPT_DRAFT
+  CREATE_AGENT_PROMPT_DRAFT_FROM_TEMPLATE
+  UPDATE_AGENT_PROMPT_DRAFT
+  PUBLISH_AGENT_PROMPT_REVISION
+  SET_PLATFORM_PROMPT_POINTER
+  SET_SHOP_PROMPT_POINTER
+  CLEAR_SHOP_PROMPT_POINTER
 
   @@schema("commerce")
 }
