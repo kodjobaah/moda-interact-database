@@ -27,6 +27,8 @@
     "test:arch020-commerce-capability-migration": "node scripts/validate-arch020-commerce-capability-migration.mjs",
     "test:arch021-agent-configuration-schema": "node scripts/validate-arch021-agent-configuration-schema.mjs",
     "test:arch021-agent-configuration-migration": "node scripts/validate-arch021-agent-configuration-migration.mjs",
+    "test:arch021-simplification-schema": "node scripts/validate-arch021-simplification-schema.mjs",
+    "test:arch021-simplification-migration": "node scripts/validate-arch021-simplification-migration.mjs",
     "test:arch020-external-connections:database": "node scripts/validate-arch020-external-connections.mjs"
   },
   "keywords": [],
