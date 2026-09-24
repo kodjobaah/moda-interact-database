@@ -79,6 +79,7 @@ ALTER TABLE "commerce"."CommerceAuditEvent"
   ADD COLUMN "merchantAccessId" TEXT;
 ALTER TABLE "commerce"."CommerceAuditEvent" ALTER COLUMN "actorAdminId" DROP NOT NULL;
 
+ALTER TABLE "commerce"."CommerceAgentPromptRevision" DISABLE TRIGGER "arch021_agent_prompt_revision_guard";
 UPDATE "commerce"."CommercePromptTemplate" AS template
 SET "promptText" = COALESCE((
   SELECT revision."promptText"
@@ -98,6 +99,7 @@ UPDATE "commerce"."CommerceAgentPromptRevision" AS revision
 SET "sourceTemplateId" = source."templateId"
 FROM "commerce"."CommercePromptTemplateRevision" AS source
 WHERE revision."sourceTemplateRevisionId" = source."id";
+ALTER TABLE "commerce"."CommerceAgentPromptRevision" ENABLE TRIGGER "arch021_agent_prompt_revision_guard";
 
 INSERT INTO "commerce"."CommerceAgentConfiguration" ("id", "environment", "scope", "shopId", "modelId", "modelEditVersion", "createdAt", "updatedAt")
 SELECT 'arch021-platform-' || lower(selection."environment"::text), selection."environment", 'PLATFORM', NULL,
@@ -135,6 +137,7 @@ SET "activePromptRevisionId" = prompt."promptRevisionId",
 FROM "commerce"."CommerceShopPromptPointer" AS prompt
 WHERE configuration."environment" = prompt."environment" AND configuration."scope" = 'SHOP' AND configuration."shopId" = prompt."shopId";
 
+ALTER TABLE "commerce"."CommerceAuditEvent" DISABLE TRIGGER "arch020_audit_immutable";
 UPDATE "commerce"."CommerceAuditEvent"
 SET "actorType" = 'PLATFORM_ADMIN'
 WHERE "actorType" IS NULL;
@@ -149,9 +152,9 @@ WHERE "operationId" IS NULL AND "action"::text IN (
   'CREATE_AGENT_PROMPT', 'CREATE_AGENT_PROMPT_DRAFT', 'CREATE_AGENT_PROMPT_DRAFT_FROM_TEMPLATE', 'UPDATE_AGENT_PROMPT_DRAFT',
   'PUBLISH_AGENT_PROMPT_REVISION', 'SET_PLATFORM_PROMPT_POINTER', 'SET_SHOP_PROMPT_POINTER', 'CLEAR_SHOP_PROMPT_POINTER'
 );
+ALTER TABLE "commerce"."CommerceAuditEvent" ENABLE TRIGGER "arch020_audit_immutable";
 
 ALTER TABLE "commerce"."CommerceAuditEvent" DROP CONSTRAINT "CommerceAuditEvent_template_revision_fkey";
-ALTER TABLE "commerce"."CommerceAuditEvent" ADD CONSTRAINT "CommerceAuditEvent_actor_admin_fkey" FOREIGN KEY ("actorAdminId") REFERENCES "public"."PlatformAdmin"("id") ON DELETE RESTRICT ON UPDATE RESTRICT;
 ALTER TABLE "commerce"."CommerceAuditEvent" ADD CONSTRAINT "CommerceAuditEvent_actor_merchant_fkey" FOREIGN KEY ("actorMerchantAccessId") REFERENCES "commerce"."CommerceStudioMerchantAccess"("id") ON DELETE RESTRICT ON UPDATE RESTRICT;
 ALTER TABLE "commerce"."CommerceAuditEvent" ADD CONSTRAINT "CommerceAuditEvent_configuration_fkey" FOREIGN KEY ("agentConfigurationId") REFERENCES "commerce"."CommerceAgentConfiguration"("id") ON DELETE RESTRICT ON UPDATE RESTRICT;
 ALTER TABLE "commerce"."CommerceAuditEvent" ADD CONSTRAINT "CommerceAuditEvent_merchant_access_fkey" FOREIGN KEY ("merchantAccessId") REFERENCES "commerce"."CommerceStudioMerchantAccess"("id") ON DELETE RESTRICT ON UPDATE RESTRICT;
