@@ -228,7 +228,7 @@ export async function runCases(db, second) {
   pass('mutation removing capability guard makes its named rejection fail; guard restored');
   await add('CommerceTool',{id:'tool',name:'read_product',displayName:'Read'});
   await add('CommerceTool',{id:'tool2',name:'other_product',displayName:'Other'});
-  const definition={name:'read_product',definitionVersion:'1.0.0',description:'Synthetic product read',inputSchema:{type:'object',properties:{handle:{type:'string'}},additionalProperties:false},execution:{kind:'POLICY_OPERATION',operation:'shopify.searchProducts',operationVersion:'1.0.0',arguments:{query:{input:'handle'}}},responseTemplate:{kind:'text',text:'{{result.title}}',unavailable:'Unknown'}};
+  const definition={name:'read_product',definitionVersion:'1.0.0',description:'Synthetic product read',inputSchema:{type:'object',properties:{handle:{type:'string'}},additionalProperties:false},execution:{kind:'POLICY_OPERATION',operation:'shopify.searchProducts',operationVersion:'1.0.0',arguments:{query:{input:'handle'}}},responseTemplate:{kind:'nunjucks',runtimeVersion:'nunjucks.v1',source:'{{ result.values.title }}',unavailable:'Unknown'}};
   const toolrev={id:'tr1',toolId:'tool',revisionNumber:1,definitionVersion:'1.0.0',definition,contractVersion:'commerce.v1',createdByAdminId:'admin'};
   controls.CommerceToolRevision=toolrev;
   await add('CommerceToolRevision',toolrev);
