@@ -12,6 +12,17 @@ WHERE "action"::text IN (
 );
 
 DELETE FROM commerce."CommerceConversationGrant";
+DROP TRIGGER arch020_grant_insert ON commerce."CommerceConversationGrant";
+DROP FUNCTION commerce.arch020_grant();
+ALTER TABLE commerce."CommerceConversationGrant" DROP CONSTRAINT arch020_grant_bounds;
+ALTER TABLE commerce."CommerceConversationGrant" ADD CONSTRAINT arch021_grant_bounds CHECK (
+  "initialInboundVersion" > 0
+  AND "runnerVersion" ~ '[^[:space:]]'
+  AND ("expiresAt" IS NULL OR "expiresAt" > "createdAt")
+  AND commerce.arch020_strings("selectedCapabilityKeys", 0, 32)
+  AND octet_length("selectedCapabilityKeys"::text) <= 8192
+  AND commerce.arch020_grant_tools("grantedTools")
+);
 DELETE FROM commerce."CommerceReleasePointer";
 DROP TRIGGER arch020_member_insert ON commerce."CommerceReleaseCapability";
 DROP TRIGGER arch020_member_immutable ON commerce."CommerceReleaseCapability";
@@ -22,6 +33,7 @@ ALTER TABLE commerce."CommerceAuditEvent"
   DROP CONSTRAINT "CommerceAuditEvent_revisionId_fkey",
   DROP COLUMN "revisionId";
 DROP TRIGGER arch020_audit_insert ON commerce."CommerceAuditEvent";
+DROP FUNCTION commerce.arch020_audit();
 ALTER TABLE commerce."CommerceReleaseCapability"
   DROP CONSTRAINT "CommerceReleaseCapability_capabilityRevisionId_capabilityI_fkey",
   DROP COLUMN "capabilityRevisionId";
@@ -192,6 +204,8 @@ BEGIN
   END IF;
   RETURN NEW;
 END $$;
+DROP FUNCTION commerce.arch020_bindings(jsonb);
+
 CREATE FUNCTION commerce.arch021_feature_configuration_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   PERFORM commerce.arch020_current_snapshot();
@@ -231,9 +245,73 @@ BEGIN
   SELECT status INTO revision_status FROM commerce."CommerceToolRevision"
     WHERE id=NEW."toolRevisionId" AND "toolId"=NEW."toolId" FOR SHARE;
   IF NOT FOUND OR revision_status <> 'PUBLISHED' THEN RAISE EXCEPTION 'ARCH021 release member requires matching published Tool revision' USING ERRCODE='23514'; END IF;
+  IF EXISTS (SELECT 1 FROM commerce."CommerceReleaseCapability" member
+    WHERE member."releaseId"=NEW."releaseId" AND member."toolId"=NEW."toolId"
+      AND member."toolRevisionId"<>NEW."toolRevisionId") THEN
+    RAISE EXCEPTION 'ARCH021 reused Tool must use one release revision' USING ERRCODE='23514';
+  END IF;
   RETURN NEW;
 END $$;
 CREATE TRIGGER arch021_release_member_guard BEFORE INSERT ON commerce."CommerceReleaseCapability" FOR EACH ROW EXECUTE FUNCTION commerce.arch021_release_member_guard();
 CREATE TRIGGER arch021_release_member_immutable BEFORE UPDATE OR DELETE ON commerce."CommerceReleaseCapability" FOR EACH ROW EXECUTE FUNCTION commerce.arch020_immutable();
+
+CREATE FUNCTION commerce.arch021_conversation_grant_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE conv whatsapp."Conversation"%ROWTYPE; owner_shop text; expected jsonb; actual jsonb;
+BEGIN
+  PERFORM commerce.arch020_current_snapshot();
+  SELECT * INTO conv FROM whatsapp."Conversation" WHERE id=NEW."conversationId" FOR UPDATE;
+  IF NOT FOUND OR conv."checkoutRecoveryId" IS NULL OR conv."checkoutRecoveryId" IN ('standalone','product-only','unknown-shop') THEN
+    RAISE EXCEPTION 'ARCH021 recovery conversation required' USING ERRCODE='23514';
+  END IF;
+  SELECT "shopId" INTO owner_shop FROM commerce."CheckoutRecovery" WHERE id=conv."checkoutRecoveryId" FOR UPDATE;
+  IF NOT FOUND OR owner_shop IS DISTINCT FROM NEW."shopId" OR
+    (conv."shopId" IS NOT NULL AND conv."shopId" IS DISTINCT FROM owner_shop) OR
+    NEW."initialInboundVersion" > conv."inboundVersion" THEN
+    RAISE EXCEPTION 'ARCH021 grant owner or inbound version mismatch' USING ERRCODE='23514';
+  END IF;
+  IF commerce.arch020_strings(NEW."selectedCapabilityKeys", 0, 32) IS DISTINCT FROM true OR
+    octet_length(NEW."selectedCapabilityKeys"::text) > 8192 OR
+    commerce.arch020_grant_tools(NEW."grantedTools") IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'ARCH021 grant shape' USING ERRCODE='23514';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements_text(NEW."selectedCapabilityKeys") selected(key)
+    WHERE NOT EXISTS (
+      SELECT 1 FROM commerce."CommerceReleaseCapability" member
+      JOIN commerce."CommerceCapability" capability ON capability.id=member."capabilityId"
+      WHERE member."releaseId"=NEW."releaseId" AND capability.key=selected.key
+    )
+  ) THEN
+    RAISE EXCEPTION 'ARCH021 selected key outside release' USING ERRCODE='23514';
+  END IF;
+  SELECT COALESCE(jsonb_agg(entry ORDER BY entry->>'toolId' COLLATE "C"), '[]'::jsonb)
+  INTO expected
+  FROM (
+    SELECT jsonb_build_object(
+      'toolId', tool.id,
+      'toolRevisionId', tool_revision.id,
+      'toolName', tool.name,
+      'definitionVersion', tool_revision."definitionVersion",
+      'capabilityKeys', jsonb_agg(capability.key ORDER BY capability.key COLLATE "C")
+    ) AS entry
+    FROM commerce."CommerceReleaseCapability" member
+    JOIN commerce."CommerceCapability" capability ON capability.id=member."capabilityId"
+    JOIN commerce."CommerceTool" tool ON tool.id=member."toolId"
+    JOIN commerce."CommerceToolRevision" tool_revision
+      ON tool_revision.id=member."toolRevisionId" AND tool_revision."toolId"=member."toolId"
+      AND tool_revision.status='PUBLISHED'
+    WHERE member."releaseId"=NEW."releaseId"
+      AND NEW."selectedCapabilityKeys" ? capability.key
+    GROUP BY tool.id, tool_revision.id, tool.name, tool_revision."definitionVersion"
+  ) entries;
+  SELECT COALESCE(jsonb_agg(granted ORDER BY granted->>'toolId' COLLATE "C"), '[]'::jsonb)
+  INTO actual
+  FROM jsonb_array_elements(NEW."grantedTools") granted;
+  IF expected IS DISTINCT FROM actual THEN
+    RAISE EXCEPTION 'ARCH021 grant must equal direct release Tool authority' USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER arch021_conversation_grant_guard BEFORE INSERT ON commerce."CommerceConversationGrant" FOR EACH ROW EXECUTE FUNCTION commerce.arch021_conversation_grant_guard();
 
 CREATE TRIGGER arch021_audit_immutable BEFORE UPDATE OR DELETE ON commerce."CommerceAuditEvent" FOR EACH ROW EXECUTE FUNCTION commerce.arch020_immutable();

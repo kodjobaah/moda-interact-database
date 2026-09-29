@@ -163,6 +163,37 @@ async function assertOldCompositionCleared() {
   assert.equal((await query(`SELECT status::text AS status FROM ${c('CommerceToolRevision')} WHERE id='tool-revision-1'`))[0].status, 'PUBLISHED');
 }
 
+async function assertGrantGuardsUseDirectReleaseComposition() {
+  const legacyObjects = await query(`
+    SELECT to_regprocedure('commerce.arch020_grant()') IS NOT NULL AS legacy_grant,
+      to_regprocedure('commerce.arch020_bindings(jsonb)') IS NOT NULL AS legacy_bindings,
+      EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='arch020_grant_insert' AND NOT tgisinternal) AS legacy_trigger
+  `);
+  assert.deepEqual(legacyObjects[0], {legacy_grant: false, legacy_bindings: false, legacy_trigger: false});
+  const definitions = await query(`
+    SELECT pg_get_constraintdef(constraint_row.oid) AS definition
+    FROM pg_constraint constraint_row
+    JOIN pg_namespace namespace ON namespace.oid=constraint_row.connamespace
+    WHERE namespace.nspname='commerce'
+    UNION ALL
+    SELECT pg_get_triggerdef(trigger_row.oid) || procedure.prosrc AS definition
+    FROM pg_trigger trigger_row
+    JOIN pg_class relation ON relation.oid=trigger_row.tgrelid
+    JOIN pg_namespace namespace ON namespace.oid=relation.relnamespace
+    JOIN pg_proc procedure ON procedure.oid=trigger_row.tgfoid
+    WHERE namespace.nspname='commerce' AND NOT trigger_row.tgisinternal
+    UNION ALL
+    SELECT procedure.prosrc AS definition
+    FROM pg_proc procedure
+    JOIN pg_namespace namespace ON namespace.oid=procedure.pronamespace
+    WHERE namespace.nspname='commerce'
+  `);
+  for (const {definition} of definitions) {
+    assert.doesNotMatch(definition ?? '', /CommerceCapabilityRevision|toolBindings|selectionBinding|conversation_core/i,
+      'Active commerce constraint/trigger/function must not depend on removed capability concepts or mandatory BASE capability');
+  }
+}
+
 async function exerciseNewContract() {
   await run(insertSql(c('CommerceFeatureConfiguration'), {featureId: 'feature-1', behaviourPrompt: '', editVersion: 0, createdAt: now, updatedAt: now}));
   assert.equal((await query(`SELECT "behaviourPrompt" FROM ${c('CommerceFeatureConfiguration')} WHERE "featureId"='feature-1'`))[0].behaviourPrompt, '', 'Empty current Feature prompt is valid');
@@ -201,6 +232,51 @@ async function exerciseNewContract() {
   await run(insertSql(c('CommerceRelease'), {id: 'release-draft-tool', runnerCompatibility: '^1.0.0', contractVersion: 'commerce.v1', responseContract, responseContractHash: responseHash, createdByAdminId: 'admin-1', createdAt: now}));
   await run(insertSql(c('CommerceReleaseFeature'), {releaseId: 'release-draft-tool', featureId: 'feature-1', behaviourPrompt: 'Updated feature guidance', createdAt: now}));
   await rejects('Release member requires a published Tool revision', insertSql(c('CommerceReleaseCapability'), {releaseId: 'release-draft-tool', capabilityId: 'cap-one', featureId: 'feature-1', toolId: 'tool-1', toolRevisionId: 'tool-revision-draft', position: 0}));
+
+  const addConversation = async id => {
+    const recoveryId = `recovery-${id}`;
+    await run(insertSql(c('CheckoutRecovery'), {
+      id: recoveryId, shopId: 'shop-1', checkoutToken: `checkout-${id}`, lastExternalActivityAt: now, updatedAt: now,
+    }));
+    await run(insertSql(w('Conversation'), {
+      id: `conversation-${id}`, shopId: 'shop-1', checkoutRecoveryId: recoveryId, type: 'RECOVERY', inboundVersion: 2, updatedAt: now,
+    }));
+  };
+  const grant = (id, selectedCapabilityKeys, grantedTools, releaseId = 'release-new') => insertSql(c('CommerceConversationGrant'), {
+    id, shopId: 'shop-1', conversationId: `conversation-${id}`, initialInboundVersion: 1,
+    releaseId, selectedCapabilityKeys, grantedTools, runnerVersion: '1.0.0', createdAt: now,
+  });
+  const sharedToolGrant = [{
+    toolId: 'tool-1', toolRevisionId: 'tool-revision-1', toolName: 'read_product',
+    definitionVersion: '1.0.0', capabilityKeys: ['capability_one', 'capability_two'],
+  }];
+  await addConversation('grant-empty');
+  await run(grant('grant-empty', [], []));
+  console.log('PASS grant accepts zero selected Capabilities and zero Tools');
+
+  await addConversation('grant-direct');
+  await run(grant('grant-direct', ['capability_one', 'capability_two'], sharedToolGrant));
+  assert.deepEqual((await query(`SELECT "grantedTools" FROM ${c('CommerceConversationGrant')} WHERE id='grant-direct'`))[0].grantedTools, sharedToolGrant,
+    'Reused Tool grant must include provenance from every selected Capability');
+  console.log('PASS grant derives the exact pinned Tool and all selected Capability provenance');
+
+  await addConversation('grant-missing');
+  await rejects('Grant rejects missing release-pinned Tool authority', grant('grant-missing', ['capability_one'], []));
+  await addConversation('grant-extra');
+  await rejects('Grant rejects extra Tool authority when no Capability is selected', grant('grant-extra', [], sharedToolGrant));
+
+  const secondToolRevision = {...definition, definitionVersion: '1.2.0'};
+  await run(insertSql(c('CommerceToolRevision'), {
+    id: 'tool-revision-1-v2', toolId: 'tool-1', revisionNumber: 3, status: 'PUBLISHED',
+    contractVersion: 'commerce.v1', contentHash: hash, createdByAdminId: 'admin-1', publishedByAdminId: 'admin-1',
+    publishedAt: now, definitionVersion: '1.2.0', definition: secondToolRevision, createdAt: now, updatedAt: now,
+  }));
+  await run(insertSql(c('CommerceRelease'), {id: 'release-alt-revision', runnerCompatibility: '^1.0.0', contractVersion: 'commerce.v1', responseContract, responseContractHash: responseHash, createdByAdminId: 'admin-1', createdAt: now}));
+  await run(insertSql(c('CommerceReleaseFeature'), {releaseId: 'release-alt-revision', featureId: 'feature-1', behaviourPrompt: 'Updated feature guidance', createdAt: now}));
+  await run(insertSql(c('CommerceReleaseCapability'), {releaseId: 'release-alt-revision', capabilityId: 'cap-one', featureId: 'feature-1', toolId: 'tool-1', toolRevisionId: 'tool-revision-1-v2', position: 0}));
+  await addConversation('grant-mismatched');
+  await rejects('Grant rejects a Tool revision different from the release-pinned revision', grant('grant-mismatched', ['capability_one'], [{...sharedToolGrant[0], capabilityKeys: ['capability_one']}], 'release-alt-revision'));
+  await assertGrantGuardsUseDirectReleaseComposition();
 
   const types = await query(`SELECT typname FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='commerce' AND typname IN ('CommerceToolRevisionStatus','CommerceCapabilityRevisionStatus','CommerceCapabilitySelectionBinding') ORDER BY typname`);
   assert.deepEqual(types.map(row => row.typname), ['CommerceToolRevisionStatus']);
