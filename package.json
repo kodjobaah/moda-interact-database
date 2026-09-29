@@ -31,6 +31,8 @@
     "test:arch021-simplification-migration": "node scripts/validate-arch021-simplification-migration.mjs",
     "test:arch021-feature-capability-schema": "node scripts/validate-arch021-feature-capability-schema.mjs",
     "test:arch021-feature-capability-migration": "node scripts/validate-arch021-feature-capability-migration.mjs",
+    "test:arch023-merchant-knowledge-schema": "node scripts/validate-arch023-merchant-knowledge-schema.mjs",
+    "test:arch023-merchant-knowledge-migration": "node scripts/validate-arch023-merchant-knowledge-migration.mjs",
     "test:arch020-external-connections:database": "node scripts/validate-arch020-external-connections.mjs"
   },
   "keywords": [],
