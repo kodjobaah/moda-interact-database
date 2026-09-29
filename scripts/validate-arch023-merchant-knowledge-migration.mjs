@@ -4,11 +4,12 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writ
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PrismaClient } from '@prisma/client';
+import { validateMigrationContract } from './fixtures/arch023-merchant-knowledge-migration-contract.mjs';
 import { runArch023Cases, seedArch023Cases, verifyConfigurationDefaultsAndRoundTrip } from './fixtures/arch023-merchant-knowledge-cases.mjs';
 
 const root = new URL('..', import.meta.url);
 const migrationName = '20260929160000_arch023_merchant_knowledge_schema';
-const migration = readFileSync(new URL(`../prisma/migrations/${migrationName}/migration.sql`, import.meta.url), 'utf8');
+const migration = readFileSync(process.env.ARCH023_MIGRATION_PATH ?? new URL(`../prisma/migrations/${migrationName}/migration.sql`, import.meta.url), 'utf8');
 const requiredTables = [
   'CommerceStoreCategoryTaxonomyMapping',
   'CommerceShopProfile',
@@ -105,8 +106,9 @@ assert.deepEqual(insertTargets, [
 ]);
 assert.doesNotMatch(migration, /'merchant_knowledge'/i, 'Do not seed a Merchant Knowledge Feature, plan, Capability, Tool, or Release');
 assert.doesNotMatch(migration, /DROP\s+(?:TABLE|SCHEMA|COLUMN)|TRUNCATE\s+TABLE/i, 'Migration must be additive');
+validateMigrationContract(migration);
 
-console.log('ARCH-023 migration static contract passed.');
+console.log('ARCH-023 migration exact static contract passed.');
 
 const modePosition = process.argv.indexOf('--mode');
 if (modePosition === -1) process.exit(0);
