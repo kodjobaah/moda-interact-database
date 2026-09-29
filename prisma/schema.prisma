@@ -572,6 +572,9 @@ enum FeatureActivationMode {
 
 model Feature {
   commerceCapabilities CommerceCapability[]
+  commerceFeatureConfiguration CommerceFeatureConfiguration?
+  commerceReleaseFeatures CommerceReleaseFeature[]
+  commerceAuditEvents CommerceAuditEvent[]
 
   id String @id @default(cuid())
 
@@ -1721,8 +1724,6 @@ enum PlatformAdminRole {
 }
 
 model PlatformAdmin {
-  createdCommerceCapabilityRevisions      CommerceCapabilityRevision[]         @relation("CommerceCapabilityRevisionCreator")
-  publishedCommerceCapabilityRevisions    CommerceCapabilityRevision[]         @relation("CommerceCapabilityRevisionPublisher")
   createdCommerceToolRevisions            CommerceToolRevision[]               @relation("CommerceToolRevisionCreator")
   publishedCommerceToolRevisions          CommerceToolRevision[]               @relation("CommerceToolRevisionPublisher")
   commerceReleases                        CommerceRelease[]
@@ -2182,48 +2183,34 @@ model BackgroundRuntimeLease {
 
 // ARCH-020: SQL migration supplies JSON, publication and ownership guards.
 model CommerceCapability {
-  id               String                             @id @default(cuid()) @db.Text
-  key              String                             @unique @db.VarChar(128)
-  displayName      String                             @db.VarChar(255)
-  description      String?                            @db.Text
-  selectionBinding CommerceCapabilitySelectionBinding
-  featureId        String?                            @db.Text
-  enabled          Boolean                            @default(true)
-  createdAt        DateTime                           @default(now()) @db.Timestamptz(3)
-  updatedAt        DateTime                           @default(now()) @updatedAt @db.Timestamptz(3)
-  feature          Feature?                           @relation(fields: [featureId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  revisions        CommerceCapabilityRevision[]
-  auditEvents      CommerceAuditEvent[]
+  id             String                      @id @default(cuid()) @db.Text
+  key            String                      @unique @db.VarChar(128)
+  displayName    String                      @db.VarChar(255)
+  description    String?                     @db.Text
+  featureId      String                      @db.Text
+  toolId         String                      @db.Text
+  enabled        Boolean                     @default(true)
+  createdAt      DateTime                    @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime                    @default(now()) @updatedAt @db.Timestamptz(3)
+  feature        Feature                     @relation(fields: [featureId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  tool           CommerceTool                @relation(fields: [toolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  releaseMembers CommerceReleaseCapability[]
+  auditEvents    CommerceAuditEvent[]
 
+  @@unique([id, featureId, toolId])
   @@index([featureId])
+  @@index([toolId])
   @@schema("commerce")
 }
 
-model CommerceCapabilityRevision {
-  id                 String                           @id @default(cuid()) @db.Text
-  capabilityId       String                           @db.Text
-  revisionNumber     Int
-  status             CommerceCapabilityRevisionStatus @default(DRAFT)
-  contractVersion    String                           @db.VarChar(64)
-  editVersion        Int                              @default(0)
-  contentHash        String?                          @db.VarChar(64)
-  createdByAdminId   String                           @db.Text
-  publishedByAdminId String?                          @db.Text
-  createdAt          DateTime                         @default(now()) @db.Timestamptz(3)
-  updatedAt          DateTime                         @default(now()) @updatedAt @db.Timestamptz(3)
-  publishedAt        DateTime?                        @db.Timestamptz(3)
-  promptTemplate     String                           @db.Text
-  configuration      Json                             @default("{}") @db.JsonB
-  toolBindings       Json                             @default("[]") @db.JsonB
-  capability         CommerceCapability               @relation(fields: [capabilityId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  createdBy          PlatformAdmin                    @relation("CommerceCapabilityRevisionCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  publishedBy        PlatformAdmin?                   @relation("CommerceCapabilityRevisionPublisher", fields: [publishedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  releaseMembers     CommerceReleaseCapability[]
-  auditEvents        CommerceAuditEvent[]
+model CommerceFeatureConfiguration {
+  featureId       String   @id @db.Text
+  behaviourPrompt String   @default("") @db.Text
+  editVersion     Int      @default(0)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  feature         Feature  @relation(fields: [featureId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
-  @@unique([capabilityId, revisionNumber])
-  @@unique([id, capabilityId])
-  @@index([capabilityId, status, revisionNumber])
   @@schema("commerce")
 }
 
@@ -2239,6 +2226,7 @@ model CommerceRelease {
   createdAt            DateTime                    @default(now()) @db.Timestamptz(3)
   createdBy            PlatformAdmin               @relation(fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   capabilities         CommerceReleaseCapability[]
+  features             CommerceReleaseFeature[]
   pointers             CommerceReleasePointer[]
   auditEvents          CommerceAuditEvent[]
   grants               CommerceConversationGrant[]
@@ -2248,16 +2236,35 @@ model CommerceRelease {
 }
 
 model CommerceReleaseCapability {
-  releaseId            String                     @db.Text
-  capabilityId         String                     @db.Text
-  capabilityRevisionId String                     @db.Text
-  position             Int
-  release              CommerceRelease            @relation(fields: [releaseId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  revision             CommerceCapabilityRevision @relation(fields: [capabilityRevisionId, capabilityId], references: [id, capabilityId], onDelete: Restrict, onUpdate: Restrict)
+  releaseId       String                     @db.Text
+  capabilityId    String                     @db.Text
+  featureId       String                     @db.Text
+  toolId          String                     @db.Text
+  toolRevisionId  String                     @db.Text
+  position        Int
+  release         CommerceRelease            @relation(fields: [releaseId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  capability      CommerceCapability         @relation(fields: [capabilityId, featureId, toolId], references: [id, featureId, toolId], onDelete: Restrict, onUpdate: Restrict)
+  featureSnapshot CommerceReleaseFeature     @relation(fields: [releaseId, featureId], references: [releaseId, featureId], onDelete: Restrict, onUpdate: Restrict)
+  toolRevision    CommerceToolRevision       @relation(fields: [toolRevisionId, toolId], references: [id, toolId], onDelete: Restrict, onUpdate: Restrict)
 
   @@id([releaseId, capabilityId])
   @@unique([releaseId, position])
-  @@index([capabilityRevisionId, capabilityId])
+  @@index([toolRevisionId, toolId])
+  @@index([featureId, releaseId])
+  @@schema("commerce")
+}
+
+model CommerceReleaseFeature {
+  releaseId       String                     @db.Text
+  featureId       String                     @db.Text
+  behaviourPrompt String                     @db.Text
+  createdAt       DateTime                   @default(now()) @db.Timestamptz(3)
+  release         CommerceRelease            @relation(fields: [releaseId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  feature         Feature                    @relation(fields: [featureId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  members         CommerceReleaseCapability[]
+
+  @@id([releaseId, featureId])
+  @@index([featureId, releaseId])
   @@schema("commerce")
 }
 
@@ -2282,7 +2289,7 @@ model CommerceAuditEvent {
   operationId              String?                         @db.VarChar(128)
   action                   CommerceAuditAction
   capabilityId             String?                         @db.Text
-  revisionId               String?                         @db.Text
+  featureId                String?                         @db.Text
   releaseId                String?                         @db.Text
   toolId                   String?                         @db.Text
   toolRevisionId           String?                         @db.Text
@@ -2302,7 +2309,7 @@ model CommerceAuditEvent {
   actor                    PlatformAdmin?                  @relation("CommerceAuditPlatformActor", fields: [actorAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   merchantActor            CommerceStudioMerchantAccess?   @relation("CommerceAuditMerchantActor", fields: [actorMerchantAccessId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   capability               CommerceCapability?             @relation(fields: [capabilityId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  revision                 CommerceCapabilityRevision?     @relation(fields: [revisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  feature                  Feature?                        @relation(fields: [featureId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   release                  CommerceRelease?                @relation(fields: [releaseId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   tool                     CommerceTool?                   @relation(fields: [toolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   toolRevision             CommerceToolRevision?           @relation(fields: [toolRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
@@ -2410,6 +2417,7 @@ model CommerceTool {
   createdAt   DateTime               @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime               @default(now()) @updatedAt @db.Timestamptz(3)
   revisions   CommerceToolRevision[]
+  capabilities CommerceCapability[]
   auditEvents CommerceAuditEvent[]
 
   @@index([createdAt, id])
@@ -2420,7 +2428,7 @@ model CommerceToolRevision {
   id                 String                           @id @default(cuid()) @db.Text
   toolId             String                           @db.Text
   revisionNumber     Int
-  status             CommerceCapabilityRevisionStatus @default(DRAFT)
+  status             CommerceToolRevisionStatus      @default(DRAFT)
   contractVersion    String                           @db.VarChar(64)
   editVersion        Int                              @default(0)
   contentHash        String?                          @db.VarChar(64)
@@ -2435,6 +2443,7 @@ model CommerceToolRevision {
   createdBy          PlatformAdmin                    @relation("CommerceToolRevisionCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   publishedBy        PlatformAdmin?                   @relation("CommerceToolRevisionPublisher", fields: [publishedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   auditEvents        CommerceAuditEvent[]
+  releaseMembers     CommerceReleaseCapability[]
 
   @@unique([toolId, revisionNumber])
   @@unique([toolId, definitionVersion])
@@ -2547,15 +2556,7 @@ model CommerceAgentPromptRevision {
   @@schema("commerce")
 }
 
-enum CommerceCapabilitySelectionBinding {
-  BASE
-  FEATURE
-  RECOVERY_POLICY
-
-  @@schema("commerce")
-}
-
-enum CommerceCapabilityRevisionStatus {
+enum CommerceToolRevisionStatus {
   DRAFT
   PUBLISHED
 
@@ -2611,14 +2612,12 @@ enum CommerceEnvironment {
 enum CommerceAuditAction {
   CREATE_CAPABILITY
   UPDATE_CAPABILITY
-  CREATE_DRAFT
-  UPDATE_DRAFT
-  PUBLISH_REVISION
   CREATE_RELEASE
   ACTIVATE_RELEASE
   ROLLBACK_RELEASE
   ENABLE_CAPABILITY
   DISABLE_CAPABILITY
+  UPDATE_FEATURE_BEHAVIOUR
   CREATE_TOOL
   UPDATE_TOOL
   CREATE_TOOL_DRAFT
