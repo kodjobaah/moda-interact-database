@@ -34,6 +34,8 @@
     "test:arch023-merchant-knowledge-schema": "node scripts/validate-arch023-merchant-knowledge-schema.mjs",
     "test:arch023-merchant-knowledge-migration": "node scripts/validate-arch023-merchant-knowledge-migration.mjs",
     "test:arch023-merchant-knowledge-validator-mutations": "node scripts/test-arch023-merchant-knowledge-validator-mutations.mjs",
+    "test:arch023-release-feature-snapshot-history": "node scripts/validate-arch023-release-feature-snapshot-history.mjs",
+    "test:arch023-release-feature-snapshot-history:postgres": "node scripts/test-arch023-release-feature-snapshot-history-postgres.mjs",
     "test:arch020-external-connections:database": "node scripts/validate-arch020-external-connections.mjs"
   },
   "keywords": [],
