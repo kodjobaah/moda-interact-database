@@ -40,6 +40,8 @@
     "test:arch023-merchant-knowledge-validator-mutations": "node scripts/test-arch023-merchant-knowledge-validator-mutations.mjs",
     "test:arch023-release-feature-snapshot-history": "node scripts/validate-arch023-release-feature-snapshot-history.mjs",
     "test:arch023-release-feature-snapshot-history:postgres": "node scripts/test-arch023-release-feature-snapshot-history-postgres.mjs",
+    "test:arch024-model-availability-schema": "node scripts/validate-arch024-model-availability-schema.mjs",
+    "test:arch024-model-availability-migration": "node scripts/validate-arch024-model-availability-migration.mjs",
     "test:arch020-external-connections:database": "node scripts/validate-arch020-external-connections.mjs"
   },
   "keywords": [],

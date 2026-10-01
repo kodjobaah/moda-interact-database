@@ -348,9 +348,9 @@ enum "CommerceToolRevisionStatus" as CommerceToolRevisionStatus {
   DRAFT
   PUBLISHED
 }
-enum "CommerceModelProvider" as CommerceModelProvider {
-  OPENAI
-  GROQ
+enum "CommerceModelAvailabilityScope" as CommerceModelAvailabilityScope {
+  PLATFORM
+  SHOP
 }
 enum "CommerceAgentPromptScope" as CommerceAgentPromptScope {
   PLATFORM
@@ -428,6 +428,14 @@ enum "CommerceAuditAction" as CommerceAuditAction {
   UPDATE_MERCHANT_STUDIO_ACCESS
   DISABLE_MERCHANT_STUDIO_ACCESS
   BIND_MERCHANT_STUDIO_IDENTITY
+  CREATE_MODEL_AVAILABILITY
+  UPDATE_MODEL_AVAILABILITY
+  ENABLE_MODEL_AVAILABILITY
+  DISABLE_MODEL_AVAILABILITY
+  ASSIGN_MODEL_CATALOGUE_ENTRY_AVAILABILITY
+  SET_OPENROUTER_CREDENTIAL
+  REPLACE_OPENROUTER_CREDENTIAL
+  REMOVE_OPENROUTER_CREDENTIAL
 }
 entity "Session" as Session {
 + id [PK] : String
@@ -721,6 +729,7 @@ entity "MerchantPricingPlan" as MerchantPricingPlan {
   economicsOverrideFingerprint : String
   shopifyRecoveryUsageEventHandle : String
   materializedAt : DateTime
+  # commerceModelId : [FK] CommerceModelCatalogueEntry
   * createdAt : DateTime
   * updatedAt : DateTime
 }
@@ -1537,6 +1546,7 @@ entity "CommerceAuditEvent" as CommerceAuditEvent {
   # toolRevisionId : [FK] CommerceToolRevision
   # shopId : [FK] Shop
   # modelCatalogueEntryId : [FK] CommerceModelCatalogueEntry
+  # modelAvailabilityId : [FK] CommerceModelAvailability
   # promptTemplateCategoryId : [FK] CommercePromptTemplateCategory
   # promptTemplateId : [FK] CommercePromptTemplate
   promptTemplateRevisionId : String
@@ -1626,13 +1636,43 @@ entity "CommerceToolRevision" as CommerceToolRevision {
 entity "CommerceModelCatalogueEntry" as CommerceModelCatalogueEntry {
 + id [PK] : String
 --
-  * provider : CommerceModelProvider
+  # availabilityId : [FK] CommerceModelAvailability
+  * provider : String
   * providerModelId : String
   * displayName : String
   * description : String
+  * configurationSchemaVersion : Int
+  * configuration : Json
   * enabled : Boolean
   * editVersion : Int
   # createdByAdminId : [FK] PlatformAdmin
+  # updatedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommerceModelAvailability" as CommerceModelAvailability {
++ id [PK] : String
+--
+  * scope : CommerceModelAvailabilityScope
+  # shopId : [FK] Shop
+  * enabled : Boolean
+  * editVersion : Int
+  # createdByAdminId : [FK] PlatformAdmin
+  # updatedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommerceOpenRouterCredential" as CommerceOpenRouterCredential {
++ id [PK] : String
+--
+  * environment : CommerceEnvironment
+  * ciphertext : Bytes
+  * nonce : Bytes
+  * authTag : Bytes
+  * keyId : String
+  * editVersion : Int
   # updatedByAdminId : [FK] PlatformAdmin
   * createdAt : DateTime
   * updatedAt : DateTime
@@ -1846,6 +1886,7 @@ Conversation }o--o| Shop
 Conversation }o--o| Customer
 Conversation |o--o| CheckoutRecovery
 ConversationMessage }o--|| Conversation
+MerchantPricingPlan }o--o| CommerceModelCatalogueEntry
 MerchantPricingPlanTranslation }o--|| MerchantPricingPlan
 MerchantPricingPlanHighlight }o--|| MerchantPricingPlan
 MerchantPricingPlanHighlightTranslation }o--|| MerchantPricingPlanHighlight
@@ -1951,6 +1992,7 @@ CommerceAuditEvent }o--o| CommerceTool
 CommerceAuditEvent }o--o| CommerceToolRevision
 CommerceAuditEvent }o--o| Shop
 CommerceAuditEvent }o--o| CommerceModelCatalogueEntry
+CommerceAuditEvent }o--o| CommerceModelAvailability
 CommerceAuditEvent }o--o| CommercePromptTemplateCategory
 CommerceAuditEvent }o--o| CommercePromptTemplate
 CommerceAuditEvent }o--o| CommerceAgentConfiguration
@@ -1969,8 +2011,13 @@ CommerceConversationGrant }o--|| CommerceRelease
 CommerceToolRevision }o--|| CommerceTool
 CommerceToolRevision }o--|| PlatformAdmin
 CommerceToolRevision }o--o| PlatformAdmin
+CommerceModelCatalogueEntry }o--|| CommerceModelAvailability
 CommerceModelCatalogueEntry }o--|| PlatformAdmin
 CommerceModelCatalogueEntry }o--|| PlatformAdmin
+CommerceModelAvailability |o--o| Shop
+CommerceModelAvailability }o--o| PlatformAdmin
+CommerceModelAvailability }o--o| PlatformAdmin
+CommerceOpenRouterCredential }o--|| PlatformAdmin
 CommercePromptTemplateCategory }o--|| PlatformAdmin
 CommercePromptTemplateCategory }o--|| PlatformAdmin
 CommercePromptTemplateCategory |o--o| CommercePromptTemplate
@@ -2067,7 +2114,8 @@ CommerceAgentConfiguration |o--|| CommerceEnvironment
 CommerceAgentConfiguration |o--|| CommerceAgentPromptScope
 CommerceStudioMerchantAccess |o--|| CommerceStudioMerchantRole
 CommerceToolRevision |o--|| CommerceToolRevisionStatus
-CommerceModelCatalogueEntry |o--|| CommerceModelProvider
+CommerceModelAvailability |o--|| CommerceModelAvailabilityScope
+CommerceOpenRouterCredential |o--|| CommerceEnvironment
 CommerceAgentPrompt |o--|| CommerceAgentPromptScope
 CommerceAgentPromptRevision |o--|| CommercePromptRevisionStatus
 MerchantKnowledgeDataFormat |o--|| MerchantKnowledgeInputKind
