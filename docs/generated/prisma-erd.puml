@@ -315,6 +315,33 @@ enum "BackgroundRuntimeLeaseName" as BackgroundRuntimeLeaseName {
   TRANSLATION_RECONCILIATION
   QUEUE_CONCURRENCY_RECONCILIATION
   CHECKOUT_RECOVERY_EXPIRY
+  MERCHANT_KNOWLEDGE_PENDING_RECONCILIATION
+  MERCHANT_KNOWLEDGE_UPLOAD_CLEANUP
+}
+enum "MerchantKnowledgeInputKind" as MerchantKnowledgeInputKind {
+  REMOTE_URL
+  UPLOAD
+}
+enum "MerchantKnowledgeRevisionReason" as MerchantKnowledgeRevisionReason {
+  CREATE
+  URL_CHANGE
+  FILE_REPLACE
+  REFRESH
+  REPROCESS
+  ENTITLEMENT_CHANGE
+}
+enum "MerchantKnowledgeRevisionStatus" as MerchantKnowledgeRevisionStatus {
+  PENDING
+  PROCESSING
+  ACTIVE
+  FAILED
+  SUPERSEDED
+}
+enum "MerchantKnowledgeUploadedAssetStatus" as MerchantKnowledgeUploadedAssetStatus {
+  PENDING_UPLOAD
+  AVAILABLE
+  FAILED
+  DELETED
 }
 enum "CommerceToolRevisionStatus" as CommerceToolRevisionStatus {
   DRAFT
@@ -804,12 +831,14 @@ entity "BillingPlanFeature" as BillingPlanFeature {
   # planId : [FK] BillingPlan
   # featureId : [FK] Feature
   * enabled : Boolean
+  * configuration : Json
 }
 
 entity "MerchantPricingPlanFeature" as MerchantPricingPlanFeature {
 --
   # merchantPricingPlanId : [FK] MerchantPricingPlan
   # featureId : [FK] Feature
+  * configuration : Json
   * createdAt : DateTime
 }
 
@@ -1621,6 +1650,7 @@ entity "CommercePromptTemplateCategory" as CommercePromptTemplateCategory {
   # updatedByAdminId : [FK] PlatformAdmin
   * createdAt : DateTime
   * updatedAt : DateTime
+  # defaultTemplateId : [FK] CommercePromptTemplate
 }
 
 entity "CommercePromptTemplate" as CommercePromptTemplate {
@@ -1657,9 +1687,138 @@ entity "CommerceAgentPromptRevision" as CommerceAgentPromptRevision {
   * promptText : String
   contentHash : String
   # sourceTemplateId : [FK] CommercePromptTemplate
+  sourceTemplateEditVersion : Int
   * createdAt : DateTime
   * updatedAt : DateTime
   publishedAt : DateTime
+}
+
+entity "CommerceStoreCategoryTaxonomyMapping" as CommerceStoreCategoryTaxonomyMapping {
++ id [PK] : String
+--
+  # categoryId : [FK] CommercePromptTemplateCategory
+  * shopifyTaxonomyCategoryId : String
+  * weight : Int
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommerceShopProfile" as CommerceShopProfile {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # activeCategoryId : [FK] CommercePromptTemplateCategory
+  activeCategoryActivatedAt : DateTime
+  # pendingCategoryId : [FK] CommercePromptTemplateCategory
+  # pendingPromptRevisionId : [FK] CommerceAgentPromptRevision
+  * pendingSelectionGeneration : Int
+  pendingSelectedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantKnowledgePurpose" as MerchantKnowledgePurpose {
++ id [PK] : String
+--
+  * key : String
+  * displayName : String
+  * active : Boolean
+  * displayOrder : Int
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantKnowledgeDataFormat" as MerchantKnowledgeDataFormat {
++ id [PK] : String
+--
+  * key : String
+  * displayName : String
+  * inputKind : MerchantKnowledgeInputKind
+  canonicalExtension : String
+  * acceptedContentTypes : Json
+  * active : Boolean
+  * displayOrder : Int
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantKnowledgePurposeDataFormat" as MerchantKnowledgePurposeDataFormat {
+--
+  # purposeId : [FK] MerchantKnowledgePurpose
+  # dataFormatId : [FK] MerchantKnowledgeDataFormat
+  * createdAt : DateTime
+}
+
+entity "MerchantKnowledgeUploadedAsset" as MerchantKnowledgeUploadedAsset {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # dataFormatId : [FK] MerchantKnowledgeDataFormat
+  * status : MerchantKnowledgeUploadedAssetStatus
+  * objectKey : String
+  * originalFileName : String
+  contentType : String
+  sizeBytes : BigInt
+  sha256 : String
+  * uploadExpiresAt : DateTime
+  availableAt : DateTime
+  failureCode : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantKnowledgeSource" as MerchantKnowledgeSource {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # purposeId : [FK] MerchantKnowledgePurpose
+  # dataFormatId : [FK] MerchantKnowledgeDataFormat
+  * name : String
+  * languageTag : String
+  * position : Int
+  * currentGeneration : Int
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantKnowledgeSourceRevision" as MerchantKnowledgeSourceRevision {
++ id [PK] : String
+--
+  # sourceId : [FK] MerchantKnowledgeSource
+  # uploadedAssetId : [FK] MerchantKnowledgeUploadedAsset
+  * generation : Int
+  * reason : MerchantKnowledgeRevisionReason
+  requestedUrl : String
+  resolvedUrl : String
+  * status : MerchantKnowledgeRevisionStatus
+  contentType : String
+  httpStatus : Int
+  normalizedContent : String
+  contentUnits : Int
+  contentHash : String
+  * truncated : Boolean
+  failureCode : String
+  * requestedAt : DateTime
+  processingStartedAt : DateTime
+  fetchedAt : DateTime
+  completedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantKnowledgeChunk" as MerchantKnowledgeChunk {
++ id [PK] : String
+--
+  # revisionId : [FK] MerchantKnowledgeSourceRevision
+  * ordinal : Int
+  * content : String
+  * contentUnits : Int
+  * contentHash : String
+  * embeddingProvider : String
+  * embeddingModel : String
+  * embeddingDimensions : Int
+  * embeddingIndexVersion : String
+  * createdAt : DateTime
 }
 
 ' Relations
@@ -1813,12 +1972,30 @@ CommerceModelCatalogueEntry }o--|| PlatformAdmin
 CommerceModelCatalogueEntry }o--|| PlatformAdmin
 CommercePromptTemplateCategory }o--|| PlatformAdmin
 CommercePromptTemplateCategory }o--|| PlatformAdmin
+CommercePromptTemplateCategory |o--o| CommercePromptTemplate
 CommercePromptTemplate }o--|| CommercePromptTemplateCategory
 CommercePromptTemplate }o--|| PlatformAdmin
 CommercePromptTemplate }o--|| PlatformAdmin
 CommerceAgentPrompt }o--o| Shop
 CommerceAgentPromptRevision }o--|| CommerceAgentPrompt
 CommerceAgentPromptRevision }o--o| CommercePromptTemplate
+CommerceStoreCategoryTaxonomyMapping }o--|| CommercePromptTemplateCategory
+CommerceShopProfile |o--|| Shop
+CommerceShopProfile }o--o| CommercePromptTemplateCategory
+CommerceShopProfile }o--o| CommercePromptTemplateCategory
+CommerceShopProfile }o--o| CommerceAgentPromptRevision
+MerchantKnowledgePurposeDataFormat }o--|| MerchantKnowledgePurpose
+MerchantKnowledgePurposeDataFormat }o--|| MerchantKnowledgeDataFormat
+MerchantKnowledgeUploadedAsset }o--|| Shop
+MerchantKnowledgeUploadedAsset }o--|| MerchantKnowledgeDataFormat
+MerchantKnowledgeSource }o--|| Shop
+MerchantKnowledgeSource }o--|| MerchantKnowledgePurpose
+MerchantKnowledgeSource }o--|| MerchantKnowledgeDataFormat
+MerchantKnowledgeSource }o--|| MerchantKnowledgePurposeDataFormat
+MerchantKnowledgeSource }o--|| MerchantKnowledgePurposeDataFormat
+MerchantKnowledgeSourceRevision }o--|| MerchantKnowledgeSource
+MerchantKnowledgeSourceRevision }o--o| MerchantKnowledgeUploadedAsset
+MerchantKnowledgeChunk }o--|| MerchantKnowledgeSourceRevision
 ' ManyToMany Relations
 ' enum relations
 ShopSettings |o--|| RecoveryOfferMode
@@ -1892,4 +2069,8 @@ CommerceToolRevision |o--|| CommerceToolRevisionStatus
 CommerceModelCatalogueEntry |o--|| CommerceModelProvider
 CommerceAgentPrompt |o--|| CommerceAgentPromptScope
 CommerceAgentPromptRevision |o--|| CommercePromptRevisionStatus
+MerchantKnowledgeDataFormat |o--|| MerchantKnowledgeInputKind
+MerchantKnowledgeUploadedAsset |o--|| MerchantKnowledgeUploadedAssetStatus
+MerchantKnowledgeSourceRevision |o--|| MerchantKnowledgeRevisionReason
+MerchantKnowledgeSourceRevision |o--|| MerchantKnowledgeRevisionStatus
 @enduml
