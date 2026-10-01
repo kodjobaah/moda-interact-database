@@ -35,6 +35,8 @@
     "test:arch023-merchant-knowledge-migration": "node scripts/validate-arch023-merchant-knowledge-migration.mjs",
     "test:arch023-merchant-knowledge-runtime-leases": "node scripts/validate-arch023-merchant-knowledge-runtime-leases.mjs",
     "test:arch023-merchant-knowledge-runtime-leases:postgres": "node scripts/test-arch023-merchant-knowledge-runtime-leases-postgres.mjs",
+    "test:arch023-merchant-knowledge-entitlement-reconciliation-lease": "node scripts/validate-arch023-merchant-knowledge-entitlement-reconciliation-lease.mjs",
+    "test:arch023-merchant-knowledge-entitlement-reconciliation-lease:postgres": "node scripts/test-arch023-merchant-knowledge-entitlement-reconciliation-lease-postgres.mjs",
     "test:arch023-merchant-knowledge-validator-mutations": "node scripts/test-arch023-merchant-knowledge-validator-mutations.mjs",
     "test:arch023-release-feature-snapshot-history": "node scripts/validate-arch023-release-feature-snapshot-history.mjs",
     "test:arch023-release-feature-snapshot-history:postgres": "node scripts/test-arch023-release-feature-snapshot-history-postgres.mjs",
