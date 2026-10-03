@@ -13,4 +13,4 @@ WHERE settings."shopId" = shop."id";
 
 ALTER TABLE "commerce"."Shop"
   ADD CONSTRAINT "Shop_default_country_code_check"
-    CHECK ("defaultCountryCode" IS NULL OR "defaultCountryCode" ~ '^[A-Z]{2}$');
+    CHECK ("defaultCountryCode" IS NULL OR ("defaultCountryCode" COLLATE "C") ~ '^[A-Z]{2}$');

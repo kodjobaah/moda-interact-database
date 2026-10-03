@@ -109,12 +109,16 @@ function assertColumnsAndConstraint() {
     {name: 'defaultTimeZone', type: 'character varying', maxLength: 255, nullable: 'YES'},
     {name: 'defaultCountryCode', type: 'character varying', maxLength: 2, nullable: 'YES'},
   ]);
-  const constraint = jsonQuery(`SELECT count(*)::int FROM pg_constraint constraint_row
+  const constraint = jsonQuery(`SELECT jsonb_build_object(
+      'count', count(*)::int,
+      'usesCCollation', bool_and(pg_get_constraintdef(constraint_row.oid) LIKE '%COLLATE "C"%')
+    )::text FROM pg_constraint constraint_row
     JOIN pg_class relation ON relation.oid=constraint_row.conrelid
     JOIN pg_namespace namespace ON namespace.oid=relation.relnamespace
     WHERE namespace.nspname='commerce' AND relation.relname='Shop'
       AND constraint_row.conname='Shop_default_country_code_check' AND constraint_row.contype='c';`);
-  assert.equal(constraint, 1, 'nullable country-code check must exist once on commerce.Shop');
+  assert.deepEqual(constraint, {count: 1, usesCCollation: true},
+    'nullable country-code check must exist once and use C collation for ASCII ranges');
 }
 
 function runBehaviorCases() {
