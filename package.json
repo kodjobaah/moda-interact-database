@@ -42,6 +42,9 @@
     "test:arch023-release-feature-snapshot-history:postgres": "node scripts/test-arch023-release-feature-snapshot-history-postgres.mjs",
     "test:arch024-model-availability-schema": "node scripts/validate-arch024-model-availability-schema.mjs",
     "test:arch024-model-availability-migration": "node scripts/validate-arch024-model-availability-migration.mjs",
+    "test:arch026-woocommerce-installation-schema": "node scripts/validate-arch026-woocommerce-installation-schema.mjs",
+    "test:arch026-woocommerce-installation-migration:fresh": "node scripts/test-arch026-woocommerce-installation-postgres.mjs --mode fresh",
+    "test:arch026-woocommerce-installation-migration:upgrade": "node scripts/test-arch026-woocommerce-installation-postgres.mjs --mode upgrade",
     "test:arch020-external-connections:database": "node scripts/validate-arch020-external-connections.mjs"
   },
   "keywords": [],

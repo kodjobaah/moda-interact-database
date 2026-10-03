@@ -11,7 +11,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["shopify", "commerce", "whatsapp", "billing", "public", "support"]
+  schemas  = ["shopify", "commerce", "whatsapp", "billing", "public", "support", "woocommerce"]
 }
 
 model Session {
@@ -784,11 +784,11 @@ model MerchantPricingPlan {
   materializedAt                     DateTime?
   commerceModelId                    String?                        @db.Text
 
-  translations MerchantPricingPlanTranslation[]
-  usageEvents  MerchantPricingUsageEvent[]
-  highlights   MerchantPricingPlanHighlight[]
-  features     MerchantPricingPlanFeature[]
-  commerceModel CommerceModelCatalogueEntry? @relation("MerchantPricingPlanCommerceModel", fields: [commerceModelId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  translations  MerchantPricingPlanTranslation[]
+  usageEvents   MerchantPricingUsageEvent[]
+  highlights    MerchantPricingPlanHighlight[]
+  features      MerchantPricingPlanFeature[]
+  commerceModel CommerceModelCatalogueEntry?     @relation("MerchantPricingPlanCommerceModel", fields: [commerceModelId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1486,12 +1486,26 @@ enum ShopStatus {
   @@schema("commerce")
 }
 
+enum ShopPlatform {
+  SHOPIFY
+  WOOCOMMERCE
+
+  @@schema("commerce")
+}
+
+enum WooCommerceInstallationStatus {
+  ACTIVE
+  REVOKED
+
+  @@schema("woocommerce")
+}
+
 model Shop {
   commerceConversationGrants      CommerceConversationGrant[]
   externalCredentials             CommerceExternalCredential[]
   externalConnectionAudits        CommerceExternalConnectionAudit[]
   commerceAgentConfigurations     CommerceAgentConfiguration[]
-  commerceModelAvailability        CommerceModelAvailability?
+  commerceModelAvailability       CommerceModelAvailability?
   commerceStudioAccess            CommerceStudioMerchantAccess[]
   commerceAuditEvents             CommerceAuditEvent[]
   commerceShopProfile             CommerceShopProfile?
@@ -1501,8 +1515,11 @@ model Shop {
   id String @id @default(cuid())
 
   // Shopify identity
-  domain        String  @unique
-  shopifyShopId String? @unique
+  domain                  String                   @unique
+  shopifyShopId           String?                  @unique
+  platform                ShopPlatform             @default(SHOPIFY)
+  onboardingCompleted     Boolean                  @default(false)
+  wooCommerceInstallation WooCommerceInstallation?
 
   // Installation lifecycle
   status             ShopStatus @default(ACTIVE)
@@ -1545,7 +1562,25 @@ model Shop {
 
   @@index([status])
   @@index([status, reinstallPendingAt])
+  @@index([platform, status], map: "Shop_platform_status_idx")
   @@schema("commerce")
+}
+
+model WooCommerceInstallation {
+  id                 String                        @id @default(cuid()) @db.Text
+  shopId             String                        @unique(map: "WooCommerceInstallation_shopId_key") @db.Text
+  shop               Shop                          @relation(fields: [shopId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  canonicalSiteUrl   String                        @unique(map: "WooCommerceInstallation_canonicalSiteUrl_key") @db.VarChar(512)
+  status             WooCommerceInstallationStatus @default(ACTIVE)
+  credentialDigest   Bytes
+  credentialVersion  Int                           @default(1)
+  credentialIssuedAt DateTime                      @default(now()) @db.Timestamptz(3)
+  revokedAt          DateTime?                     @db.Timestamptz(3)
+  createdAt          DateTime                      @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                      @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([status, shopId], map: "WooCommerceInstallation_status_shopId_idx")
+  @@schema("woocommerce")
 }
 
 enum CommerceExternalConnectionScope {
@@ -1743,8 +1778,8 @@ model PlatformAdmin {
   externalConnectionAuditActors           CommerceExternalConnectionAudit[]    @relation("CommerceExternalConnectionAuditActor")
   createdCommerceModelCatalogueEntries    CommerceModelCatalogueEntry[]        @relation("CommerceModelCatalogueEntryCreator")
   updatedCommerceModelCatalogueEntries    CommerceModelCatalogueEntry[]        @relation("CommerceModelCatalogueEntryUpdater")
-  createdCommerceModelAvailabilities      CommerceModelAvailability[]           @relation("CommerceModelAvailabilityCreator")
-  updatedCommerceModelAvailabilities      CommerceModelAvailability[]           @relation("CommerceModelAvailabilityUpdater")
+  createdCommerceModelAvailabilities      CommerceModelAvailability[]          @relation("CommerceModelAvailabilityCreator")
+  updatedCommerceModelAvailabilities      CommerceModelAvailability[]          @relation("CommerceModelAvailabilityUpdater")
   updatedCommerceOpenRouterCredentials    CommerceOpenRouterCredential[]       @relation("CommerceOpenRouterCredentialUpdater")
   createdCommercePromptTemplateCategories CommercePromptTemplateCategory[]     @relation("CommercePromptTemplateCategoryCreator")
   updatedCommercePromptTemplateCategories CommercePromptTemplateCategory[]     @relation("CommercePromptTemplateCategoryUpdater")
@@ -2485,11 +2520,11 @@ model CommerceModelCatalogueEntry {
   updatedByAdminId           String                       @db.Text
   createdAt                  DateTime                     @default(now()) @db.Timestamptz(3)
   updatedAt                  DateTime                     @default(now()) @updatedAt @db.Timestamptz(3)
-  availability               CommerceModelAvailability   @relation(fields: [availabilityId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  availability               CommerceModelAvailability    @relation(fields: [availabilityId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   createdBy                  PlatformAdmin                @relation("CommerceModelCatalogueEntryCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   updatedBy                  PlatformAdmin                @relation("CommerceModelCatalogueEntryUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   configurations             CommerceAgentConfiguration[]
-  merchantPricingPlans       MerchantPricingPlan[]         @relation("MerchantPricingPlanCommerceModel")
+  merchantPricingPlans       MerchantPricingPlan[]        @relation("MerchantPricingPlanCommerceModel")
   auditEvents                CommerceAuditEvent[]
 
   @@unique([availabilityId, provider, providerModelId])

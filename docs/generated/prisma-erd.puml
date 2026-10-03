@@ -230,6 +230,14 @@ enum "ShopStatus" as ShopStatus {
   UNINSTALLED
   SUSPENDED
 }
+enum "ShopPlatform" as ShopPlatform {
+  SHOPIFY
+  WOOCOMMERCE
+}
+enum "WooCommerceInstallationStatus" as WooCommerceInstallationStatus {
+  ACTIVE
+  REVOKED
+}
 enum "CommerceExternalConnectionScope" as CommerceExternalConnectionScope {
   PLATFORM
   PER_SHOP
@@ -1131,10 +1139,26 @@ entity "Shop" as Shop {
 --
   * domain : String
   shopifyShopId : String
+  * platform : ShopPlatform
+  * onboardingCompleted : Boolean
   * status : ShopStatus
   * installedAt : DateTime
   uninstalledAt : DateTime
   reinstallPendingAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "WooCommerceInstallation" as WooCommerceInstallation {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  * canonicalSiteUrl : String
+  * status : WooCommerceInstallationStatus
+  * credentialDigest : Bytes
+  * credentialVersion : Int
+  * credentialIssuedAt : DateTime
+  revokedAt : DateTime
   * createdAt : DateTime
   * updatedAt : DateTime
 }
@@ -1941,6 +1965,7 @@ BillingAuditEvent }o--|| PlatformAdmin
 BillingPeriod }o--|| Shop
 BillingPeriod }o--|| Subscription
 BillingPeriod }o--o| BillingPlan
+WooCommerceInstallation |o--|| Shop
 CommerceExternalConnectionRevision }o--|| CommerceExternalConnection
 CommerceExternalConnectionRevision }o--|| PlatformAdmin
 CommerceExternalCredential }o--|| CommerceExternalConnectionRevision
@@ -2088,7 +2113,9 @@ BillingAuditEvent |o--|| BillingAuditAction
 BillingPeriod |o--|| BillingPlanKind
 BillingPeriod |o--|| BillingPeriodStatus
 BillingPeriod |o--|| BillingPeriodCloseReason
+Shop |o--|| ShopPlatform
 Shop |o--|| ShopStatus
+WooCommerceInstallation |o--|| WooCommerceInstallationStatus
 CommerceExternalConnectionRevision |o--|| CommerceExternalConnectionScope
 CommerceExternalConnectionRevision |o--|| CommerceExternalAuthMode
 CommerceExternalConnectionAudit |o--|| CommerceExternalConnectionAction
