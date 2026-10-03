@@ -45,6 +45,10 @@
     "test:arch026-woocommerce-installation-schema": "node scripts/validate-arch026-woocommerce-installation-schema.mjs",
     "test:arch026-woocommerce-installation-migration:fresh": "node scripts/test-arch026-woocommerce-installation-postgres.mjs --mode fresh",
     "test:arch026-woocommerce-installation-migration:upgrade": "node scripts/test-arch026-woocommerce-installation-postgres.mjs --mode upgrade",
+    "test:arch026-shared-international-context-schema": "node scripts/validate-arch026-shared-international-context-schema.mjs",
+    "test:arch026-shared-international-context-migration": "node scripts/validate-arch026-shared-international-context-migration.mjs",
+    "test:arch026-shared-international-context-migration:fresh": "node scripts/test-arch026-shared-international-context-postgres.mjs --mode fresh",
+    "test:arch026-shared-international-context-migration:upgrade": "node scripts/test-arch026-shared-international-context-postgres.mjs --mode upgrade",
     "test:arch020-external-connections:database": "node scripts/validate-arch020-external-connections.mjs"
   },
   "keywords": [],

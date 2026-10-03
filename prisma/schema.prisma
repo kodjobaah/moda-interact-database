@@ -1520,6 +1520,10 @@ model Shop {
   platform                ShopPlatform             @default(SHOPIFY)
   onboardingCompleted     Boolean                  @default(false)
   wooCommerceInstallation WooCommerceInstallation?
+  storeLocale             String?                  @db.VarChar(128)
+  defaultLanguageTag      String?                  @db.VarChar(64)
+  defaultTimeZone         String?                  @db.VarChar(255)
+  defaultCountryCode      String?                  @db.VarChar(2)
 
   // Installation lifecycle
   status             ShopStatus @default(ACTIVE)
