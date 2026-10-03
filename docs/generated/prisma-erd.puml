@@ -1141,6 +1141,10 @@ entity "Shop" as Shop {
   shopifyShopId : String
   * platform : ShopPlatform
   * onboardingCompleted : Boolean
+  storeLocale : String
+  defaultLanguageTag : String
+  defaultTimeZone : String
+  defaultCountryCode : String
   * status : ShopStatus
   * installedAt : DateTime
   uninstalledAt : DateTime
