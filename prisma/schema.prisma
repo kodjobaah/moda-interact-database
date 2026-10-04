@@ -2587,8 +2587,13 @@ model CommercePromptTemplateCategory {
   updatedByAdminId    String                                 @db.Text
   createdAt           DateTime                               @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime                               @default(now()) @updatedAt @db.Timestamptz(3)
-  defaultTemplateId   String?                                @unique @db.Text
-  createdBy           PlatformAdmin                          @relation("CommercePromptTemplateCategoryCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  defaultTemplateId                  String?                                @unique @db.Text
+  referenceTaxonomySource           String?                                @db.VarChar(64)
+  referenceTaxonomyVersion          String?                                @db.VarChar(32)
+  referenceTaxonomyCategoryId       String?                                @unique @db.VarChar(255)
+  referenceTaxonomyCategoryName     String?                                @db.VarChar(255)
+  referenceTaxonomyCategoryFullName String?                                @db.Text
+  createdBy                          PlatformAdmin                          @relation("CommercePromptTemplateCategoryCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   updatedBy           PlatformAdmin                          @relation("CommercePromptTemplateCategoryUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   templates           CommercePromptTemplate[]               @relation("CommercePromptTemplateCategoryTemplates")
   defaultTemplate     CommercePromptTemplate?                @relation("CommercePromptTemplateCategoryDefault", fields: [defaultTemplateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
@@ -2703,13 +2708,17 @@ enum MerchantKnowledgeUploadedAssetStatus {
 }
 
 model CommerceStoreCategoryTaxonomyMapping {
-  id                        String                         @id @default(cuid()) @db.Text
-  categoryId                String                         @db.Text
+  id                       String                         @id @default(cuid()) @db.Text
+  categoryId               String                         @db.Text
   shopifyTaxonomyCategoryId String                         @unique @db.VarChar(255)
-  weight                    Int                            @default(1)
-  createdAt                 DateTime                       @default(now()) @db.Timestamptz(3)
-  updatedAt                 DateTime                       @default(now()) @updatedAt @db.Timestamptz(3)
-  category                  CommercePromptTemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  taxonomySource           String?                        @db.VarChar(64)
+  taxonomyVersion          String?                        @db.VarChar(32)
+  taxonomyCategoryName     String?                        @db.VarChar(255)
+  taxonomyCategoryFullName String?                        @db.Text
+  weight                   Int                            @default(1)
+  createdAt                DateTime                       @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime                       @default(now()) @updatedAt @db.Timestamptz(3)
+  category                 CommercePromptTemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade, onUpdate: Restrict)
 
   @@index([categoryId])
   @@schema("commerce")
