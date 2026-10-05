@@ -50,7 +50,8 @@
     "test:arch026-shared-international-context-migration:fresh": "node scripts/test-arch026-shared-international-context-postgres.mjs --mode fresh",
     "test:arch026-shared-international-context-migration:upgrade": "node scripts/test-arch026-shared-international-context-postgres.mjs --mode upgrade",
     "test:arch020-external-connections:database": "node scripts/validate-arch020-external-connections.mjs",
-    "test:arch023-store-category-taxonomy-metadata": "node scripts/validate-arch023-store-category-taxonomy-metadata.mjs"
+    "test:arch023-store-category-taxonomy-metadata": "node scripts/validate-arch023-store-category-taxonomy-metadata.mjs",
+    "test:arch023-embedding-configuration": "node scripts/validate-arch023-embedding-configuration.mjs"
   },
   "keywords": [],
   "author": "",

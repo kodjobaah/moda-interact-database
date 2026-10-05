@@ -1785,6 +1785,7 @@ model PlatformAdmin {
   createdCommerceModelAvailabilities      CommerceModelAvailability[]          @relation("CommerceModelAvailabilityCreator")
   updatedCommerceModelAvailabilities      CommerceModelAvailability[]          @relation("CommerceModelAvailabilityUpdater")
   updatedCommerceOpenRouterCredentials    CommerceOpenRouterCredential[]       @relation("CommerceOpenRouterCredentialUpdater")
+  updatedCommerceEmbeddingConfigurations  CommerceEmbeddingConfiguration[]     @relation("CommerceEmbeddingConfigurationUpdater")
   createdCommercePromptTemplateCategories CommercePromptTemplateCategory[]     @relation("CommercePromptTemplateCategoryCreator")
   updatedCommercePromptTemplateCategories CommercePromptTemplateCategory[]     @relation("CommercePromptTemplateCategoryUpdater")
   createdCommercePromptTemplates          CommercePromptTemplate[]             @relation("CommercePromptTemplateCreator")
@@ -2575,6 +2576,30 @@ model CommerceOpenRouterCredential {
   @@schema("commerce")
 }
 
+model CommerceEmbeddingConfiguration {
+  id                    String                   @id @default(cuid()) @db.Text
+  environment           CommerceEnvironment
+  purpose               CommerceEmbeddingPurpose
+  embeddingProvider     String                   @db.VarChar(64)
+  embeddingModel        String                   @db.VarChar(255)
+  embeddingDimensions   Int
+  embeddingIndexVersion String                   @db.VarChar(64)
+  ciphertext            Bytes
+  nonce                 Bytes
+  authTag               Bytes
+  keyId                 String                   @db.VarChar(64)
+  editVersion           Int                      @default(1)
+  updatedByAdminId      String                   @db.Text
+  createdAt             DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                 @default(now()) @updatedAt @db.Timestamptz(3)
+
+  updatedBy PlatformAdmin @relation("CommerceEmbeddingConfigurationUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([environment, purpose])
+  @@index([purpose, environment])
+  @@schema("commerce")
+}
+
 model CommercePromptTemplateCategory {
   id                  String                                 @id @default(cuid()) @db.Text
   slug                String                                 @unique @db.VarChar(128)
@@ -2948,6 +2973,13 @@ enum CommerceEnvironment {
   @@schema("commerce")
 }
 
+enum CommerceEmbeddingPurpose {
+  MERCHANT_KNOWLEDGE
+  REFERENCE_TAXONOMY
+
+  @@schema("commerce")
+}
+
 enum CommerceAuditAction {
   CREATE_CAPABILITY
   UPDATE_CAPABILITY
@@ -3008,6 +3040,9 @@ enum CommerceAuditAction {
   SET_OPENROUTER_CREDENTIAL
   REPLACE_OPENROUTER_CREDENTIAL
   REMOVE_OPENROUTER_CREDENTIAL
+  SET_EMBEDDING_CONFIGURATION
+  REPLACE_EMBEDDING_CONFIGURATION
+  REMOVE_EMBEDDING_CONFIGURATION
 
   @@schema("commerce")
 }
