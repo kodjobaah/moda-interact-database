@@ -1786,6 +1786,10 @@ model PlatformAdmin {
   updatedCommerceModelAvailabilities      CommerceModelAvailability[]          @relation("CommerceModelAvailabilityUpdater")
   updatedCommerceOpenRouterCredentials    CommerceOpenRouterCredential[]       @relation("CommerceOpenRouterCredentialUpdater")
   updatedCommerceEmbeddingConfigurations  CommerceEmbeddingConfiguration[]     @relation("CommerceEmbeddingConfigurationUpdater")
+  updatedCommerceTranslationProviderCredentials CommerceTranslationProviderCredential[] @relation("CommerceTranslationProviderCredentialUpdater")
+  createdCommerceTranslationModelConfigurations CommerceTranslationModelConfiguration[]  @relation("CommerceTranslationModelConfigurationCreator")
+  updatedCommerceTranslationModelConfigurations CommerceTranslationModelConfiguration[]  @relation("CommerceTranslationModelConfigurationUpdater")
+  requestedCommerceStoreCategoryTranslationRuns CommerceStoreCategoryTranslationRun[]     @relation("CommerceStoreCategoryTranslationRunRequester")
   createdCommercePromptTemplateCategories CommercePromptTemplateCategory[]     @relation("CommercePromptTemplateCategoryCreator")
   updatedCommercePromptTemplateCategories CommercePromptTemplateCategory[]     @relation("CommercePromptTemplateCategoryUpdater")
   createdCommercePromptTemplates          CommercePromptTemplate[]             @relation("CommercePromptTemplateCreator")
@@ -2351,6 +2355,7 @@ model CommerceAuditEvent {
   shopId                   String?                         @db.Text
   modelCatalogueEntryId    String?                         @db.Text
   modelAvailabilityId      String?                         @db.Text
+  translationModelConfigurationId String?                  @db.Text
   promptTemplateCategoryId String?                         @db.Text
   promptTemplateId         String?                         @db.Text
   promptTemplateRevisionId String?                         @db.Text
@@ -2372,6 +2377,7 @@ model CommerceAuditEvent {
   shop                     Shop?                           @relation(fields: [shopId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   modelCatalogueEntry      CommerceModelCatalogueEntry?    @relation(fields: [modelCatalogueEntryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   modelAvailability        CommerceModelAvailability?      @relation(fields: [modelAvailabilityId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  translationModelConfiguration CommerceTranslationModelConfiguration? @relation(fields: [translationModelConfigurationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   promptTemplateCategory   CommercePromptTemplateCategory? @relation(fields: [promptTemplateCategoryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   promptTemplate           CommercePromptTemplate?         @relation(fields: [promptTemplateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   agentConfiguration       CommerceAgentConfiguration?     @relation(fields: [agentConfigurationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
@@ -2388,6 +2394,7 @@ model CommerceAuditEvent {
   @@index([shopId, createdAt, id])
   @@index([modelCatalogueEntryId, createdAt, id])
   @@index([modelAvailabilityId, createdAt, id])
+  @@index([translationModelConfigurationId, createdAt, id])
   @@index([promptTemplateCategoryId, createdAt, id])
   @@index([promptTemplateId, createdAt, id])
   @@index([agentPromptId, createdAt, id])
@@ -2600,12 +2607,58 @@ model CommerceEmbeddingConfiguration {
   @@schema("commerce")
 }
 
+model CommerceTranslationProviderCredential {
+  id               String              @id @default(cuid()) @db.Text
+  environment      CommerceEnvironment
+  provider         String              @db.VarChar(64)
+  ciphertext       Bytes
+  nonce            Bytes
+  authTag          Bytes
+  keyId            String              @db.VarChar(64)
+  editVersion      Int                 @default(1)
+  updatedByAdminId String              @db.Text
+  createdAt        DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
+
+  updatedBy PlatformAdmin                           @relation("CommerceTranslationProviderCredentialUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  models    CommerceTranslationModelConfiguration[] @relation("CommerceTranslationModelCredential")
+
+  @@unique([environment, provider])
+  @@index([provider, environment])
+  @@schema("commerce")
+}
+
+model CommerceTranslationModelConfiguration {
+  id               String              @id @default(cuid()) @db.Text
+  environment      CommerceEnvironment
+  provider         String              @db.VarChar(64)
+  providerModelId  String              @db.VarChar(255)
+  displayName      String              @db.VarChar(255)
+  enabled          Boolean             @default(true)
+  editVersion      Int                 @default(1)
+  createdByAdminId String              @db.Text
+  updatedByAdminId String              @db.Text
+  createdAt        DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
+
+  credential CommerceTranslationProviderCredential @relation("CommerceTranslationModelCredential", fields: [environment, provider], references: [environment, provider], onDelete: Restrict, onUpdate: Restrict)
+  createdBy  PlatformAdmin                         @relation("CommerceTranslationModelConfigurationCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy  PlatformAdmin                         @relation("CommerceTranslationModelConfigurationUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  runs       CommerceStoreCategoryTranslationRun[]
+  auditEvents CommerceAuditEvent[]
+
+  @@unique([environment, provider, providerModelId])
+  @@unique([environment, displayName])
+  @@index([environment, enabled, displayName, id])
+  @@schema("commerce")
+}
+
 model CommercePromptTemplateCategory {
   id                  String                                 @id @default(cuid()) @db.Text
   slug                String                                 @unique @db.VarChar(128)
   displayName         String                                 @db.VarChar(255)
   description         String                                 @default("") @db.Text
-  enabled             Boolean                                @default(true)
+  enabled             Boolean                                @default(false)
   displayOrder        Int                                    @default(0)
   editVersion         Int                                    @default(1)
   createdByAdminId    String                                 @db.Text
@@ -2623,11 +2676,29 @@ model CommercePromptTemplateCategory {
   templates           CommercePromptTemplate[]               @relation("CommercePromptTemplateCategoryTemplates")
   defaultTemplate     CommercePromptTemplate?                @relation("CommercePromptTemplateCategoryDefault", fields: [defaultTemplateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   taxonomyMappings    CommerceStoreCategoryTaxonomyMapping[]
+  translations        CommercePromptTemplateCategoryTranslation[]
+  translationRuns     CommerceStoreCategoryTranslationRun[]
   activeShopProfiles  CommerceShopProfile[]                  @relation("CommerceShopProfileActiveCategory")
   pendingShopProfiles CommerceShopProfile[]                  @relation("CommerceShopProfilePendingCategory")
   auditEvents         CommerceAuditEvent[]
 
   @@index([enabled, displayOrder, displayName, id])
+  @@schema("commerce")
+}
+
+model CommercePromptTemplateCategoryTranslation {
+  id          String   @id @default(cuid()) @db.Text
+  categoryId  String   @db.Text
+  locale      String   @db.VarChar(16)
+  displayName String   @db.VarChar(255)
+  description String   @db.Text
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  category CommercePromptTemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+
+  @@unique([categoryId, locale])
+  @@index([locale, categoryId])
   @@schema("commerce")
 }
 
@@ -2733,19 +2804,150 @@ enum MerchantKnowledgeUploadedAssetStatus {
 }
 
 model CommerceStoreCategoryTaxonomyMapping {
-  id                       String                         @id @default(cuid()) @db.Text
-  categoryId               String                         @db.Text
+  id                        String                         @id @default(cuid()) @db.Text
+  categoryId                String                         @db.Text
   shopifyTaxonomyCategoryId String                         @unique @db.VarChar(255)
-  taxonomySource           String?                        @db.VarChar(64)
-  taxonomyVersion          String?                        @db.VarChar(32)
-  taxonomyCategoryName     String?                        @db.VarChar(255)
-  taxonomyCategoryFullName String?                        @db.Text
-  weight                   Int                            @default(1)
-  createdAt                DateTime                       @default(now()) @db.Timestamptz(3)
-  updatedAt                DateTime                       @default(now()) @updatedAt @db.Timestamptz(3)
-  category                 CommercePromptTemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  taxonomySource            String?                        @db.VarChar(64)
+  taxonomyVersion           String?                        @db.VarChar(32)
+  taxonomyCategoryName      String?                        @db.VarChar(255)
+  taxonomyCategoryFullName  String?                        @db.Text
+  conditionKey              String?                        @db.VarChar(128)
+  displayName               String?                        @db.VarChar(255)
+  weight                    Int                            @default(1)
+  editVersion               Int                            @default(1)
+  createdAt                 DateTime                       @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime                       @default(now()) @updatedAt @db.Timestamptz(3)
+  category                  CommercePromptTemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  translations              CommerceStoreCategoryTaxonomyMappingTranslation[]
 
+  @@unique([categoryId, conditionKey])
   @@index([categoryId])
+  @@schema("commerce")
+}
+
+model CommerceStoreCategoryTaxonomyMappingTranslation {
+  id          String   @id @default(cuid()) @db.Text
+  mappingId   String   @db.Text
+  locale      String   @db.VarChar(16)
+  displayName String   @db.VarChar(255)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  mapping CommerceStoreCategoryTaxonomyMapping @relation(fields: [mappingId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+
+  @@unique([mappingId, locale])
+  @@index([locale, mappingId])
+  @@schema("commerce")
+}
+
+model CommerceStoreCategoryTranslationRun {
+  id                              String                                    @id @default(cuid()) @db.Text
+  categoryId                      String                                    @db.Text
+  environment                     CommerceEnvironment
+  translationModelConfigurationId String                                    @db.Text
+  provider                        String                                    @db.VarChar(64)
+  providerModelId                 String                                    @db.VarChar(255)
+  modelConfigurationVersion       Int
+  sourceSchemaVersion             Int                                       @default(1)
+  sourceHash                      String                                    @db.VarChar(64)
+  sourceSnapshot                  Json                                      @db.JsonB
+  status                          CommerceStoreCategoryTranslationRunStatus @default(PENDING)
+  requestedByAdminId              String                                    @db.Text
+  requestedAt                     DateTime                                  @default(now()) @db.Timestamptz(3)
+  startedAt                       DateTime?                                 @db.Timestamptz(3)
+  readyToPublishAt                DateTime?                                 @db.Timestamptz(3)
+  completedAt                     DateTime?                                 @db.Timestamptz(3)
+  failureCode                     String?                                   @db.VarChar(128)
+  createdAt                       DateTime                                  @default(now()) @db.Timestamptz(3)
+  updatedAt                       DateTime                                  @default(now()) @updatedAt @db.Timestamptz(3)
+
+  category             CommercePromptTemplateCategory         @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  translationModel     CommerceTranslationModelConfiguration  @relation(fields: [translationModelConfigurationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  requestedBy          PlatformAdmin                           @relation("CommerceStoreCategoryTranslationRunRequester", fields: [requestedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  items                CommerceStoreCategoryTranslationItem[]
+  batches              CommerceStoreCategoryTranslationBatch[]
+
+  @@index([categoryId, status, requestedAt])
+  @@index([status, requestedAt])
+  @@index([translationModelConfigurationId, requestedAt])
+  @@schema("commerce")
+}
+
+model CommerceStoreCategoryTranslationItem {
+  id                String                                     @id @default(cuid()) @db.Text
+  runId             String                                     @db.Text
+  sourceEntityKind  CommerceStoreCategoryTranslationEntityKind
+  sourceEntityId    String                                     @db.Text
+  sourceField       CommerceStoreCategoryTranslationField
+  sourceLanguageTag String                                     @db.VarChar(16)
+  targetLanguageTag String                                     @db.VarChar(16)
+  sourceText        String                                     @db.Text
+  translatedText    String?                                    @db.Text
+  status            CommerceStoreCategoryTranslationItemStatus @default(PENDING)
+  failureCode       String?                                    @db.VarChar(128)
+  retryCount        Int                                        @default(0)
+  nextAttemptAt     DateTime?                                  @db.Timestamptz(3)
+  currentBatchId    String?                                    @db.Text
+  completedAt       DateTime?                                  @db.Timestamptz(3)
+  createdAt         DateTime                                   @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime                                   @default(now()) @updatedAt @db.Timestamptz(3)
+
+  run          CommerceStoreCategoryTranslationRun       @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  currentBatch CommerceStoreCategoryTranslationBatch?     @relation("CommerceStoreCategoryTranslationItemCurrentBatch", fields: [currentBatchId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  batchItems   CommerceStoreCategoryTranslationBatchItem[]
+
+  @@unique([runId, sourceEntityKind, sourceEntityId, sourceField, targetLanguageTag])
+  @@index([status, currentBatchId, nextAttemptAt, createdAt])
+  @@index([runId, targetLanguageTag])
+  @@schema("commerce")
+}
+
+model CommerceStoreCategoryTranslationBatch {
+  id                   String                                      @id @default(cuid()) @db.Text
+  runId                String                                      @db.Text
+  provider             String                                      @db.VarChar(64)
+  model                String                                      @db.VarChar(255)
+  status               CommerceStoreCategoryTranslationBatchStatus @default(READY)
+  providerBatchId      String?                                     @db.Text
+  inputFileId          String?                                     @db.Text
+  outputFileId         String?                                     @db.Text
+  errorFileId          String?                                     @db.Text
+  submissionStartedAt  DateTime?                                   @db.Timestamptz(3)
+  lastSubmitAttemptAt  DateTime?                                   @db.Timestamptz(3)
+  submitAttemptCount   Int                                         @default(0)
+  nextSubmitAt         DateTime?                                   @db.Timestamptz(3)
+  submittedAt          DateTime?                                   @db.Timestamptz(3)
+  lastPolledAt         DateTime?                                   @db.Timestamptz(3)
+  nextPollAt           DateTime?                                   @db.Timestamptz(3)
+  pollSequence         Int                                         @default(0)
+  completedAt          DateTime?                                   @db.Timestamptz(3)
+  failureCode          String?                                     @db.VarChar(128)
+  createdAt            DateTime                                    @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime                                    @default(now()) @updatedAt @db.Timestamptz(3)
+
+  run          CommerceStoreCategoryTranslationRun        @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  currentItems CommerceStoreCategoryTranslationItem[]      @relation("CommerceStoreCategoryTranslationItemCurrentBatch")
+  items        CommerceStoreCategoryTranslationBatchItem[]
+
+  @@unique([provider, providerBatchId])
+  @@index([runId, status, createdAt])
+  @@index([status, nextSubmitAt, createdAt])
+  @@index([status, nextPollAt, createdAt])
+  @@schema("commerce")
+}
+
+model CommerceStoreCategoryTranslationBatchItem {
+  id                String                               @id @default(cuid()) @db.Text
+  batchId           String                               @db.Text
+  translationItemId String                               @db.Text
+  providerCustomId  String                               @unique @db.VarChar(255)
+  createdAt         DateTime                             @default(now()) @db.Timestamptz(3)
+
+  batch           CommerceStoreCategoryTranslationBatch @relation(fields: [batchId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  translationItem CommerceStoreCategoryTranslationItem  @relation(fields: [translationItemId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+
+  @@unique([batchId, translationItemId])
+  @@index([translationItemId, createdAt])
   @@schema("commerce")
 }
 
@@ -2980,6 +3182,53 @@ enum CommerceEmbeddingPurpose {
   @@schema("commerce")
 }
 
+enum CommerceStoreCategoryTranslationRunStatus {
+  PENDING
+  PROCESSING
+  READY_TO_PUBLISH
+  SUCCEEDED
+  FAILED
+  STALE
+
+  @@schema("commerce")
+}
+
+enum CommerceStoreCategoryTranslationEntityKind {
+  CATEGORY
+  MAPPING
+
+  @@schema("commerce")
+}
+
+enum CommerceStoreCategoryTranslationField {
+  DISPLAY_NAME
+  DESCRIPTION
+
+  @@schema("commerce")
+}
+
+enum CommerceStoreCategoryTranslationItemStatus {
+  PENDING
+  AVAILABLE
+  FAILED
+
+  @@schema("commerce")
+}
+
+enum CommerceStoreCategoryTranslationBatchStatus {
+  READY
+  SUBMITTING
+  SUBMISSION_UNKNOWN
+  SUBMITTED
+  PROVIDER_COMPLETED
+  COMPLETED
+  FAILED
+  EXPIRED
+  CANCELLED
+
+  @@schema("commerce")
+}
+
 enum CommerceAuditAction {
   CREATE_CAPABILITY
   UPDATE_CAPABILITY
@@ -3043,6 +3292,14 @@ enum CommerceAuditAction {
   SET_EMBEDDING_CONFIGURATION
   REPLACE_EMBEDDING_CONFIGURATION
   REMOVE_EMBEDDING_CONFIGURATION
+  SET_TRANSLATION_PROVIDER_CREDENTIAL
+  REPLACE_TRANSLATION_PROVIDER_CREDENTIAL
+  REMOVE_TRANSLATION_PROVIDER_CREDENTIAL
+  CREATE_TRANSLATION_MODEL_CONFIGURATION
+  UPDATE_TRANSLATION_MODEL_CONFIGURATION
+  ENABLE_TRANSLATION_MODEL_CONFIGURATION
+  DISABLE_TRANSLATION_MODEL_CONFIGURATION
+  REQUEST_PROMPT_TEMPLATE_CATEGORY_TRANSLATION
 
   @@schema("commerce")
 }
