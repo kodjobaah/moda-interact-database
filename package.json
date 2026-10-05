@@ -54,7 +54,8 @@
     "test:arch023-store-category-taxonomy-metadata": "node scripts/validate-arch023-store-category-taxonomy-metadata.mjs",
     "test:arch023-embedding-configuration": "node scripts/validate-arch023-embedding-configuration.mjs",
     "test:arch029-store-category-localisation": "node scripts/validate-arch029-store-category-localisation.mjs",
-    "test:arch029-translation-runtime": "node scripts/validate-arch029-translation-runtime.mjs"
+    "test:arch029-translation-runtime": "node scripts/validate-arch029-translation-runtime.mjs",
+    "test:arch030-commerce-capability-shop-platform": "node scripts/validate-arch030-commerce-capability-shop-platform.mjs"
   },
   "keywords": [],
   "author": "",

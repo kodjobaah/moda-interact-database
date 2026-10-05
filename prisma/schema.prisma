@@ -2248,6 +2248,8 @@ model CommerceCapability {
   description    String?                     @db.Text
   featureId      String                      @db.Text
   toolId         String                      @db.Text
+  /// Null means this capability is generic and may be used by any shop platform.
+  shopPlatform   ShopPlatform?
   enabled        Boolean                     @default(true)
   createdAt      DateTime                    @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime                    @default(now()) @updatedAt @db.Timestamptz(3)
