@@ -2752,6 +2752,7 @@ model CommerceAgentPromptRevision {
   contentHash               String?                      @db.VarChar(64)
   sourceTemplateId          String?                      @db.Text
   sourceTemplateEditVersion Int?
+  sourceContext             Json?                        @db.JsonB
   createdAt                 DateTime                     @default(now()) @db.Timestamptz(3)
   updatedAt                 DateTime                     @default(now()) @updatedAt @db.Timestamptz(3)
   publishedAt               DateTime?                    @db.Timestamptz(3)
