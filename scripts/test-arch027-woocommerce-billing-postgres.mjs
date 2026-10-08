@@ -503,7 +503,7 @@ async function main() {
   assert.equal(existingTables, 0, `${databaseName} must be a fresh disposable database with no user tables`);
 
   const migrations = migrationNames();
-  assert.equal(migrations.at(-1), targetMigration, 'ARCH-027 must be the last ordered migration for this task branch');
+  assert.ok(migrations.includes(targetMigration), 'accepted ARCH-027 migration must remain in the ordered chain');
   for (const name of migrations) {
     if (name === targetMigration) break;
     applyMigration(name);
