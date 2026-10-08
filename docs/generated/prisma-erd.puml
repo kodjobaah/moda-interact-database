@@ -208,6 +208,19 @@ enum "MerchantPricingUsagePricingMode" as MerchantPricingUsagePricingMode {
   GRADUATED
   VOLUME
 }
+enum "BillingOperationKind" as BillingOperationKind {
+  SUBSCRIPTION_CREATE
+  PLAN_SWITCH
+  ONE_TIME_CHARGE
+  CANCEL
+}
+enum "BillingOperationState" as BillingOperationState {
+  INITIATING
+  AWAITING_CONFIRMATION
+  CONFIRMED
+  OUTCOME_UNKNOWN
+  FAILED
+}
 enum "PromotionTargetScope" as PromotionTargetScope {
   GLOBAL
   PLAN
@@ -384,6 +397,42 @@ enum "CommerceEnvironment" as CommerceEnvironment {
   STAGING
   PRODUCTION
 }
+enum "CommerceEmbeddingPurpose" as CommerceEmbeddingPurpose {
+  MERCHANT_KNOWLEDGE
+  REFERENCE_TAXONOMY
+}
+enum "CommerceStoreCategoryTranslationRunStatus" as CommerceStoreCategoryTranslationRunStatus {
+  PENDING
+  PROCESSING
+  READY_TO_PUBLISH
+  SUCCEEDED
+  FAILED
+  STALE
+}
+enum "CommerceStoreCategoryTranslationEntityKind" as CommerceStoreCategoryTranslationEntityKind {
+  CATEGORY
+  MAPPING
+}
+enum "CommerceStoreCategoryTranslationField" as CommerceStoreCategoryTranslationField {
+  DISPLAY_NAME
+  DESCRIPTION
+}
+enum "CommerceStoreCategoryTranslationItemStatus" as CommerceStoreCategoryTranslationItemStatus {
+  PENDING
+  AVAILABLE
+  FAILED
+}
+enum "CommerceStoreCategoryTranslationBatchStatus" as CommerceStoreCategoryTranslationBatchStatus {
+  READY
+  SUBMITTING
+  SUBMISSION_UNKNOWN
+  SUBMITTED
+  PROVIDER_COMPLETED
+  COMPLETED
+  FAILED
+  EXPIRED
+  CANCELLED
+}
 enum "CommerceAuditAction" as CommerceAuditAction {
   CREATE_CAPABILITY
   UPDATE_CAPABILITY
@@ -444,6 +493,17 @@ enum "CommerceAuditAction" as CommerceAuditAction {
   SET_OPENROUTER_CREDENTIAL
   REPLACE_OPENROUTER_CREDENTIAL
   REMOVE_OPENROUTER_CREDENTIAL
+  SET_EMBEDDING_CONFIGURATION
+  REPLACE_EMBEDDING_CONFIGURATION
+  REMOVE_EMBEDDING_CONFIGURATION
+  SET_TRANSLATION_PROVIDER_CREDENTIAL
+  REPLACE_TRANSLATION_PROVIDER_CREDENTIAL
+  REMOVE_TRANSLATION_PROVIDER_CREDENTIAL
+  CREATE_TRANSLATION_MODEL_CONFIGURATION
+  UPDATE_TRANSLATION_MODEL_CONFIGURATION
+  ENABLE_TRANSLATION_MODEL_CONFIGURATION
+  DISABLE_TRANSLATION_MODEL_CONFIGURATION
+  REQUEST_PROMPT_TEMPLATE_CATEGORY_TRANSLATION
 }
 entity "Session" as Session {
 + id [PK] : String
@@ -799,6 +859,27 @@ entity "MerchantPricingUsageTier" as MerchantPricingUsageTier {
   * flatAmountMinor : Int
 }
 
+entity "BillingOperation" as BillingOperation {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  * kind : BillingOperationKind
+  * state : BillingOperationState
+  * requestKey : String
+  * requestFingerprint : Bytes
+  # merchantPricingPlanId : [FK] MerchantPricingPlan
+  # merchantPricingUsageEventId : [FK] MerchantPricingUsageEvent
+  quotedAmountMinor : Int
+  quotedCurrency : String
+  quotedBillingPeriod : MerchantPricingBillingPeriod
+  # recoveryCreditPurchaseId : [FK] RecoveryCreditPurchase
+  providerReference : String
+  confirmationUrl : String
+  lastErrorCode : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 entity "BillingPlan" as BillingPlan {
 + id [PK] : String
 --
@@ -883,6 +964,7 @@ entity "Subscription" as Subscription {
   trialEndsAt : DateTime
   * cancelAtPeriodEnd : Boolean
   providerSubscriptionId : String
+  providerCoverageEndAt : DateTime
   lastSyncedAt : DateTime
   lastSyncErrorCode : String
   lastSyncErrorAt : DateTime
@@ -946,6 +1028,7 @@ entity "BillingPeriodEntitlementCounter" as BillingPeriodEntitlementCounter {
   * committedQuantity : Int
   * reservedQuantity : Int
   * forfeitedQuantity : Int
+  currentAllowanceQuantity : Int
   * version : Int
   * createdAt : DateTime
   * updatedAt : DateTime
@@ -957,12 +1040,12 @@ entity "RecoveryCreditPurchase" as RecoveryCreditPurchase {
   # shopId : [FK] Shop
   # planId : [FK] BillingPlan
   # billingPeriodId : [FK] BillingPeriod
-  * shopifyPlanHandleSnapshot : String
-  * shopifyEventHandleSnapshot : String
-  * providerSubscriptionIdSnapshot : String
-  * providerUsageQuantityBeforeSnapshot : Decimal
-  * providerUsageCostBeforeSnapshot : Decimal
-  * providerUsageCostCurrencyBeforeSnapshot : String
+  shopifyPlanHandleSnapshot : String
+  shopifyEventHandleSnapshot : String
+  providerSubscriptionIdSnapshot : String
+  providerUsageQuantityBeforeSnapshot : Decimal
+  providerUsageCostBeforeSnapshot : Decimal
+  providerUsageCostCurrencyBeforeSnapshot : String
   providerUsageQuantityAfterSnapshot : Decimal
   providerUsageCostAfterSnapshot : Decimal
   providerUsageCostCurrencyAfterSnapshot : String
@@ -970,6 +1053,9 @@ entity "RecoveryCreditPurchase" as RecoveryCreditPurchase {
   providerPurchaseCurrency : String
   providerValuationConfirmedAt : DateTime
   providerPriceSnapshot : Json
+  * provider : String
+  providerReference : String
+  refundAttemptedAt : DateTime
   * creditsGranted : Int
   * currentAmount : Int
   * reservedAmount : Int
@@ -1167,6 +1253,19 @@ entity "WooCommerceInstallation" as WooCommerceInstallation {
   * updatedAt : DateTime
 }
 
+entity "WooCommerceBillingWebhookReceipt" as WooCommerceBillingWebhookReceipt {
++ id [PK] : String
+--
+  * topic : String
+  providerContractId : String
+  # billingOperationId : [FK] BillingOperation
+  * payloadSha256 : Bytes
+  * normalizedPayload : Json
+  * receivedAt : DateTime
+  processedAt : DateTime
+  processingError : String
+}
+
 entity "CommerceExternalConnection" as CommerceExternalConnection {
 + id [PK] : String
 --
@@ -1324,10 +1423,11 @@ entity "RecoveryCreditRefund" as RecoveryCreditRefund {
   * currentAmountAtRequestSnapshot : Int
   * reservedAmountAtRequestSnapshot : Int
   * availableAmountAtRequestSnapshot : Int
-  * billingPeriodIdSnapshot : String
-  * providerSubscriptionIdSnapshot : String
-  * planHandleSnapshot : String
-  * eventHandleSnapshot : String
+  billingPeriodIdSnapshot : String
+  providerSubscriptionIdSnapshot : String
+  planHandleSnapshot : String
+  eventHandleSnapshot : String
+  * provider : String
   * shopifyPartnerDevelopmentSnapshot : Boolean
   * purchaseProviderAmountSnapshot : Decimal
   * purchaseProviderCurrencySnapshot : String
@@ -1505,7 +1605,7 @@ entity "CommerceCapability" as CommerceCapability {
   description : String
   # featureId : [FK] Feature
   # toolId : [FK] CommerceTool
-  shopPlatform : ShopPlatform
+  shopPlatform (Null means this capability is generic and may be used by any shop platform.) : ShopPlatform
   * enabled : Boolean
   * createdAt : DateTime
   * updatedAt : DateTime
@@ -1576,6 +1676,7 @@ entity "CommerceAuditEvent" as CommerceAuditEvent {
   # shopId : [FK] Shop
   # modelCatalogueEntryId : [FK] CommerceModelCatalogueEntry
   # modelAvailabilityId : [FK] CommerceModelAvailability
+  # translationModelConfigurationId : [FK] CommerceTranslationModelConfiguration
   # promptTemplateCategoryId : [FK] CommercePromptTemplateCategory
   # promptTemplateId : [FK] CommercePromptTemplate
   promptTemplateRevisionId : String
@@ -1707,6 +1808,55 @@ entity "CommerceOpenRouterCredential" as CommerceOpenRouterCredential {
   * updatedAt : DateTime
 }
 
+entity "CommerceEmbeddingConfiguration" as CommerceEmbeddingConfiguration {
++ id [PK] : String
+--
+  * environment : CommerceEnvironment
+  * purpose : CommerceEmbeddingPurpose
+  * embeddingProvider : String
+  * embeddingModel : String
+  * embeddingDimensions : Int
+  * embeddingIndexVersion : String
+  * ciphertext : Bytes
+  * nonce : Bytes
+  * authTag : Bytes
+  * keyId : String
+  * editVersion : Int
+  # updatedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommerceTranslationProviderCredential" as CommerceTranslationProviderCredential {
++ id [PK] : String
+--
+  * environment : CommerceEnvironment
+  * provider : String
+  * ciphertext : Bytes
+  * nonce : Bytes
+  * authTag : Bytes
+  * keyId : String
+  * editVersion : Int
+  # updatedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommerceTranslationModelConfiguration" as CommerceTranslationModelConfiguration {
++ id [PK] : String
+--
+  # environment : [FK] CommerceTranslationProviderCredential
+  # provider : [FK] CommerceTranslationProviderCredential
+  * providerModelId : String
+  * displayName : String
+  * enabled : Boolean
+  * editVersion : Int
+  # createdByAdminId : [FK] PlatformAdmin
+  # updatedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 entity "CommercePromptTemplateCategory" as CommercePromptTemplateCategory {
 + id [PK] : String
 --
@@ -1721,6 +1871,22 @@ entity "CommercePromptTemplateCategory" as CommercePromptTemplateCategory {
   * createdAt : DateTime
   * updatedAt : DateTime
   # defaultTemplateId : [FK] CommercePromptTemplate
+  referenceTaxonomySource : String
+  referenceTaxonomyVersion : String
+  referenceTaxonomyCategoryId : String
+  referenceTaxonomyCategoryName : String
+  referenceTaxonomyCategoryFullName : String
+}
+
+entity "CommercePromptTemplateCategoryTranslation" as CommercePromptTemplateCategoryTranslation {
++ id [PK] : String
+--
+  # categoryId : [FK] CommercePromptTemplateCategory
+  * locale : String
+  * displayName : String
+  * description : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
 }
 
 entity "CommercePromptTemplate" as CommercePromptTemplate {
@@ -1758,6 +1924,7 @@ entity "CommerceAgentPromptRevision" as CommerceAgentPromptRevision {
   contentHash : String
   # sourceTemplateId : [FK] CommercePromptTemplate
   sourceTemplateEditVersion : Int
+  sourceContext : Json
   * createdAt : DateTime
   * updatedAt : DateTime
   publishedAt : DateTime
@@ -1768,9 +1935,104 @@ entity "CommerceStoreCategoryTaxonomyMapping" as CommerceStoreCategoryTaxonomyMa
 --
   # categoryId : [FK] CommercePromptTemplateCategory
   * shopifyTaxonomyCategoryId : String
+  taxonomySource : String
+  taxonomyVersion : String
+  taxonomyCategoryName : String
+  taxonomyCategoryFullName : String
+  conditionKey : String
+  displayName : String
   * weight : Int
+  * editVersion : Int
   * createdAt : DateTime
   * updatedAt : DateTime
+}
+
+entity "CommerceStoreCategoryTaxonomyMappingTranslation" as CommerceStoreCategoryTaxonomyMappingTranslation {
++ id [PK] : String
+--
+  # mappingId : [FK] CommerceStoreCategoryTaxonomyMapping
+  * locale : String
+  * displayName : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommerceStoreCategoryTranslationRun" as CommerceStoreCategoryTranslationRun {
++ id [PK] : String
+--
+  # categoryId : [FK] CommercePromptTemplateCategory
+  * environment : CommerceEnvironment
+  # translationModelConfigurationId : [FK] CommerceTranslationModelConfiguration
+  * provider : String
+  * providerModelId : String
+  * modelConfigurationVersion : Int
+  * sourceSchemaVersion : Int
+  * sourceHash : String
+  * sourceSnapshot : Json
+  * status : CommerceStoreCategoryTranslationRunStatus
+  # requestedByAdminId : [FK] PlatformAdmin
+  * requestedAt : DateTime
+  startedAt : DateTime
+  readyToPublishAt : DateTime
+  completedAt : DateTime
+  failureCode : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommerceStoreCategoryTranslationItem" as CommerceStoreCategoryTranslationItem {
++ id [PK] : String
+--
+  # runId : [FK] CommerceStoreCategoryTranslationRun
+  * sourceEntityKind : CommerceStoreCategoryTranslationEntityKind
+  * sourceEntityId : String
+  * sourceField : CommerceStoreCategoryTranslationField
+  * sourceLanguageTag : String
+  * targetLanguageTag : String
+  * sourceText : String
+  translatedText : String
+  * status : CommerceStoreCategoryTranslationItemStatus
+  failureCode : String
+  * retryCount : Int
+  nextAttemptAt : DateTime
+  # currentBatchId : [FK] CommerceStoreCategoryTranslationBatch
+  completedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommerceStoreCategoryTranslationBatch" as CommerceStoreCategoryTranslationBatch {
++ id [PK] : String
+--
+  # runId : [FK] CommerceStoreCategoryTranslationRun
+  * provider : String
+  * model : String
+  * status : CommerceStoreCategoryTranslationBatchStatus
+  providerBatchId : String
+  inputFileId : String
+  outputFileId : String
+  errorFileId : String
+  submissionStartedAt : DateTime
+  lastSubmitAttemptAt : DateTime
+  * submitAttemptCount : Int
+  nextSubmitAt : DateTime
+  submittedAt : DateTime
+  lastPolledAt : DateTime
+  nextPollAt : DateTime
+  * pollSequence : Int
+  completedAt : DateTime
+  failureCode : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "CommerceStoreCategoryTranslationBatchItem" as CommerceStoreCategoryTranslationBatchItem {
++ id [PK] : String
+--
+  # batchId : [FK] CommerceStoreCategoryTranslationBatch
+  # translationItemId : [FK] CommerceStoreCategoryTranslationItem
+  * providerCustomId : String
+  * createdAt : DateTime
 }
 
 entity "CommerceShopProfile" as CommerceShopProfile {
@@ -1921,6 +2183,10 @@ MerchantPricingPlanHighlight }o--|| MerchantPricingPlan
 MerchantPricingPlanHighlightTranslation }o--|| MerchantPricingPlanHighlight
 MerchantPricingUsageEvent }o--|| MerchantPricingPlan
 MerchantPricingUsageTier }o--|| MerchantPricingUsageEvent
+BillingOperation }o--|| Shop
+BillingOperation }o--o| MerchantPricingPlan
+BillingOperation }o--o| MerchantPricingUsageEvent
+BillingOperation |o--o| RecoveryCreditPurchase
 BillingUpgradeEconomicsEdge |o--|| BillingPlan
 BillingUpgradeEconomicsEdge |o--|| BillingPlan
 BillingEconomicsSnapshot }o--|| BillingPlan
@@ -1943,8 +2209,8 @@ BillingPeriodEntitlementCounter }o--|| Shop
 BillingPeriodEntitlementCounter }o--|| BillingPeriod
 RecoveryCreditPurchase }o--|| Shop
 RecoveryCreditPurchase }o--|| BillingPlan
-RecoveryCreditPurchase }o--|| BillingPeriod
-RecoveryCreditPurchase |o--|| UsageEvent
+RecoveryCreditPurchase }o--o| BillingPeriod
+RecoveryCreditPurchase |o--o| UsageEvent
 UsageReservation }o--|| Shop
 UsageReservation }o--o| ShopEntitlementCounter
 UsageReservation }o--o| BillingPeriodEntitlementCounter
@@ -1971,6 +2237,7 @@ BillingPeriod }o--|| Shop
 BillingPeriod }o--|| Subscription
 BillingPeriod }o--o| BillingPlan
 WooCommerceInstallation |o--|| Shop
+WooCommerceBillingWebhookReceipt }o--o| BillingOperation
 CommerceExternalConnectionRevision }o--|| CommerceExternalConnection
 CommerceExternalConnectionRevision }o--|| PlatformAdmin
 CommerceExternalCredential }o--|| CommerceExternalConnectionRevision
@@ -2023,6 +2290,7 @@ CommerceAuditEvent }o--o| CommerceToolRevision
 CommerceAuditEvent }o--o| Shop
 CommerceAuditEvent }o--o| CommerceModelCatalogueEntry
 CommerceAuditEvent }o--o| CommerceModelAvailability
+CommerceAuditEvent }o--o| CommerceTranslationModelConfiguration
 CommerceAuditEvent }o--o| CommercePromptTemplateCategory
 CommerceAuditEvent }o--o| CommercePromptTemplate
 CommerceAuditEvent }o--o| CommerceAgentConfiguration
@@ -2048,9 +2316,16 @@ CommerceModelAvailability |o--o| Shop
 CommerceModelAvailability }o--o| PlatformAdmin
 CommerceModelAvailability }o--o| PlatformAdmin
 CommerceOpenRouterCredential }o--|| PlatformAdmin
+CommerceEmbeddingConfiguration }o--|| PlatformAdmin
+CommerceTranslationProviderCredential }o--|| PlatformAdmin
+CommerceTranslationModelConfiguration }o--|| CommerceTranslationProviderCredential
+CommerceTranslationModelConfiguration }o--|| CommerceTranslationProviderCredential
+CommerceTranslationModelConfiguration }o--|| PlatformAdmin
+CommerceTranslationModelConfiguration }o--|| PlatformAdmin
 CommercePromptTemplateCategory }o--|| PlatformAdmin
 CommercePromptTemplateCategory }o--|| PlatformAdmin
 CommercePromptTemplateCategory |o--o| CommercePromptTemplate
+CommercePromptTemplateCategoryTranslation }o--|| CommercePromptTemplateCategory
 CommercePromptTemplate }o--|| CommercePromptTemplateCategory
 CommercePromptTemplate }o--|| PlatformAdmin
 CommercePromptTemplate }o--|| PlatformAdmin
@@ -2058,6 +2333,15 @@ CommerceAgentPrompt }o--o| Shop
 CommerceAgentPromptRevision }o--|| CommerceAgentPrompt
 CommerceAgentPromptRevision }o--o| CommercePromptTemplate
 CommerceStoreCategoryTaxonomyMapping }o--|| CommercePromptTemplateCategory
+CommerceStoreCategoryTaxonomyMappingTranslation }o--|| CommerceStoreCategoryTaxonomyMapping
+CommerceStoreCategoryTranslationRun }o--|| CommercePromptTemplateCategory
+CommerceStoreCategoryTranslationRun }o--|| CommerceTranslationModelConfiguration
+CommerceStoreCategoryTranslationRun }o--|| PlatformAdmin
+CommerceStoreCategoryTranslationItem }o--|| CommerceStoreCategoryTranslationRun
+CommerceStoreCategoryTranslationItem }o--o| CommerceStoreCategoryTranslationBatch
+CommerceStoreCategoryTranslationBatch }o--|| CommerceStoreCategoryTranslationRun
+CommerceStoreCategoryTranslationBatchItem }o--|| CommerceStoreCategoryTranslationBatch
+CommerceStoreCategoryTranslationBatchItem }o--|| CommerceStoreCategoryTranslationItem
 CommerceShopProfile |o--|| Shop
 CommerceShopProfile }o--o| CommercePromptTemplateCategory
 CommerceShopProfile }o--o| CommercePromptTemplateCategory
@@ -2101,6 +2385,9 @@ MerchantPricingPlan |o--|| MerchantPricingPlanKind
 MerchantPricingPlan |o--|| MerchantPricingAllowancePeriod
 MerchantPricingPlan |o--|| MerchantPricingBillingPeriod
 MerchantPricingUsageEvent |o--|| MerchantPricingUsagePricingMode
+BillingOperation |o--|| BillingOperationKind
+BillingOperation |o--|| BillingOperationState
+BillingOperation |o--|| MerchantPricingBillingPeriod
 BillingPlan |o--|| BillingPlanKind
 Subscription |o--|| SubscriptionProjectionStatus
 Subscription |o--|| ProviderSubscriptionLifecycleState
@@ -2138,6 +2425,7 @@ MerchantTranslationReconciliationRequest |o--|| MerchantTranslationReconciliatio
 MerchantTranslationReconciliationRequest |o--|| MerchantTranslationReconciliationStatus
 BackgroundRuntimeConfigAuditEvent |o--|| BackgroundRuntimeConfigSection
 BackgroundRuntimeLease |o--|| BackgroundRuntimeLeaseName
+CommerceCapability |o--|| ShopPlatform
 CommerceReleasePointer |o--|| CommerceEnvironment
 CommerceAuditEvent |o--|| CommerceAuditActorType
 CommerceAuditEvent |o--|| CommerceAuditAction
@@ -2148,8 +2436,18 @@ CommerceStudioMerchantAccess |o--|| CommerceStudioMerchantRole
 CommerceToolRevision |o--|| CommerceToolRevisionStatus
 CommerceModelAvailability |o--|| CommerceModelAvailabilityScope
 CommerceOpenRouterCredential |o--|| CommerceEnvironment
+CommerceEmbeddingConfiguration |o--|| CommerceEnvironment
+CommerceEmbeddingConfiguration |o--|| CommerceEmbeddingPurpose
+CommerceTranslationProviderCredential |o--|| CommerceEnvironment
+CommerceTranslationModelConfiguration |o--|| CommerceEnvironment
 CommerceAgentPrompt |o--|| CommerceAgentPromptScope
 CommerceAgentPromptRevision |o--|| CommercePromptRevisionStatus
+CommerceStoreCategoryTranslationRun |o--|| CommerceEnvironment
+CommerceStoreCategoryTranslationRun |o--|| CommerceStoreCategoryTranslationRunStatus
+CommerceStoreCategoryTranslationItem |o--|| CommerceStoreCategoryTranslationEntityKind
+CommerceStoreCategoryTranslationItem |o--|| CommerceStoreCategoryTranslationField
+CommerceStoreCategoryTranslationItem |o--|| CommerceStoreCategoryTranslationItemStatus
+CommerceStoreCategoryTranslationBatch |o--|| CommerceStoreCategoryTranslationBatchStatus
 MerchantKnowledgeDataFormat |o--|| MerchantKnowledgeInputKind
 MerchantKnowledgeUploadedAsset |o--|| MerchantKnowledgeUploadedAssetStatus
 MerchantKnowledgeSourceRevision |o--|| MerchantKnowledgeRevisionReason
