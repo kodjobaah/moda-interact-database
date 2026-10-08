@@ -7,7 +7,6 @@ import {PrismaClient} from '@prisma/client';
 
 const root = new URL('..', import.meta.url);
 const migrationName = '20260930120000_arch024_model_availability_openrouter';
-const migrationPath = `prisma/migrations/${migrationName}/migration.sql`;
 const migrationDirectory = new URL('../prisma/migrations/', import.meta.url);
 const migrationNames = readdirSync(migrationDirectory).filter(name => name !== 'migration_lock.toml').sort();
 const requestedModeIndex = process.argv.indexOf('--mode');
