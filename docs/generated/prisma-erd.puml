@@ -30,6 +30,7 @@ enum "CheckoutRecoveryStatus" as CheckoutRecoveryStatus {
 }
 enum "RecoveryAdmissionBlockReason" as RecoveryAdmissionBlockReason {
   RECOVERY_CAPACITY_EXHAUSTED
+  WHATSAPP_RECIPIENT_SUPPRESSED
 }
 enum "RecoveryOutreachTrigger" as RecoveryOutreachTrigger {
   INITIAL
@@ -760,6 +761,22 @@ entity "ConversationMessage" as ConversationMessage {
   sentAt : DateTime
   deliveredAt : DateTime
   readAt : DateTime
+  providerFailureCode : String
+  failedAt : DateTime
+}
+
+entity "WhatsAppRecipientReachability" as WhatsAppRecipientReachability {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  * recipient : String
+  lastProviderFailureCode : String
+  lastFailureAt : DateTime
+  suppressUntil : DateTime
+  lastSuccessfulAt : DateTime
+  * version : Int
+  * createdAt : DateTime
+  * updatedAt : DateTime
 }
 
 entity "Feature" as Feature {
@@ -1081,6 +1098,10 @@ entity "UsageReservation" as UsageReservation {
   releaseReason : UsageReservationReleaseReason
   expiresAt : DateTime
   # committedUsageEventId : [FK] UsageEvent
+  # compensationUsageEventId : [FK] UsageEvent
+  compensationReason : UsageReservationCompensationReason
+  compensationDisposition : UsageReservationCompensationDisposition
+  compensatedAt : DateTime
   * createdAt : DateTime
   * updatedAt : DateTime
 }
@@ -1097,6 +1118,7 @@ entity "PlatformBillingPolicy" as PlatformBillingPolicy {
   * defaultOutboundSoftLimit : Int
   * defaultOutboundHardLimit : Int
   * terminalMessageReservedSlots : Int
+  * whatsappRecipientSuppressionDays : Int
   * version : Int
   * createdAt : DateTime
   * updatedAt : DateTime
@@ -2177,6 +2199,7 @@ Conversation }o--o| Shop
 Conversation }o--o| Customer
 Conversation |o--o| CheckoutRecovery
 ConversationMessage }o--|| Conversation
+WhatsAppRecipientReachability }o--|| Shop
 MerchantPricingPlan }o--o| CommerceModelCatalogueEntry
 MerchantPricingPlanTranslation }o--|| MerchantPricingPlan
 MerchantPricingPlanHighlight }o--|| MerchantPricingPlan
@@ -2217,6 +2240,7 @@ UsageReservation }o--o| BillingPeriodEntitlementCounter
 UsageReservation }o--o| RecoveryCreditPurchase
 UsageReservation }o--o| PromotionalCreditGrant
 UsageReservation }o--o| PromotionalCreditGrant
+UsageReservation |o--o| UsageEvent
 UsageReservation |o--o| UsageEvent
 ShopBillingPolicyOverride |o--|| Shop
 ShopBillingPolicyOverride }o--o| PlatformAdmin
@@ -2398,6 +2422,8 @@ BillingPeriodEntitlementCounter |o--|| BillingPeriodEntitlementCounterKind
 RecoveryCreditPurchase |o--|| RecoveryCreditPurchaseStatus
 UsageReservation |o--|| UsageReservationStatus
 UsageReservation |o--|| UsageReservationReleaseReason
+UsageReservation |o--|| UsageReservationCompensationReason
+UsageReservation |o--|| UsageReservationCompensationDisposition
 PromotionCampaign |o--|| PromotionTargetScope
 PromotionCampaign |o--|| PromotionCampaignStatus
 PromotionCampaignEvent |o--|| PromotionCampaignEventType
