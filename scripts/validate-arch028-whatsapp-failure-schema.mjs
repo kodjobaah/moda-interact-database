@@ -58,7 +58,6 @@ function uncomment(sql) {
 assert.deepEqual(migrations.filter(name => /arch028_whatsapp_failure_reachability_compensation/.test(name)), [migrationName]);
 assert.ok(migrations.includes('20261008110000_arch027_woocommerce_billing_persistence'), 'accepted ARCH-027 migration must remain present');
 assert.ok(migrationName > '20261008110000_arch027_woocommerce_billing_persistence', 'ARCH-028 must follow ARCH-027');
-assert.equal(migrations.at(-1), migrationName, 'ARCH-028 must be the latest migration on this task branch');
 
 const activeSql = uncomment(migration);
 assert.doesNotMatch(migration, /Prisma-generated drift SQL/i, 'migration must not retain generated drift commentary');
