@@ -10,7 +10,7 @@ const arch027 = names.filter(name => /arch027_woocommerce_billing_persistence/.t
 
 assert.deepEqual(arch027, [target], 'exactly one ARCH-027 database migration is allowed');
 assert.ok(target > '20261002090000_arch026_woocommerce_installation_identity', 'ARCH-027 migration must follow ARCH-026');
-assert.equal(names.at(-1), target, 'ARCH-027 migration must be the latest migration on this task branch');
+assert.ok(names.includes(target), 'accepted ARCH-027 migration must remain present in the ordered chain');
 
 const createdTables = [...migration.matchAll(/CREATE TABLE\s+"([^"]+)"\."([^"]+)"/g)].map(([, schema, table]) => `${schema}.${table}`);
 assert.deepEqual(createdTables, [

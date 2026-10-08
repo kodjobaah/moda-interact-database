@@ -271,6 +271,7 @@ enum CheckoutRecoveryStatus {
 
 enum RecoveryAdmissionBlockReason {
   RECOVERY_CAPACITY_EXHAUSTED
+  WHATSAPP_RECIPIENT_SUPPRESSED
 
   @@schema("commerce")
 }
@@ -546,13 +547,35 @@ model ConversationMessage {
 
   recoveryOutreachAttempt RecoveryOutreachAttempt?
 
-  sentAt      DateTime?
-  deliveredAt DateTime?
-  readAt      DateTime?
+  sentAt              DateTime?
+  deliveredAt         DateTime?
+  readAt              DateTime?
+  providerFailureCode String?   @db.VarChar(64)
+  failedAt            DateTime?
 
   @@index([conversationId, createdAt])
   @@index([conversationId, createdAt, id])
   @@index([inReplyToProviderId])
+  @@schema("whatsapp")
+}
+
+model WhatsAppRecipientReachability {
+  id String @id @default(cuid())
+
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  recipient               String    @db.VarChar(64)
+  lastProviderFailureCode String?   @db.VarChar(64)
+  lastFailureAt           DateTime?
+  suppressUntil           DateTime?
+  lastSuccessfulAt        DateTime?
+  version                 Int       @default(0)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@unique([shopId, recipient])
+  @@index([shopId, suppressUntil])
   @@schema("whatsapp")
 }
 
@@ -1134,6 +1157,7 @@ model UsageEvent {
   correctionOfUsageEvent   UsageEvent?       @relation("UsageEventCorrection", fields: [correctionOfUsageEventId], references: [id], onDelete: SetNull)
   corrections              UsageEvent[]      @relation("UsageEventCorrection")
   committedReservation     UsageReservation? @relation("CommittedReservation")
+  compensatedReservation   UsageReservation? @relation("CompensatedReservation")
 
   sourceType String?
   sourceId   String?
@@ -1295,6 +1319,12 @@ model UsageReservation {
   committedUsageEventId String?     @unique
   committedUsageEvent   UsageEvent? @relation("CommittedReservation", fields: [committedUsageEventId], references: [id], onDelete: SetNull)
 
+  compensationUsageEventId String?                                  @unique
+  compensationUsageEvent   UsageEvent?                              @relation("CompensatedReservation", fields: [compensationUsageEventId], references: [id], onDelete: Restrict)
+  compensationReason       UsageReservationCompensationReason?
+  compensationDisposition  UsageReservationCompensationDisposition?
+  compensatedAt            DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1310,19 +1340,34 @@ model UsageReservation {
 model PlatformBillingPolicy {
   id String @id @default("default")
 
-  globalPauseNewRecoveries      Boolean @default(false)
-  globalPauseAutomatedWhatsapp  Boolean @default(false)
-  lifetimeFreeRecoveryAllowance Int     @default(5)
-  minimumUpgradePremiumBps      Int     @default(2000)
-  absoluteOutboundHardLimit     Int
-  defaultWarningPercent         Int
-  defaultOutboundSoftLimit      Int     @default(1000)
-  defaultOutboundHardLimit      Int     @default(2000)
-  terminalMessageReservedSlots  Int     @default(1)
-  version                       Int     @default(0)
+  globalPauseNewRecoveries         Boolean @default(false)
+  globalPauseAutomatedWhatsapp     Boolean @default(false)
+  lifetimeFreeRecoveryAllowance    Int     @default(5)
+  minimumUpgradePremiumBps         Int     @default(2000)
+  absoluteOutboundHardLimit        Int
+  defaultWarningPercent            Int
+  defaultOutboundSoftLimit         Int     @default(1000)
+  defaultOutboundHardLimit         Int     @default(2000)
+  terminalMessageReservedSlots     Int     @default(1)
+  whatsappRecipientSuppressionDays Int     @default(7)
+  version                          Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@schema("billing")
+}
+
+enum UsageReservationCompensationReason {
+  WHATSAPP_RECIPIENT_UNDELIVERABLE
+
+  @@schema("billing")
+}
+
+enum UsageReservationCompensationDisposition {
+  RESTORED_SPENDABLE
+  HELD_FOR_REFUND
+  HISTORICAL_ONLY
 
   @@schema("billing")
 }
@@ -1624,6 +1669,7 @@ model Shop {
   recoveryPolicyOverrideAuditEvents ShopRecoveryPolicyOverrideAuditEvent[]
   featurePreferences                ShopFeaturePreference[]
   whatsappTemplateVariants          WhatsAppTemplateVariant[]
+  whatsappRecipientReachability     WhatsAppRecipientReachability[]
   merchantSupportThread             MerchantSupportThread?
 
   // Commerce domain
