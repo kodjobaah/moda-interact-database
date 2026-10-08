@@ -178,6 +178,8 @@ ALTER TABLE "billing"."RecoveryCreditRefund"
           "status" <> 'COMPLETED'
           OR (
             "finalCreditQuantity" > 0
+            AND "providerAmount" IS NOT NULL
+            AND "providerCurrency" IS NOT NULL
             AND "providerReference" IS NOT NULL
             AND btrim("providerReference") <> ''
             AND "providerActionKind" = 'REFUND'
@@ -211,7 +213,8 @@ BEGIN
   SELECT purchase."provider"
     INTO purchase_provider
     FROM "billing"."RecoveryCreditPurchase" AS purchase
-    WHERE purchase."id" = NEW."purchaseId";
+    WHERE purchase."id" = NEW."purchaseId"
+    FOR UPDATE;
 
   IF purchase_provider IS NULL OR NEW."provider" IS DISTINCT FROM purchase_provider THEN
     RAISE EXCEPTION 'ARCH027 refund provider must match its recovery credit purchase'
@@ -334,11 +337,24 @@ CREATE FUNCTION billing.arch027_billing_operation_guard()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
+DECLARE
+  purchase_shop_id TEXT;
 BEGIN
   IF TG_OP = 'INSERT' THEN
     IF NEW."kind" = 'ONE_TIME_CHARGE' AND NEW."recoveryCreditPurchaseId" IS NULL THEN
       RAISE EXCEPTION 'ARCH027 one-time charge must reference its purchase'
         USING ERRCODE = '23514';
+    END IF;
+    IF NEW."kind" = 'ONE_TIME_CHARGE' THEN
+      SELECT purchase."shopId"
+        INTO purchase_shop_id
+        FROM "billing"."RecoveryCreditPurchase" AS purchase
+        WHERE purchase."id" = NEW."recoveryCreditPurchaseId"
+        FOR UPDATE;
+      IF purchase_shop_id IS DISTINCT FROM NEW."shopId" THEN
+        RAISE EXCEPTION 'ARCH027 one-time charge purchase must belong to the same Shop'
+          USING ERRCODE = '23514';
+      END IF;
     END IF;
     RETURN NEW;
   END IF;
@@ -386,6 +402,43 @@ CREATE TRIGGER arch027_billing_operation_guard
   ON "billing"."BillingOperation"
   FOR EACH ROW
   EXECUTE FUNCTION billing.arch027_billing_operation_guard();
+
+CREATE FUNCTION billing.arch027_recovery_credit_purchase_reference_guard()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW."provider" IS DISTINCT FROM OLD."provider"
+     AND EXISTS (
+       SELECT 1
+       FROM "billing"."RecoveryCreditRefund" AS refund
+       WHERE refund."purchaseId" = OLD."id"
+         AND refund."provider" IS DISTINCT FROM NEW."provider"
+     ) THEN
+    RAISE EXCEPTION 'ARCH027 purchase provider change would mismatch existing refunds'
+      USING ERRCODE = '23514';
+  END IF;
+
+  IF NEW."shopId" IS DISTINCT FROM OLD."shopId"
+     AND EXISTS (
+       SELECT 1
+       FROM "billing"."BillingOperation" AS operation
+       WHERE operation."recoveryCreditPurchaseId" = OLD."id"
+         AND operation."shopId" IS DISTINCT FROM NEW."shopId"
+     ) THEN
+    RAISE EXCEPTION 'ARCH027 purchase Shop change would mismatch its billing operation'
+      USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER arch027_recovery_credit_purchase_reference_guard
+  BEFORE UPDATE OF "provider", "shopId"
+  ON "billing"."RecoveryCreditPurchase"
+  FOR EACH ROW
+  EXECUTE FUNCTION billing.arch027_recovery_credit_purchase_reference_guard();
 
 CREATE TABLE "woocommerce"."WooCommerceBillingWebhookReceipt" (
   "id" TEXT NOT NULL,

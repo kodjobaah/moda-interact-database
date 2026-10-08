@@ -43,6 +43,7 @@ for (const required of [
   'arch027_billing_operation_guard',
   'arch027_woocommerce_billing_webhook_receipt_guard',
   'arch027_recovery_credit_purchase_refund_attempt_guard',
+  'arch027_recovery_credit_purchase_reference_guard',
   'arch027_recovery_credit_refund_provider_guard',
 ]) assert.ok(migration.includes(required), `${required} missing from migration`);
 
@@ -53,6 +54,9 @@ assert.match(migration, /ON DELETE CASCADE ON UPDATE RESTRICT/);
 assert.match(migration, /ON DELETE RESTRICT ON UPDATE RESTRICT/);
 assert.match(migration, /ON DELETE SET NULL ON UPDATE RESTRICT/);
 assert.match(migration, /UNIQUE \("topic", "payloadSha256"\)/);
+assert.match(migration, /"status" <> 'COMPLETED'[\s\S]*?"providerAmount" IS NOT NULL[\s\S]*?"providerCurrency" IS NOT NULL/);
+assert.match(migration, /purchase provider change would mismatch existing refunds/);
+assert.match(migration, /purchase Shop change would mismatch its billing operation/);
 assert.doesNotMatch(migration, /UNIQUE\s*\([^)]*providerContractId/i,
   'webhook dedupe must not depend on nullable provider contract identity');
 assert.doesNotMatch(migration, /CREATE SCHEMA/i, 'the accepted WooCommerce schema must be reused');

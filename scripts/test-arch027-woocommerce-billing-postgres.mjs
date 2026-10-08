@@ -60,6 +60,17 @@ $arch027_assertion$;`);
   console.log(`PASS ${label}`);
 }
 
+function expectRejectedWithMessage(label, statement, expectedMessage) {
+  try {
+    psql(statement);
+  } catch (error) {
+    assert.ok(error.message.includes(expectedMessage), error.message);
+    console.log(`PASS ${label}`);
+    return;
+  }
+  assert.fail(`Expected statement to be rejected: ${label}`);
+}
+
 function migrationNames() {
   return readdirSync(new URL('../prisma/migrations/', import.meta.url))
     .filter(name => /^\d{14}_.+$/.test(name))
@@ -408,6 +419,7 @@ UPDATE billing."RecoveryCreditPurchase"
   expectRejected('duplicate Shop/requestKey rejected', insertOperation({id: 'arch027-op-duplicate-key', key: 'create-1', planId: 'arch027-catalog-paid', amount: 1000, currency: 'EUR', period: 'EVERY_30_DAYS'}), '23505');
   expectRejected('subscription operation cannot carry a usage event', insertOperation({id: 'arch027-op-wrong-event', key: 'wrong-event', planId: 'arch027-catalog-paid', eventId: 'arch027-catalog-free-bundle', amount: 1000, currency: 'USD', period: 'EVERY_30_DAYS'}));
   expectRejected('one-time charge requires its purchase', insertOperation({id: 'arch027-op-no-purchase', kind: 'ONE_TIME_CHARGE', key: 'no-purchase', eventId: 'arch027-catalog-free-bundle', amount: 500, currency: 'USD'}));
+  expectRejected('one-time charge purchase must belong to the same Shop', insertOperation({id: 'arch027-op-cross-shop', kind: 'ONE_TIME_CHARGE', key: 'cross-shop', eventId: 'arch027-catalog-free-bundle', amount: 500, currency: 'USD', purchaseId: 'arch027-woo-purchase-paid'}));
   expectRejected('zero-value subscription create rejected', insertOperation({id: 'arch027-op-zero-create', key: 'zero-create', planId: 'arch027-catalog-paid', amount: 0, currency: 'USD', period: 'EVERY_30_DAYS'}));
   expectRejected('one-time charge cannot carry a recurring period', insertOperation({id: 'arch027-op-charge-period', kind: 'ONE_TIME_CHARGE', key: 'charge-period', eventId: 'arch027-catalog-free-bundle', amount: 500, currency: 'USD', period: 'EVERY_30_DAYS', purchaseId: 'arch027-woo-purchase-free-second'}));
   expectRejected('cancel cannot carry catalogue or quote fields', insertOperation({id: 'arch027-op-cancel-shape', kind: 'CANCEL', key: 'cancel-shape', planId: 'arch027-catalog-paid', amount: 1000, currency: 'USD', period: 'EVERY_30_DAYS', providerReference: 'woo-recurring-cancel-2'}));
@@ -445,16 +457,18 @@ UPDATE woocommerce."WooCommerceBillingWebhookReceipt" SET "processedAt"=CURRENT_
     "id","shopId","purchaseId","source","purchaseCreditsGrantedSnapshot","currentAmountAtRequestSnapshot",
     "reservedAmountAtRequestSnapshot","availableAmountAtRequestSnapshot","billingPeriodIdSnapshot",
     "providerSubscriptionIdSnapshot","planHandleSnapshot","eventHandleSnapshot","purchaseProviderAmountSnapshot",
-    "purchaseProviderCurrencySnapshot","requestKey","provider","status","finalCreditQuantity","providerReference",
+    "purchaseProviderCurrencySnapshot","requestKey","provider","status","finalCreditQuantity","providerAmount","providerCurrency","providerReference",
     "providerActionKind","providerConfirmedAt","updatedAt"
   ) VALUES (
     'arch027-woo-refund-complete','arch027-shop-woo-free','arch027-woo-purchase-free','MERCHANT_UI',10,10,0,10,
-    NULL,NULL,NULL,NULL,5,'USD','arch027-woo-refund-complete','WOOCOMMERCE','COMPLETED',2,'woo-refund-001','REFUND',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
+    NULL,NULL,NULL,NULL,5,'USD','arch027-woo-refund-complete','WOOCOMMERCE','COMPLETED',2,2.5,'USD','woo-refund-001','REFUND',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
   );`);
   expectRejected('invalid refund provider rejected', `INSERT INTO billing."RecoveryCreditRefund" ("id","shopId","purchaseId","source","purchaseCreditsGrantedSnapshot","currentAmountAtRequestSnapshot","reservedAmountAtRequestSnapshot","availableAmountAtRequestSnapshot","purchaseProviderAmountSnapshot","purchaseProviderCurrencySnapshot","requestKey","provider","updatedAt") VALUES ('arch027-refund-bad-provider','arch027-shop-woo-free','arch027-woo-purchase-free','MERCHANT_UI',10,10,0,10,5,'USD','bad-provider','MAGENTO',CURRENT_TIMESTAMP)`);
   expectRejected('Woo refund cannot carry Shopify plan/event snapshots', `INSERT INTO billing."RecoveryCreditRefund" ("id","shopId","purchaseId","source","purchaseCreditsGrantedSnapshot","currentAmountAtRequestSnapshot","reservedAmountAtRequestSnapshot","availableAmountAtRequestSnapshot","planHandleSnapshot","purchaseProviderAmountSnapshot","purchaseProviderCurrencySnapshot","requestKey","provider","updatedAt") VALUES ('arch027-refund-fake-shopify','arch027-shop-woo-free','arch027-woo-purchase-free','MERCHANT_UI',10,10,0,10,'fake-plan',5,'USD','fake-shopify','WOOCOMMERCE',CURRENT_TIMESTAMP)`);
   expectRejected('Woo refund cannot carry Shopify correction evidence', `INSERT INTO billing."RecoveryCreditRefund" ("id","shopId","purchaseId","source","purchaseCreditsGrantedSnapshot","currentAmountAtRequestSnapshot","reservedAmountAtRequestSnapshot","availableAmountAtRequestSnapshot","purchaseProviderAmountSnapshot","purchaseProviderCurrencySnapshot","requestKey","provider","automaticCorrectionUsageEventId","providerUsageQuantityBeforeCorrection","providerUsageCostBeforeCorrection","expectedProviderUsageQuantityAfterCorrection","expectedProviderUsageCostAfterCorrection","finalCreditQuantity","expectedProviderAmount","expectedProviderCurrency","updatedAt") VALUES ('arch027-refund-fake-correction','arch027-shop-woo-free','arch027-woo-purchase-free','MERCHANT_UI',10,10,0,10,5,'USD','fake-correction','WOOCOMMERCE','arch027-event-shopify-correction',3,2,2,1,1,1,'USD',CURRENT_TIMESTAMP)`);
   expectRejected('completed Woo refund requires provider settlement evidence', `INSERT INTO billing."RecoveryCreditRefund" ("id","shopId","purchaseId","source","purchaseCreditsGrantedSnapshot","currentAmountAtRequestSnapshot","reservedAmountAtRequestSnapshot","availableAmountAtRequestSnapshot","purchaseProviderAmountSnapshot","purchaseProviderCurrencySnapshot","requestKey","provider","status","finalCreditQuantity","updatedAt") VALUES ('arch027-refund-no-settlement','arch027-shop-woo-free','arch027-woo-purchase-free','MERCHANT_UI',10,10,0,10,5,'USD','no-settlement','WOOCOMMERCE','COMPLETED',2,CURRENT_TIMESTAMP)`);
+  expectRejected('completed Woo refund requires provider amount', `INSERT INTO billing."RecoveryCreditRefund" ("id","shopId","purchaseId","source","purchaseCreditsGrantedSnapshot","currentAmountAtRequestSnapshot","reservedAmountAtRequestSnapshot","availableAmountAtRequestSnapshot","purchaseProviderAmountSnapshot","purchaseProviderCurrencySnapshot","requestKey","provider","status","finalCreditQuantity","providerCurrency","providerReference","providerActionKind","providerConfirmedAt","updatedAt") VALUES ('arch027-refund-no-amount','arch027-shop-woo-free','arch027-woo-purchase-free','MERCHANT_UI',10,10,0,10,5,'USD','no-amount','WOOCOMMERCE','COMPLETED',2,'USD','woo-refund-no-amount','REFUND',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`);
+  expectRejected('completed Woo refund requires provider currency', `INSERT INTO billing."RecoveryCreditRefund" ("id","shopId","purchaseId","source","purchaseCreditsGrantedSnapshot","currentAmountAtRequestSnapshot","reservedAmountAtRequestSnapshot","availableAmountAtRequestSnapshot","purchaseProviderAmountSnapshot","purchaseProviderCurrencySnapshot","requestKey","provider","status","finalCreditQuantity","providerAmount","providerReference","providerActionKind","providerConfirmedAt","updatedAt") VALUES ('arch027-refund-no-currency','arch027-shop-woo-free','arch027-woo-purchase-free','MERCHANT_UI',10,10,0,10,5,'USD','no-currency','WOOCOMMERCE','COMPLETED',2,2.5,'woo-refund-no-currency','REFUND',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`);
   expectRejected('refund provider must match referenced purchase', `INSERT INTO billing."RecoveryCreditRefund" ("id","shopId","purchaseId","source","purchaseCreditsGrantedSnapshot","currentAmountAtRequestSnapshot","reservedAmountAtRequestSnapshot","availableAmountAtRequestSnapshot","billingPeriodIdSnapshot","providerSubscriptionIdSnapshot","planHandleSnapshot","eventHandleSnapshot","purchaseProviderAmountSnapshot","purchaseProviderCurrencySnapshot","requestKey","provider","updatedAt") VALUES ('arch027-refund-provider-mismatch','arch027-shop-shopify','arch027-shopify-positive','MERCHANT_UI',10,10,0,10,NULL,NULL,NULL,NULL,1,'USD','provider-mismatch','WOOCOMMERCE',CURRENT_TIMESTAMP)`);
   expectRejected('Shopify refund still requires period snapshot', `INSERT INTO billing."RecoveryCreditRefund" ("id","shopId","purchaseId","source","purchaseCreditsGrantedSnapshot","currentAmountAtRequestSnapshot","reservedAmountAtRequestSnapshot","availableAmountAtRequestSnapshot","providerSubscriptionIdSnapshot","planHandleSnapshot","eventHandleSnapshot","purchaseProviderAmountSnapshot","purchaseProviderCurrencySnapshot","requestKey","provider","updatedAt") VALUES ('arch027-refund-shopify-no-period','arch027-shop-shopify','arch027-shopify-positive','MERCHANT_UI',10,10,0,10,'shopify-arch027-contract','paid','pack',1,'USD','shopify-no-period','SHOPIFY',CURRENT_TIMESTAMP)`);
   psql(`INSERT INTO billing."RecoveryCreditRefund" (
@@ -466,7 +480,9 @@ UPDATE woocommerce."WooCommerceBillingWebhookReceipt" SET "processedAt"=CURRENT_
     'arch027-woo-refund-money-pair','arch027-shop-woo-free','arch027-woo-purchase-free','MERCHANT_UI',10,10,0,10,
     NULL,NULL,NULL,NULL,5,'USD','arch027-woo-refund-money-pair','WOOCOMMERCE',2.5,'USD',CURRENT_TIMESTAMP
   );`);
-  expectRejected('Woo refund provider money requires amount/currency pair', `UPDATE billing."RecoveryCreditRefund" SET "providerAmount"=3 WHERE "id"='arch027-woo-refund-complete'`);
+  expectRejectedWithMessage('purchase provider cannot change after refunds exist', `UPDATE billing."RecoveryCreditPurchase" SET "provider"='SHOPIFY' WHERE "id"='arch027-woo-purchase-free'`, 'ARCH027 purchase provider change would mismatch existing refunds');
+  expectRejectedWithMessage('purchase Shop cannot change after billing operation references it', `UPDATE billing."RecoveryCreditPurchase" SET "shopId"='arch027-shop-woo-paid' WHERE "id"='arch027-woo-purchase-free'`, 'ARCH027 purchase Shop change would mismatch its billing operation');
+  expectRejected('Woo refund provider money requires amount/currency pair', `UPDATE billing."RecoveryCreditRefund" SET "providerCurrency"=NULL WHERE "id"='arch027-woo-refund-money-pair'`);
   console.log('PASS provider-specific refund snapshots, settlement proof and purchase-provider consistency');
 
   assert.equal(jsonQuery(`SELECT count(*)::int FROM woocommerce."WooCommerceInstallation";`), 0,
