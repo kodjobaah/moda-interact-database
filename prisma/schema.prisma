@@ -760,6 +760,25 @@ enum MerchantPricingUsagePricingMode {
   @@schema("billing")
 }
 
+enum BillingOperationKind {
+  SUBSCRIPTION_CREATE
+  PLAN_SWITCH
+  ONE_TIME_CHARGE
+  CANCEL
+
+  @@schema("billing")
+}
+
+enum BillingOperationState {
+  INITIATING
+  AWAITING_CONFIRMATION
+  CONFIRMED
+  OUTCOME_UNKNOWN
+  FAILED
+
+  @@schema("billing")
+}
+
 model MerchantPricingPlan {
   id                String @id @default(cuid())
   shopifyPlanHandle String @unique
@@ -784,11 +803,12 @@ model MerchantPricingPlan {
   materializedAt                     DateTime?
   commerceModelId                    String?                        @db.Text
 
-  translations  MerchantPricingPlanTranslation[]
-  usageEvents   MerchantPricingUsageEvent[]
-  highlights    MerchantPricingPlanHighlight[]
-  features      MerchantPricingPlanFeature[]
-  commerceModel CommerceModelCatalogueEntry?     @relation("MerchantPricingPlanCommerceModel", fields: [commerceModelId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  translations      MerchantPricingPlanTranslation[]
+  usageEvents       MerchantPricingUsageEvent[]
+  billingOperations BillingOperation[]
+  highlights        MerchantPricingPlanHighlight[]
+  features          MerchantPricingPlanFeature[]
+  commerceModel     CommerceModelCatalogueEntry?     @relation("MerchantPricingPlanCommerceModel", fields: [commerceModelId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -860,6 +880,7 @@ model MerchantPricingUsageEvent {
   fixedUnitAmountMinor         Int?
   maximumUnitsPerBillingPeriod Int?
   tiers                        MerchantPricingUsageTier[]
+  billingOperations            BillingOperation[]
   createdAt                    DateTime                        @default(now())
   updatedAt                    DateTime                        @updatedAt
 
@@ -878,6 +899,47 @@ model MerchantPricingUsageTier {
   flatAmountMinor             Int
 
   @@unique([merchantPricingUsageEventId, position])
+  @@schema("billing")
+}
+
+model BillingOperation {
+  id     String @id @default(cuid()) @db.Text
+  shopId String @db.Text
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+
+  kind  BillingOperationKind
+  state BillingOperationState @default(INITIATING)
+
+  requestKey         String @db.VarChar(255)
+  requestFingerprint Bytes
+
+  merchantPricingPlanId String?              @db.Text
+  merchantPricingPlan   MerchantPricingPlan? @relation(fields: [merchantPricingPlanId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  merchantPricingUsageEventId String?                    @db.Text
+  merchantPricingUsageEvent   MerchantPricingUsageEvent? @relation(fields: [merchantPricingUsageEventId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  quotedAmountMinor   Int?
+  quotedCurrency      String?                       @db.Char(3)
+  quotedBillingPeriod MerchantPricingBillingPeriod?
+
+  recoveryCreditPurchaseId String?                 @unique @db.Text
+  recoveryCreditPurchase   RecoveryCreditPurchase? @relation("BillingOperationRecoveryCreditPurchase", fields: [recoveryCreditPurchaseId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+
+  providerReference String? @db.VarChar(255)
+  confirmationUrl   String? @db.VarChar(2048)
+  lastErrorCode     String? @db.VarChar(128)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  wooReceipts WooCommerceBillingWebhookReceipt[]
+
+  @@unique([shopId, requestKey])
+  @@index([shopId, state, createdAt])
+  @@index([providerReference, createdAt])
+  @@index([merchantPricingPlanId])
+  @@index([merchantPricingUsageEventId])
   @@schema("billing")
 }
 
@@ -1027,6 +1089,7 @@ model Subscription {
   cancelAtPeriodEnd  Boolean   @default(false)
 
   providerSubscriptionId String?
+  providerCoverageEndAt  DateTime?
 
   lastSyncedAt      DateTime?
   lastSyncErrorCode String?
@@ -1046,6 +1109,8 @@ model Subscription {
   updatedAt DateTime @updatedAt
 
   @@index([observedShopifyPlanHandle])
+  @@index([providerSubscriptionId])
+  @@index([providerCoverageEndAt])
   @@index([status])
   @@index([billingPeriodId])
   @@index([nextReconcileAt])
@@ -1132,12 +1197,13 @@ model BillingPeriodEntitlementCounter {
   billingPeriodId String
   billingPeriod   BillingPeriod @relation(fields: [billingPeriodId], references: [id], onDelete: Cascade)
 
-  counter           BillingPeriodEntitlementCounterKind
-  grantedQuantity   Int                                 @default(0)
-  committedQuantity Int                                 @default(0)
-  reservedQuantity  Int                                 @default(0)
-  forfeitedQuantity Int                                 @default(0)
-  version           Int                                 @default(0)
+  counter                  BillingPeriodEntitlementCounterKind
+  grantedQuantity          Int                                 @default(0)
+  committedQuantity        Int                                 @default(0)
+  reservedQuantity         Int                                 @default(0)
+  forfeitedQuantity        Int                                 @default(0)
+  currentAllowanceQuantity Int?
+  version                  Int                                 @default(0)
 
   reservations UsageReservation[] @relation("BillingPeriodUsageReservations")
 
@@ -1158,15 +1224,15 @@ model RecoveryCreditPurchase {
   planId String
   plan   BillingPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
 
-  billingPeriodId String
-  billingPeriod   BillingPeriod @relation("RecoveryCreditPurchaseBillingPeriod", fields: [billingPeriodId], references: [id], onDelete: Restrict)
+  billingPeriodId String?
+  billingPeriod   BillingPeriod? @relation("RecoveryCreditPurchaseBillingPeriod", fields: [billingPeriodId], references: [id], onDelete: Restrict)
 
-  shopifyPlanHandleSnapshot               String
-  shopifyEventHandleSnapshot              String
-  providerSubscriptionIdSnapshot          String
-  providerUsageQuantityBeforeSnapshot     Decimal
-  providerUsageCostBeforeSnapshot         Decimal
-  providerUsageCostCurrencyBeforeSnapshot String    @db.VarChar(3)
+  shopifyPlanHandleSnapshot               String?
+  shopifyEventHandleSnapshot              String?
+  providerSubscriptionIdSnapshot          String?
+  providerUsageQuantityBeforeSnapshot     Decimal?
+  providerUsageCostBeforeSnapshot         Decimal?
+  providerUsageCostCurrencyBeforeSnapshot String?   @db.VarChar(3)
   providerUsageQuantityAfterSnapshot      Decimal?
   providerUsageCostAfterSnapshot          Decimal?
   providerUsageCostCurrencyAfterSnapshot  String?   @db.VarChar(3)
@@ -1174,6 +1240,9 @@ model RecoveryCreditPurchase {
   providerPurchaseCurrency                String?   @db.VarChar(3)
   providerValuationConfirmedAt            DateTime?
   providerPriceSnapshot                   Json?
+  provider                                String    @default("SHOPIFY") @db.VarChar(32)
+  providerReference                       String?   @db.VarChar(512)
+  refundAttemptedAt                       DateTime?
 
   creditsGranted Int
   currentAmount  Int @default(0)
@@ -1182,14 +1251,15 @@ model RecoveryCreditPurchase {
 
   status RecoveryCreditPurchaseStatus @default(REQUESTED)
 
-  usageEventId String     @unique
-  usageEvent   UsageEvent @relation(fields: [usageEventId], references: [id], onDelete: Restrict)
+  usageEventId String?     @unique
+  usageEvent   UsageEvent? @relation(fields: [usageEventId], references: [id], onDelete: Restrict)
 
   activatedAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   refunds               RecoveryCreditRefund[]
+  billingOperation      BillingOperation?      @relation("BillingOperationRecoveryCreditPurchase")
   purchasedReservations UsageReservation[]
 
   @@index([shopId, status, createdAt])
@@ -1542,6 +1612,7 @@ model Shop {
   usageReservations                 UsageReservation[]
   billingPolicyOverride             ShopBillingPolicyOverride?
   billingAuditEvents                BillingAuditEvent[]
+  billingOperations                 BillingOperation[]
   recoveryCreditPurchases           RecoveryCreditPurchase[]
   promotionalCreditGrants           PromotionalCreditGrant[]
   merchantPromotionSelection        MerchantPromotionSelection?
@@ -1584,6 +1655,28 @@ model WooCommerceInstallation {
   updatedAt          DateTime                      @default(now()) @updatedAt @db.Timestamptz(3)
 
   @@index([status, shopId], map: "WooCommerceInstallation_status_shopId_idx")
+  @@schema("woocommerce")
+}
+
+model WooCommerceBillingWebhookReceipt {
+  id String @id @default(cuid()) @db.Text
+
+  topic              String  @db.VarChar(128)
+  providerContractId String? @db.VarChar(255)
+
+  billingOperationId String?           @db.Text
+  billingOperation   BillingOperation? @relation(fields: [billingOperationId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+
+  payloadSha256     Bytes
+  normalizedPayload Json      @db.JsonB
+  receivedAt        DateTime  @default(now()) @db.Timestamptz(3)
+  processedAt       DateTime? @db.Timestamptz(3)
+  processingError   String?   @db.VarChar(2000)
+
+  @@unique([topic, payloadSha256])
+  @@index([providerContractId, receivedAt])
+  @@index([billingOperationId, receivedAt])
+  @@index([processedAt, receivedAt])
   @@schema("woocommerce")
 }
 
@@ -1772,30 +1865,30 @@ enum PlatformAdminRole {
 }
 
 model PlatformAdmin {
-  createdCommerceToolRevisions            CommerceToolRevision[]               @relation("CommerceToolRevisionCreator")
-  publishedCommerceToolRevisions          CommerceToolRevision[]               @relation("CommerceToolRevisionPublisher")
-  commerceReleases                        CommerceRelease[]
-  commerceReleasePointers                 CommerceReleasePointer[]
-  commerceAuditEvents                     CommerceAuditEvent[]                 @relation("CommerceAuditPlatformActor")
-  externalConnectionRevisionCreators      CommerceExternalConnectionRevision[] @relation("CommerceExternalConnectionRevisionCreator")
-  externalCredentialUpdaters              CommerceExternalCredential[]         @relation("CommerceExternalCredentialUpdater")
-  externalConnectionAuditActors           CommerceExternalConnectionAudit[]    @relation("CommerceExternalConnectionAuditActor")
-  createdCommerceModelCatalogueEntries    CommerceModelCatalogueEntry[]        @relation("CommerceModelCatalogueEntryCreator")
-  updatedCommerceModelCatalogueEntries    CommerceModelCatalogueEntry[]        @relation("CommerceModelCatalogueEntryUpdater")
-  createdCommerceModelAvailabilities      CommerceModelAvailability[]          @relation("CommerceModelAvailabilityCreator")
-  updatedCommerceModelAvailabilities      CommerceModelAvailability[]          @relation("CommerceModelAvailabilityUpdater")
-  updatedCommerceOpenRouterCredentials    CommerceOpenRouterCredential[]       @relation("CommerceOpenRouterCredentialUpdater")
-  updatedCommerceEmbeddingConfigurations  CommerceEmbeddingConfiguration[]     @relation("CommerceEmbeddingConfigurationUpdater")
+  createdCommerceToolRevisions                  CommerceToolRevision[]                  @relation("CommerceToolRevisionCreator")
+  publishedCommerceToolRevisions                CommerceToolRevision[]                  @relation("CommerceToolRevisionPublisher")
+  commerceReleases                              CommerceRelease[]
+  commerceReleasePointers                       CommerceReleasePointer[]
+  commerceAuditEvents                           CommerceAuditEvent[]                    @relation("CommerceAuditPlatformActor")
+  externalConnectionRevisionCreators            CommerceExternalConnectionRevision[]    @relation("CommerceExternalConnectionRevisionCreator")
+  externalCredentialUpdaters                    CommerceExternalCredential[]            @relation("CommerceExternalCredentialUpdater")
+  externalConnectionAuditActors                 CommerceExternalConnectionAudit[]       @relation("CommerceExternalConnectionAuditActor")
+  createdCommerceModelCatalogueEntries          CommerceModelCatalogueEntry[]           @relation("CommerceModelCatalogueEntryCreator")
+  updatedCommerceModelCatalogueEntries          CommerceModelCatalogueEntry[]           @relation("CommerceModelCatalogueEntryUpdater")
+  createdCommerceModelAvailabilities            CommerceModelAvailability[]             @relation("CommerceModelAvailabilityCreator")
+  updatedCommerceModelAvailabilities            CommerceModelAvailability[]             @relation("CommerceModelAvailabilityUpdater")
+  updatedCommerceOpenRouterCredentials          CommerceOpenRouterCredential[]          @relation("CommerceOpenRouterCredentialUpdater")
+  updatedCommerceEmbeddingConfigurations        CommerceEmbeddingConfiguration[]        @relation("CommerceEmbeddingConfigurationUpdater")
   updatedCommerceTranslationProviderCredentials CommerceTranslationProviderCredential[] @relation("CommerceTranslationProviderCredentialUpdater")
-  createdCommerceTranslationModelConfigurations CommerceTranslationModelConfiguration[]  @relation("CommerceTranslationModelConfigurationCreator")
-  updatedCommerceTranslationModelConfigurations CommerceTranslationModelConfiguration[]  @relation("CommerceTranslationModelConfigurationUpdater")
-  requestedCommerceStoreCategoryTranslationRuns CommerceStoreCategoryTranslationRun[]     @relation("CommerceStoreCategoryTranslationRunRequester")
-  createdCommercePromptTemplateCategories CommercePromptTemplateCategory[]     @relation("CommercePromptTemplateCategoryCreator")
-  updatedCommercePromptTemplateCategories CommercePromptTemplateCategory[]     @relation("CommercePromptTemplateCategoryUpdater")
-  createdCommercePromptTemplates          CommercePromptTemplate[]             @relation("CommercePromptTemplateCreator")
-  updatedCommercePromptTemplates          CommercePromptTemplate[]             @relation("CommercePromptTemplateUpdater")
-  createdCommerceStudioMerchantAccess     CommerceStudioMerchantAccess[]       @relation("CommerceStudioMerchantAccessCreator")
-  updatedCommerceStudioMerchantAccess     CommerceStudioMerchantAccess[]       @relation("CommerceStudioMerchantAccessUpdater")
+  createdCommerceTranslationModelConfigurations CommerceTranslationModelConfiguration[] @relation("CommerceTranslationModelConfigurationCreator")
+  updatedCommerceTranslationModelConfigurations CommerceTranslationModelConfiguration[] @relation("CommerceTranslationModelConfigurationUpdater")
+  requestedCommerceStoreCategoryTranslationRuns CommerceStoreCategoryTranslationRun[]   @relation("CommerceStoreCategoryTranslationRunRequester")
+  createdCommercePromptTemplateCategories       CommercePromptTemplateCategory[]        @relation("CommercePromptTemplateCategoryCreator")
+  updatedCommercePromptTemplateCategories       CommercePromptTemplateCategory[]        @relation("CommercePromptTemplateCategoryUpdater")
+  createdCommercePromptTemplates                CommercePromptTemplate[]                @relation("CommercePromptTemplateCreator")
+  updatedCommercePromptTemplates                CommercePromptTemplate[]                @relation("CommercePromptTemplateUpdater")
+  createdCommerceStudioMerchantAccess           CommerceStudioMerchantAccess[]          @relation("CommerceStudioMerchantAccessCreator")
+  updatedCommerceStudioMerchantAccess           CommerceStudioMerchantAccess[]          @relation("CommerceStudioMerchantAccessUpdater")
 
   id              String            @id @default(cuid())
   provider        String            @default("google")
@@ -1922,10 +2015,11 @@ model RecoveryCreditRefund {
   currentAmountAtRequestSnapshot    Int
   reservedAmountAtRequestSnapshot   Int
   availableAmountAtRequestSnapshot  Int
-  billingPeriodIdSnapshot           String
-  providerSubscriptionIdSnapshot    String
-  planHandleSnapshot                String
-  eventHandleSnapshot               String
+  billingPeriodIdSnapshot           String?
+  providerSubscriptionIdSnapshot    String?
+  planHandleSnapshot                String?
+  eventHandleSnapshot               String?
+  provider                          String   @default("SHOPIFY") @db.VarChar(32)
   shopifyPartnerDevelopmentSnapshot Boolean  @default(false)
   purchaseProviderAmountSnapshot    Decimal
   purchaseProviderCurrencySnapshot  String   @db.VarChar(3)
@@ -2343,49 +2437,49 @@ model CommerceReleasePointer {
 }
 
 model CommerceAuditEvent {
-  id                       String                          @id @default(cuid()) @db.Text
-  actorType                CommerceAuditActorType          @default(PLATFORM_ADMIN)
-  actorAdminId             String?                         @db.Text
-  actorMerchantAccessId    String?                         @db.Text
-  operationId              String?                         @db.VarChar(128)
-  action                   CommerceAuditAction
-  capabilityId             String?                         @db.Text
-  featureId                String?                         @db.Text
-  releaseId                String?                         @db.Text
-  toolId                   String?                         @db.Text
-  toolRevisionId           String?                         @db.Text
-  shopId                   String?                         @db.Text
-  modelCatalogueEntryId    String?                         @db.Text
-  modelAvailabilityId      String?                         @db.Text
-  translationModelConfigurationId String?                  @db.Text
-  promptTemplateCategoryId String?                         @db.Text
-  promptTemplateId         String?                         @db.Text
-  promptTemplateRevisionId String?                         @db.Text
-  agentPromptId            String?                         @db.Text
-  agentPromptRevisionId    String?                         @db.Text
-  agentConfigurationId     String?                         @db.Text
-  merchantAccessId         String?                         @db.Text
-  environment              CommerceEnvironment?
-  reason                   String                          @db.VarChar(1000)
-  metadata                 Json                            @default("{}") @db.JsonB
-  createdAt                DateTime                        @default(now()) @db.Timestamptz(3)
-  actor                    PlatformAdmin?                  @relation("CommerceAuditPlatformActor", fields: [actorAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  merchantActor            CommerceStudioMerchantAccess?   @relation("CommerceAuditMerchantActor", fields: [actorMerchantAccessId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  capability               CommerceCapability?             @relation(fields: [capabilityId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  feature                  Feature?                        @relation(fields: [featureId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  release                  CommerceRelease?                @relation(fields: [releaseId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  tool                     CommerceTool?                   @relation(fields: [toolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  toolRevision             CommerceToolRevision?           @relation(fields: [toolRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  shop                     Shop?                           @relation(fields: [shopId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  modelCatalogueEntry      CommerceModelCatalogueEntry?    @relation(fields: [modelCatalogueEntryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  modelAvailability        CommerceModelAvailability?      @relation(fields: [modelAvailabilityId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  translationModelConfiguration CommerceTranslationModelConfiguration? @relation(fields: [translationModelConfigurationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  promptTemplateCategory   CommercePromptTemplateCategory? @relation(fields: [promptTemplateCategoryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  promptTemplate           CommercePromptTemplate?         @relation(fields: [promptTemplateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  agentConfiguration       CommerceAgentConfiguration?     @relation(fields: [agentConfigurationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  merchantAccess           CommerceStudioMerchantAccess?   @relation("CommerceAuditMerchantAccessTarget", fields: [merchantAccessId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  agentPrompt              CommerceAgentPrompt?            @relation(fields: [agentPromptId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  agentPromptRevision      CommerceAgentPromptRevision?    @relation(fields: [agentPromptRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  id                              String                                 @id @default(cuid()) @db.Text
+  actorType                       CommerceAuditActorType                 @default(PLATFORM_ADMIN)
+  actorAdminId                    String?                                @db.Text
+  actorMerchantAccessId           String?                                @db.Text
+  operationId                     String?                                @db.VarChar(128)
+  action                          CommerceAuditAction
+  capabilityId                    String?                                @db.Text
+  featureId                       String?                                @db.Text
+  releaseId                       String?                                @db.Text
+  toolId                          String?                                @db.Text
+  toolRevisionId                  String?                                @db.Text
+  shopId                          String?                                @db.Text
+  modelCatalogueEntryId           String?                                @db.Text
+  modelAvailabilityId             String?                                @db.Text
+  translationModelConfigurationId String?                                @db.Text
+  promptTemplateCategoryId        String?                                @db.Text
+  promptTemplateId                String?                                @db.Text
+  promptTemplateRevisionId        String?                                @db.Text
+  agentPromptId                   String?                                @db.Text
+  agentPromptRevisionId           String?                                @db.Text
+  agentConfigurationId            String?                                @db.Text
+  merchantAccessId                String?                                @db.Text
+  environment                     CommerceEnvironment?
+  reason                          String                                 @db.VarChar(1000)
+  metadata                        Json                                   @default("{}") @db.JsonB
+  createdAt                       DateTime                               @default(now()) @db.Timestamptz(3)
+  actor                           PlatformAdmin?                         @relation("CommerceAuditPlatformActor", fields: [actorAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  merchantActor                   CommerceStudioMerchantAccess?          @relation("CommerceAuditMerchantActor", fields: [actorMerchantAccessId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  capability                      CommerceCapability?                    @relation(fields: [capabilityId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  feature                         Feature?                               @relation(fields: [featureId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  release                         CommerceRelease?                       @relation(fields: [releaseId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  tool                            CommerceTool?                          @relation(fields: [toolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  toolRevision                    CommerceToolRevision?                  @relation(fields: [toolRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  shop                            Shop?                                  @relation(fields: [shopId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  modelCatalogueEntry             CommerceModelCatalogueEntry?           @relation(fields: [modelCatalogueEntryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  modelAvailability               CommerceModelAvailability?             @relation(fields: [modelAvailabilityId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  translationModelConfiguration   CommerceTranslationModelConfiguration? @relation(fields: [translationModelConfigurationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  promptTemplateCategory          CommercePromptTemplateCategory?        @relation(fields: [promptTemplateCategoryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  promptTemplate                  CommercePromptTemplate?                @relation(fields: [promptTemplateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  agentConfiguration              CommerceAgentConfiguration?            @relation(fields: [agentConfigurationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  merchantAccess                  CommerceStudioMerchantAccess?          @relation("CommerceAuditMerchantAccessTarget", fields: [merchantAccessId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  agentPrompt                     CommerceAgentPrompt?                   @relation(fields: [agentPromptId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  agentPromptRevision             CommerceAgentPromptRevision?           @relation(fields: [agentPromptRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@index([createdAt, id])
   @@index([capabilityId, createdAt, id])
@@ -2643,10 +2737,10 @@ model CommerceTranslationModelConfiguration {
   createdAt        DateTime            @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
 
-  credential CommerceTranslationProviderCredential @relation("CommerceTranslationModelCredential", fields: [environment, provider], references: [environment, provider], onDelete: Restrict, onUpdate: Restrict)
-  createdBy  PlatformAdmin                         @relation("CommerceTranslationModelConfigurationCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  updatedBy  PlatformAdmin                         @relation("CommerceTranslationModelConfigurationUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  runs       CommerceStoreCategoryTranslationRun[]
+  credential  CommerceTranslationProviderCredential @relation("CommerceTranslationModelCredential", fields: [environment, provider], references: [environment, provider], onDelete: Restrict, onUpdate: Restrict)
+  createdBy   PlatformAdmin                         @relation("CommerceTranslationModelConfigurationCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy   PlatformAdmin                         @relation("CommerceTranslationModelConfigurationUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  runs        CommerceStoreCategoryTranslationRun[]
   auditEvents CommerceAuditEvent[]
 
   @@unique([environment, provider, providerModelId])
@@ -2656,33 +2750,33 @@ model CommerceTranslationModelConfiguration {
 }
 
 model CommercePromptTemplateCategory {
-  id                  String                                 @id @default(cuid()) @db.Text
-  slug                String                                 @unique @db.VarChar(128)
-  displayName         String                                 @db.VarChar(255)
-  description         String                                 @default("") @db.Text
-  enabled             Boolean                                @default(false)
-  displayOrder        Int                                    @default(0)
-  editVersion         Int                                    @default(1)
-  createdByAdminId    String                                 @db.Text
-  updatedByAdminId    String                                 @db.Text
-  createdAt           DateTime                               @default(now()) @db.Timestamptz(3)
-  updatedAt           DateTime                               @default(now()) @updatedAt @db.Timestamptz(3)
-  defaultTemplateId                  String?                                @unique @db.Text
-  referenceTaxonomySource           String?                                @db.VarChar(64)
-  referenceTaxonomyVersion          String?                                @db.VarChar(32)
-  referenceTaxonomyCategoryId       String?                                @unique @db.VarChar(255)
-  referenceTaxonomyCategoryName     String?                                @db.VarChar(255)
-  referenceTaxonomyCategoryFullName String?                                @db.Text
-  createdBy                          PlatformAdmin                          @relation("CommercePromptTemplateCategoryCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  updatedBy           PlatformAdmin                          @relation("CommercePromptTemplateCategoryUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  templates           CommercePromptTemplate[]               @relation("CommercePromptTemplateCategoryTemplates")
-  defaultTemplate     CommercePromptTemplate?                @relation("CommercePromptTemplateCategoryDefault", fields: [defaultTemplateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  taxonomyMappings    CommerceStoreCategoryTaxonomyMapping[]
-  translations        CommercePromptTemplateCategoryTranslation[]
-  translationRuns     CommerceStoreCategoryTranslationRun[]
-  activeShopProfiles  CommerceShopProfile[]                  @relation("CommerceShopProfileActiveCategory")
-  pendingShopProfiles CommerceShopProfile[]                  @relation("CommerceShopProfilePendingCategory")
-  auditEvents         CommerceAuditEvent[]
+  id                                String                                      @id @default(cuid()) @db.Text
+  slug                              String                                      @unique @db.VarChar(128)
+  displayName                       String                                      @db.VarChar(255)
+  description                       String                                      @default("") @db.Text
+  enabled                           Boolean                                     @default(false)
+  displayOrder                      Int                                         @default(0)
+  editVersion                       Int                                         @default(1)
+  createdByAdminId                  String                                      @db.Text
+  updatedByAdminId                  String                                      @db.Text
+  createdAt                         DateTime                                    @default(now()) @db.Timestamptz(3)
+  updatedAt                         DateTime                                    @default(now()) @updatedAt @db.Timestamptz(3)
+  defaultTemplateId                 String?                                     @unique @db.Text
+  referenceTaxonomySource           String?                                     @db.VarChar(64)
+  referenceTaxonomyVersion          String?                                     @db.VarChar(32)
+  referenceTaxonomyCategoryId       String?                                     @unique @db.VarChar(255)
+  referenceTaxonomyCategoryName     String?                                     @db.VarChar(255)
+  referenceTaxonomyCategoryFullName String?                                     @db.Text
+  createdBy                         PlatformAdmin                               @relation("CommercePromptTemplateCategoryCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy                         PlatformAdmin                               @relation("CommercePromptTemplateCategoryUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  templates                         CommercePromptTemplate[]                    @relation("CommercePromptTemplateCategoryTemplates")
+  defaultTemplate                   CommercePromptTemplate?                     @relation("CommercePromptTemplateCategoryDefault", fields: [defaultTemplateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  taxonomyMappings                  CommerceStoreCategoryTaxonomyMapping[]
+  translations                      CommercePromptTemplateCategoryTranslation[]
+  translationRuns                   CommerceStoreCategoryTranslationRun[]
+  activeShopProfiles                CommerceShopProfile[]                       @relation("CommerceShopProfileActiveCategory")
+  pendingShopProfiles               CommerceShopProfile[]                       @relation("CommerceShopProfilePendingCategory")
+  auditEvents                       CommerceAuditEvent[]
 
   @@index([enabled, displayOrder, displayName, id])
   @@schema("commerce")
@@ -2807,20 +2901,20 @@ enum MerchantKnowledgeUploadedAssetStatus {
 }
 
 model CommerceStoreCategoryTaxonomyMapping {
-  id                        String                         @id @default(cuid()) @db.Text
-  categoryId                String                         @db.Text
-  shopifyTaxonomyCategoryId String                         @unique @db.VarChar(255)
-  taxonomySource            String?                        @db.VarChar(64)
-  taxonomyVersion           String?                        @db.VarChar(32)
-  taxonomyCategoryName      String?                        @db.VarChar(255)
-  taxonomyCategoryFullName  String?                        @db.Text
-  conditionKey              String?                        @db.VarChar(128)
-  displayName               String?                        @db.VarChar(255)
-  weight                    Int                            @default(1)
-  editVersion               Int                            @default(1)
-  createdAt                 DateTime                       @default(now()) @db.Timestamptz(3)
-  updatedAt                 DateTime                       @default(now()) @updatedAt @db.Timestamptz(3)
-  category                  CommercePromptTemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  id                        String                                            @id @default(cuid()) @db.Text
+  categoryId                String                                            @db.Text
+  shopifyTaxonomyCategoryId String                                            @unique @db.VarChar(255)
+  taxonomySource            String?                                           @db.VarChar(64)
+  taxonomyVersion           String?                                           @db.VarChar(32)
+  taxonomyCategoryName      String?                                           @db.VarChar(255)
+  taxonomyCategoryFullName  String?                                           @db.Text
+  conditionKey              String?                                           @db.VarChar(128)
+  displayName               String?                                           @db.VarChar(255)
+  weight                    Int                                               @default(1)
+  editVersion               Int                                               @default(1)
+  createdAt                 DateTime                                          @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime                                          @default(now()) @updatedAt @db.Timestamptz(3)
+  category                  CommercePromptTemplateCategory                    @relation(fields: [categoryId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   translations              CommerceStoreCategoryTaxonomyMappingTranslation[]
 
   @@unique([categoryId, conditionKey])
@@ -2864,11 +2958,11 @@ model CommerceStoreCategoryTranslationRun {
   createdAt                       DateTime                                  @default(now()) @db.Timestamptz(3)
   updatedAt                       DateTime                                  @default(now()) @updatedAt @db.Timestamptz(3)
 
-  category             CommercePromptTemplateCategory         @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  translationModel     CommerceTranslationModelConfiguration  @relation(fields: [translationModelConfigurationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  requestedBy          PlatformAdmin                           @relation("CommerceStoreCategoryTranslationRunRequester", fields: [requestedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  items                CommerceStoreCategoryTranslationItem[]
-  batches              CommerceStoreCategoryTranslationBatch[]
+  category         CommercePromptTemplateCategory          @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  translationModel CommerceTranslationModelConfiguration   @relation(fields: [translationModelConfigurationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  requestedBy      PlatformAdmin                           @relation("CommerceStoreCategoryTranslationRunRequester", fields: [requestedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  items            CommerceStoreCategoryTranslationItem[]
+  batches          CommerceStoreCategoryTranslationBatch[]
 
   @@index([categoryId, status, requestedAt])
   @@index([status, requestedAt])
@@ -2895,8 +2989,8 @@ model CommerceStoreCategoryTranslationItem {
   createdAt         DateTime                                   @default(now()) @db.Timestamptz(3)
   updatedAt         DateTime                                   @default(now()) @updatedAt @db.Timestamptz(3)
 
-  run          CommerceStoreCategoryTranslationRun       @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: Restrict)
-  currentBatch CommerceStoreCategoryTranslationBatch?     @relation("CommerceStoreCategoryTranslationItemCurrentBatch", fields: [currentBatchId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  run          CommerceStoreCategoryTranslationRun         @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  currentBatch CommerceStoreCategoryTranslationBatch?      @relation("CommerceStoreCategoryTranslationItemCurrentBatch", fields: [currentBatchId], references: [id], onDelete: SetNull, onUpdate: Restrict)
   batchItems   CommerceStoreCategoryTranslationBatchItem[]
 
   @@unique([runId, sourceEntityKind, sourceEntityId, sourceField, targetLanguageTag])
@@ -2906,29 +3000,29 @@ model CommerceStoreCategoryTranslationItem {
 }
 
 model CommerceStoreCategoryTranslationBatch {
-  id                   String                                      @id @default(cuid()) @db.Text
-  runId                String                                      @db.Text
-  provider             String                                      @db.VarChar(64)
-  model                String                                      @db.VarChar(255)
-  status               CommerceStoreCategoryTranslationBatchStatus @default(READY)
-  providerBatchId      String?                                     @db.Text
-  inputFileId          String?                                     @db.Text
-  outputFileId         String?                                     @db.Text
-  errorFileId          String?                                     @db.Text
-  submissionStartedAt  DateTime?                                   @db.Timestamptz(3)
-  lastSubmitAttemptAt  DateTime?                                   @db.Timestamptz(3)
-  submitAttemptCount   Int                                         @default(0)
-  nextSubmitAt         DateTime?                                   @db.Timestamptz(3)
-  submittedAt          DateTime?                                   @db.Timestamptz(3)
-  lastPolledAt         DateTime?                                   @db.Timestamptz(3)
-  nextPollAt           DateTime?                                   @db.Timestamptz(3)
-  pollSequence         Int                                         @default(0)
-  completedAt          DateTime?                                   @db.Timestamptz(3)
-  failureCode          String?                                     @db.VarChar(128)
-  createdAt            DateTime                                    @default(now()) @db.Timestamptz(3)
-  updatedAt            DateTime                                    @default(now()) @updatedAt @db.Timestamptz(3)
+  id                  String                                      @id @default(cuid()) @db.Text
+  runId               String                                      @db.Text
+  provider            String                                      @db.VarChar(64)
+  model               String                                      @db.VarChar(255)
+  status              CommerceStoreCategoryTranslationBatchStatus @default(READY)
+  providerBatchId     String?                                     @db.Text
+  inputFileId         String?                                     @db.Text
+  outputFileId        String?                                     @db.Text
+  errorFileId         String?                                     @db.Text
+  submissionStartedAt DateTime?                                   @db.Timestamptz(3)
+  lastSubmitAttemptAt DateTime?                                   @db.Timestamptz(3)
+  submitAttemptCount  Int                                         @default(0)
+  nextSubmitAt        DateTime?                                   @db.Timestamptz(3)
+  submittedAt         DateTime?                                   @db.Timestamptz(3)
+  lastPolledAt        DateTime?                                   @db.Timestamptz(3)
+  nextPollAt          DateTime?                                   @db.Timestamptz(3)
+  pollSequence        Int                                         @default(0)
+  completedAt         DateTime?                                   @db.Timestamptz(3)
+  failureCode         String?                                     @db.VarChar(128)
+  createdAt           DateTime                                    @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                                    @default(now()) @updatedAt @db.Timestamptz(3)
 
-  run          CommerceStoreCategoryTranslationRun        @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  run          CommerceStoreCategoryTranslationRun         @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   currentItems CommerceStoreCategoryTranslationItem[]      @relation("CommerceStoreCategoryTranslationItemCurrentBatch")
   items        CommerceStoreCategoryTranslationBatchItem[]
 
@@ -2940,11 +3034,11 @@ model CommerceStoreCategoryTranslationBatch {
 }
 
 model CommerceStoreCategoryTranslationBatchItem {
-  id                String                               @id @default(cuid()) @db.Text
-  batchId           String                               @db.Text
-  translationItemId String                               @db.Text
-  providerCustomId  String                               @unique @db.VarChar(255)
-  createdAt         DateTime                             @default(now()) @db.Timestamptz(3)
+  id                String   @id @default(cuid()) @db.Text
+  batchId           String   @db.Text
+  translationItemId String   @db.Text
+  providerCustomId  String   @unique @db.VarChar(255)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
 
   batch           CommerceStoreCategoryTranslationBatch @relation(fields: [batchId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   translationItem CommerceStoreCategoryTranslationItem  @relation(fields: [translationItemId], references: [id], onDelete: Cascade, onUpdate: Restrict)
