@@ -368,6 +368,7 @@ model RecoveryOutreachAttempt {
 
   checkoutRecoveryId String
   checkoutRecovery   CheckoutRecovery        @relation(fields: [checkoutRecoveryId], references: [id], onDelete: Cascade)
+  recipient          String                  @db.VarChar(64)
   sequence           Int
   trigger            RecoveryOutreachTrigger
   status             RecoveryOutreachStatus  @default(PENDING)

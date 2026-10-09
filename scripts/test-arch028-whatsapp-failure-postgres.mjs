@@ -109,6 +109,21 @@ expectRejected('duplicate recipient within one Shop rejected', `INSERT INTO what
 expectRejected('non-digit recipient rejected', `INSERT INTO whatsapp."WhatsAppRecipientReachability" ("id","shopId","recipient","updatedAt") VALUES ('arch028-reach-invalid','arch028-shop-a','+15551234567',CURRENT_TIMESTAMP);`);
 expectRejected('empty recipient rejected', `INSERT INTO whatsapp."WhatsAppRecipientReachability" ("id","shopId","recipient","updatedAt") VALUES ('arch028-reach-empty','arch028-shop-a','',CURRENT_TIMESTAMP);`);
 expectRejected('recipient longer than 64 digits rejected', `INSERT INTO whatsapp."WhatsAppRecipientReachability" ("id","shopId","recipient","updatedAt") VALUES ('arch028-reach-too-long','arch028-shop-a',repeat('1',65),CURRENT_TIMESTAMP);`, '22001');
+function outreachAttemptSql(id, recipientValue = null) {
+  const recoveryId = `${id}-recovery`;
+  return `INSERT INTO commerce."CheckoutRecovery" ("id","shopId","checkoutToken","lastExternalActivityAt","updatedAt")
+    VALUES ('${recoveryId}','arch028-shop-a','${recoveryId}-token',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+    INSERT INTO commerce."RecoveryOutreachAttempt" ("id","checkoutRecoveryId","sequence","trigger","configuredOfferMode"${recipientValue === null ? '' : ',"recipient"'},"updatedAt")
+    VALUES ('${id}','${recoveryId}',1,'INITIAL','NONE'${recipientValue === null ? '' : `,${recipientValue}`},CURRENT_TIMESTAMP);`;
+}
+psql(outreachAttemptSql('arch028-attempt-recipient-1', "'1'"));
+psql(outreachAttemptSql('arch028-attempt-recipient-64', `repeat('1',64)`));
+console.log('PASS outreach attempt accepts canonical recipient lengths 1 and 64');
+expectRejected('outreach attempt recipient is required', outreachAttemptSql('arch028-attempt-recipient-required'), '23502');
+expectRejected('outreach attempt rejects empty recipient', outreachAttemptSql('arch028-attempt-recipient-empty', "''"));
+expectRejected('outreach attempt rejects non-digit recipient', outreachAttemptSql('arch028-attempt-recipient-invalid', "'+15551234567'"));
+expectRejected('outreach attempt rejects trailing newline recipient', outreachAttemptSql('arch028-attempt-recipient-newline', "E'15551234567\\n'"));
+expectRejected('outreach attempt rejects recipient longer than 64 digits', outreachAttemptSql('arch028-attempt-recipient-too-long', `repeat('1',65)`), '22001');
 expectRejected('suppression without failure evidence rejected', `INSERT INTO whatsapp."WhatsAppRecipientReachability" ("id","shopId","recipient","suppressUntil","updatedAt") VALUES ('arch028-reach-no-evidence','arch028-shop-a','15550000001',CURRENT_TIMESTAMP + INTERVAL '1 day',CURRENT_TIMESTAMP);`);
 expectRejected('suppression not later than failure rejected', `INSERT INTO whatsapp."WhatsAppRecipientReachability" ("id","shopId","recipient","lastFailureAt","suppressUntil","updatedAt") VALUES ('arch028-reach-expired','arch028-shop-a','15550000002',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);`);
 expectRejected('whitespace-only failure code rejected', `INSERT INTO whatsapp."WhatsAppRecipientReachability" ("id","shopId","recipient","lastProviderFailureCode","lastFailureAt","updatedAt") VALUES ('arch028-reach-empty-code','arch028-shop-a','15550000003','   ',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);`);

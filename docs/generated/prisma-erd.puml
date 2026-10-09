@@ -222,6 +222,14 @@ enum "BillingOperationState" as BillingOperationState {
   OUTCOME_UNKNOWN
   FAILED
 }
+enum "UsageReservationCompensationReason" as UsageReservationCompensationReason {
+  WHATSAPP_RECIPIENT_UNDELIVERABLE
+}
+enum "UsageReservationCompensationDisposition" as UsageReservationCompensationDisposition {
+  RESTORED_SPENDABLE
+  HELD_FOR_REFUND
+  HISTORICAL_ONLY
+}
 enum "PromotionTargetScope" as PromotionTargetScope {
   GLOBAL
   PLAN
@@ -695,6 +703,7 @@ entity "RecoveryOutreachAttempt" as RecoveryOutreachAttempt {
 + id [PK] : String
 --
   # checkoutRecoveryId : [FK] CheckoutRecovery
+  * recipient : String
   * sequence : Int
   * trigger : RecoveryOutreachTrigger
   * status : RecoveryOutreachStatus
