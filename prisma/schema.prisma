@@ -1858,8 +1858,84 @@ model WooCommerceInstallation {
   revokedAt          DateTime?                     @db.Timestamptz(3)
   createdAt          DateTime                      @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime                      @default(now()) @updatedAt @db.Timestamptz(3)
+  restReadGrant      WooCommerceRestReadGrant?
+  restReadAttempts   WooCommerceRestReadAttempt[]
 
+  // Required for shop-bound composite foreign keys on the outgoing REST grant.
+  @@unique([id, shopId], map: "WooCommerceInstallation_id_shopId_key")
   @@index([status, shopId], map: "WooCommerceInstallation_status_shopId_idx")
+  @@schema("woocommerce")
+}
+
+// Credentials for Moda -> WooCommerce wc/v3 reads. This is independent of the
+// inbound Woo plugin -> Moda credentialDigest on WooCommerceInstallation.
+enum WooCommerceRestReadGrantStatus {
+  ACTIVE
+  INVALID
+  REVOKED
+
+  @@schema("woocommerce")
+}
+
+enum WooCommerceRestReadAttemptStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+
+  @@schema("woocommerce")
+}
+
+model WooCommerceRestReadAttempt {
+  id                        String                               @id @default(cuid()) @db.Text
+  installationId            String                               @db.Text
+  shopId                    String                               @db.Text
+  installation              WooCommerceInstallation              @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Cascade, onUpdate: Restrict)
+  tokenDigest               Bytes                                @unique(map: "WooCommerceRestReadAttempt_tokenDigest_key")
+  attemptSequence           BigInt                               @unique(map: "WooCommerceRestReadAttempt_attemptSequence_key") @default(autoincrement())
+  credentialVersionSnapshot Int
+  status                    WooCommerceRestReadAttemptStatus     @default(PENDING)
+  expiresAt                 DateTime                             @db.Timestamptz(3)
+  consumedAt                DateTime?                            @db.Timestamptz(3)
+  consumptionTransactionId  BigInt?
+  failureCode               String?                              @db.VarChar(64)
+  createdAt                 DateTime                             @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime                             @default(now()) @updatedAt @db.Timestamptz(3)
+  authorisedGrant           WooCommerceRestReadGrant?
+
+  @@index([installationId, status, expiresAt], map: "WooCommerceRestReadAttempt_installation_pending_idx")
+  @@index([createdAt], map: "WooCommerceRestReadAttempt_createdAt_idx")
+  @@schema("woocommerce")
+}
+
+model WooCommerceRestReadGrant {
+  id                            String                         @id @default(cuid()) @db.Text
+  installationId                String                         @unique(map: "WooCommerceRestReadGrant_installationId_key") @db.Text
+  shopId                        String                         @db.Text
+  installation                  WooCommerceInstallation        @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Cascade, onUpdate: Restrict)
+  authorizationAttemptId        String                         @unique(map: "WooCommerceRestReadGrant_authorizationAttemptId_key") @db.Text
+  authorizationAttempt          WooCommerceRestReadAttempt     @relation(fields: [authorizationAttemptId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  authorizationAttemptSequence  BigInt
+  credentialVersionSnapshot     Int
+  rotationVersion               Int                            @default(1)
+  status                        WooCommerceRestReadGrantStatus @default(ACTIVE)
+  // A single AEAD ciphertext contains both Woo consumer key and consumer secret.
+  credentialCiphertext          Bytes
+  credentialNonce               Bytes
+  credentialAuthTag             Bytes
+  encryptionKeyId               String                         @db.VarChar(128)
+  providerKeyId                 String                         @db.VarChar(128)
+  authorizedScope               String                         @db.VarChar(16)
+  verifiedAt                    DateTime                       @db.Timestamptz(3)
+  grantedAt                     DateTime                       @default(now()) @db.Timestamptz(3)
+  revokedAt                     DateTime?                      @db.Timestamptz(3)
+  invalidatedAt                 DateTime?                      @db.Timestamptz(3)
+  createdAt                     DateTime                       @default(now()) @db.Timestamptz(3)
+  updatedAt                     DateTime                       @default(now()) @updatedAt @db.Timestamptz(3)
+
+  // Prisma requires the full defining-side key of a composite 1:1 relation to be unique.
+  // installationId remains independently unique: exactly one grant per installation.
+  @@unique([installationId, shopId], map: "WooCommerceRestReadGrant_installationId_shopId_key")
+  @@index([shopId, status], map: "WooCommerceRestReadGrant_shop_status_idx")
   @@schema("woocommerce")
 }
 
