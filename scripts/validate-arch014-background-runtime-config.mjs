@@ -237,7 +237,7 @@ for (const field of Object.keys(configFields).filter((field) => field.endsWith("
 expect(configModel.includes("translationResultRetrySeconds") && configModel.includes("translationPollIntervalSeconds"), "translation retry/poll fields are missing");
 expect(configModel.indexOf("translationResultRetrySeconds") !== configModel.indexOf("translationPollIntervalSeconds"), "translation retry/poll fields are not distinct");
 for (const model of ["BackgroundRuntimeConfig", "BackgroundRuntimeConfigAuditEvent", "BackgroundRuntimeLease"]) {
-  expect(erd.includes(`entity \"${model}\"`), `ERD is missing ${model}`);
+  expect(erd.includes(`entity "${model}"`), `ERD is missing ${model}`);
 }
 expect(
   cadenceMigration.replace(/\s+/g, " ").trim() ===
@@ -259,7 +259,7 @@ for (const table of [
   "Shop",
   "WhatsApp",
 ]) {
-  expect(!cadenceMigration.includes(`\"${table}\"`), `cadence migration must not alter ${table}`);
+  expect(!cadenceMigration.includes(`"${table}"`), `cadence migration must not alter ${table}`);
 }
 expect(!/DEFAULT|NOT NULL|INSERT|UPDATE|CREATE INDEX|CREATE UNIQUE INDEX|SEED|BACKFILL/i.test(cadenceMigration), "cadence migration must not add defaults, backfills, seeds, or indexes");
 expect(erd.includes("lastFinishedAt : DateTime"), "ERD is missing BackgroundRuntimeLease.lastFinishedAt");

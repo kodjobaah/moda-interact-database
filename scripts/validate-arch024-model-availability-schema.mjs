@@ -51,7 +51,7 @@ for (const action of [
 ]) assert.match(schema, new RegExp(`^\\s*${action}\\s*$`, 'm'), `${action} missing`);
 
 for (const table of ['CommerceModelAvailability', 'CommerceOpenRouterCredential']) {
-  assert.match(migration, new RegExp(`CREATE TABLE "commerce"\."${table}"`), `${table} migration missing`);
+  assert.match(migration, new RegExp(`CREATE TABLE "commerce"\\."${table}"`), `${table} migration missing`);
   assert.match(erd, new RegExp(`entity "${table}"`), `${table} missing from generated ERD`);
 }
 assert.match(migration, /'arch024-platform-model-availability', 'PLATFORM', NULL, true, 1, NULL, NULL[\s\S]*?ON CONFLICT \("id"\) DO NOTHING/);
