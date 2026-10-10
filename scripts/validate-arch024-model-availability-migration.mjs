@@ -7,7 +7,6 @@ import {PrismaClient} from '@prisma/client';
 
 const root = new URL('..', import.meta.url);
 const migrationName = '20260930120000_arch024_model_availability_openrouter';
-const migrationPath = `prisma/migrations/${migrationName}/migration.sql`;
 const migrationDirectory = new URL('../prisma/migrations/', import.meta.url);
 const migrationNames = readdirSync(migrationDirectory).filter(name => name !== 'migration_lock.toml').sort();
 const requestedModeIndex = process.argv.indexOf('--mode');
@@ -39,7 +38,7 @@ const migrate = (url, schemaPath) => {
   } catch (error) {
     if (error.stdout) console.error(String(error.stdout).replaceAll(url, '[isolated test URL]'));
     if (error.stderr) console.error(String(error.stderr).replaceAll(url, '[isolated test URL]'));
-    throw new Error(`Prisma migration deploy failed for the isolated ${schemaPath.includes(migrationName) ? 'ARCH-024 target' : 'schema'} rehearsal`);
+    throw new Error(`Prisma migration deploy failed for the isolated ${schemaPath.includes(migrationName) ? 'ARCH-024 target' : 'schema'} rehearsal`, {cause: error});
   }
 };
 

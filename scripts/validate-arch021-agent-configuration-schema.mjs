@@ -7,7 +7,7 @@ const sql = read('prisma/migrations/20260923150000_arch021_agent_configuration/m
 const erd = read('docs/generated/prisma-erd.puml');
 assert.equal((sql.match(/CREATE TABLE "commerce"\."Commerce/g) || []).length, 10);
 assert.equal((sql.match(/CREATE TYPE "commerce"\."Commerce(ModelProvider|AgentPromptScope|PromptRevisionStatus)"/g) || []).length, 3);
-for (const name of tables) { assert.match(schema, new RegExp(`model ${name} \\{`), `${name} missing from Prisma schema`); assert.match(sql, new RegExp(`CREATE TABLE "commerce"\."${name}"`)); assert.match(erd, new RegExp(`entity "${name}"`)); for (const field of requiredFields[name]) assert.match(schema, new RegExp(`^\\s*${field}\\s`, 'm'), `${name}.${field} missing`); }
+for (const name of tables) { assert.match(schema, new RegExp(`model ${name} \\{`), `${name} missing from Prisma schema`); assert.match(sql, new RegExp(`CREATE TABLE "commerce"\\."${name}"`)); assert.match(erd, new RegExp(`entity "${name}"`)); for (const field of requiredFields[name]) assert.match(schema, new RegExp(`^\\s*${field}\\s`, 'm'), `${name}.${field} missing`); }
 for (const name of enums) assert.match(schema, new RegExp(`enum ${name} \\{`));
 for (const action of auditActions) assert.match(schema, new RegExp(`^\\s*${action}\\s*$`, 'm'));
 for (const name of ['CommerceAgentPrompt_one_platform_idx','CommerceAgentPrompt_one_shop_idx',...checkNames]) assert.match(sql, new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${name} missing`);

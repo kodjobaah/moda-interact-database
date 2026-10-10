@@ -41,7 +41,7 @@ function preflight() {
   assert.match(migrationSql, /ORDER BY revision\."revisionNumber" DESC/);
   assert.match(migrationSql, /status" = 'PUBLISHED'/);
   assert.match(migrationSql, /operationId" = "id"/);
-  for (const table of ['CommercePlatformModelSelection', 'CommerceShopModelSelection', 'CommercePlatformPromptPointer', 'CommerceShopPromptPointer', 'CommercePromptTemplateRevision']) assert.equal((migrationSql.match(new RegExp(`DROP TABLE "commerce"\."${table}"`, 'g')) || []).length, 1);
+  for (const table of ['CommercePlatformModelSelection', 'CommerceShopModelSelection', 'CommercePlatformPromptPointer', 'CommerceShopPromptPointer', 'CommercePromptTemplateRevision']) assert.equal((migrationSql.match(new RegExp(`DROP TABLE "commerce"\\."${table}"`, 'g')) || []).length, 1);
   assert.doesNotMatch(migrationSql, /DROP TABLE "commerce"\."(CommerceModelCatalogueEntry|CommercePromptTemplateCategory|CommercePromptTemplate|CommerceAgentPrompt|CommerceAgentPromptRevision|CommerceAuditEvent)"/);
   assert.match(migrationSql, /CommerceAgentConfiguration_guard_trigger/);
   assert.match(migrationSql, /CommerceStudioMerchantAccess_identity_guard_trigger/);
