@@ -271,6 +271,7 @@ enum CheckoutRecoveryStatus {
 
 enum RecoveryAdmissionBlockReason {
   RECOVERY_CAPACITY_EXHAUSTED
+  WHATSAPP_RECIPIENT_SUPPRESSED
 
   @@schema("commerce")
 }
@@ -367,6 +368,7 @@ model RecoveryOutreachAttempt {
 
   checkoutRecoveryId String
   checkoutRecovery   CheckoutRecovery        @relation(fields: [checkoutRecoveryId], references: [id], onDelete: Cascade)
+  recipient          String                  @db.VarChar(64)
   sequence           Int
   trigger            RecoveryOutreachTrigger
   status             RecoveryOutreachStatus  @default(PENDING)
@@ -546,13 +548,35 @@ model ConversationMessage {
 
   recoveryOutreachAttempt RecoveryOutreachAttempt?
 
-  sentAt      DateTime?
-  deliveredAt DateTime?
-  readAt      DateTime?
+  sentAt              DateTime?
+  deliveredAt         DateTime?
+  readAt              DateTime?
+  providerFailureCode String?   @db.VarChar(64)
+  failedAt            DateTime?
 
   @@index([conversationId, createdAt])
   @@index([conversationId, createdAt, id])
   @@index([inReplyToProviderId])
+  @@schema("whatsapp")
+}
+
+model WhatsAppRecipientReachability {
+  id String @id @default(cuid())
+
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  recipient               String    @db.VarChar(64)
+  lastProviderFailureCode String?   @db.VarChar(64)
+  lastFailureAt           DateTime?
+  suppressUntil           DateTime?
+  lastSuccessfulAt        DateTime?
+  version                 Int       @default(0)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@unique([shopId, recipient])
+  @@index([shopId, suppressUntil])
   @@schema("whatsapp")
 }
 
@@ -779,6 +803,53 @@ enum BillingOperationState {
   @@schema("billing")
 }
 
+enum MerchantPricingTranslationRunStatus {
+  PENDING
+  PROCESSING
+  READY_TO_APPLY
+  APPLIED
+  FAILED
+  STALE
+
+  @@schema("billing")
+}
+
+enum MerchantPricingTranslationEntityKind {
+  PLAN
+  HIGHLIGHT
+
+  @@schema("billing")
+}
+
+enum MerchantPricingTranslationField {
+  TITLE
+  DESCRIPTION
+
+  @@schema("billing")
+}
+
+enum MerchantPricingTranslationItemStatus {
+  PENDING
+  AVAILABLE
+  FAILED
+
+  @@schema("billing")
+}
+
+enum MerchantPricingTranslationBatchStatus {
+  READY
+  SUBMITTING
+  SUBMISSION_UNKNOWN
+  SUBMITTED
+  PROVIDER_COMPLETED
+  COMPLETED
+  FAILED
+  EXPIRED
+  CANCELLED
+
+  @@schema("billing")
+}
+
 model MerchantPricingPlan {
   id                String @id @default(cuid())
   shopifyPlanHandle String @unique
@@ -864,6 +935,117 @@ model MerchantPricingPlanHighlightTranslation {
   updatedAt DateTime @updatedAt
 
   @@unique([merchantPricingPlanHighlightId, locale])
+  @@schema("billing")
+}
+
+model MerchantPricingTranslationRun {
+  id                              String                              @id @default(cuid()) @db.Text
+  shopifyPlanHandle               String                              @db.Text
+  environment                     CommerceEnvironment
+  translationModelConfigurationId String                              @db.Text
+  provider                        String                              @db.VarChar(64)
+  providerModelId                 String                              @db.VarChar(255)
+  modelConfigurationVersion       Int
+  sourceSchemaVersion             Int                                 @default(1)
+  sourceHash                      String                              @db.VarChar(64)
+  sourceSnapshot                  Json                                @db.JsonB
+  status                          MerchantPricingTranslationRunStatus @default(PENDING)
+  requestedByAdminId              String                              @db.Text
+  requestedAt                     DateTime                            @default(now()) @db.Timestamptz(3)
+  startedAt                       DateTime?                           @db.Timestamptz(3)
+  readyToApplyAt                  DateTime?                           @db.Timestamptz(3)
+  appliedAt                       DateTime?                           @db.Timestamptz(3)
+  completedAt                     DateTime?                           @db.Timestamptz(3)
+  appliedMerchantPricingPlanId    String?                             @db.Text
+  failureCode                     String?                             @db.VarChar(128)
+  createdAt                       DateTime                            @default(now()) @db.Timestamptz(3)
+  updatedAt                       DateTime                            @default(now()) @updatedAt @db.Timestamptz(3)
+
+  translationModel CommerceTranslationModelConfiguration @relation(fields: [translationModelConfigurationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  requestedBy      PlatformAdmin                         @relation("MerchantPricingTranslationRunRequester", fields: [requestedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  items            MerchantPricingTranslationItem[]
+  batches          MerchantPricingTranslationBatch[]
+
+  @@index([shopifyPlanHandle, status, requestedAt], map: "MerchantPricingTranslationRun_handle_status_requested_idx")
+  @@index([status, requestedAt], map: "MerchantPricingTranslationRun_status_requested_idx")
+  @@index([translationModelConfigurationId, requestedAt], map: "MerchantPricingTranslationRun_model_requested_idx")
+  @@schema("billing")
+}
+
+model MerchantPricingTranslationItem {
+  id                String                               @id @default(cuid()) @db.Text
+  runId             String                               @db.Text
+  sourceEntityKind  MerchantPricingTranslationEntityKind
+  sourceContentKey  String?                              @db.Uuid
+  sourceField       MerchantPricingTranslationField
+  sourceLanguageTag String                               @db.VarChar(16)
+  targetLanguageTag String                               @db.VarChar(16)
+  sourceText        String                               @db.Text
+  translatedText    String?                              @db.Text
+  status            MerchantPricingTranslationItemStatus @default(PENDING)
+  failureCode       String?                              @db.VarChar(128)
+  retryCount        Int                                  @default(0)
+  nextAttemptAt     DateTime?                            @db.Timestamptz(3)
+  currentBatchId    String?                              @db.Text
+  completedAt       DateTime?                            @db.Timestamptz(3)
+  createdAt         DateTime                             @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime                             @default(now()) @updatedAt @db.Timestamptz(3)
+
+  run          MerchantPricingTranslationRun         @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  currentBatch MerchantPricingTranslationBatch?      @relation("MerchantPricingTranslationItemCurrentBatch", fields: [currentBatchId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  batchItems   MerchantPricingTranslationBatchItem[]
+
+  @@index([status, currentBatchId, nextAttemptAt, createdAt], map: "MerchantPricingTranslationItem_status_batch_retry_idx")
+  @@index([runId, targetLanguageTag], map: "MerchantPricingTranslationItem_run_locale_idx")
+  @@schema("billing")
+}
+
+model MerchantPricingTranslationBatch {
+  id                  String                                @id @default(cuid()) @db.Text
+  runId               String                                @db.Text
+  provider            String                                @db.VarChar(64)
+  model               String                                @db.VarChar(255)
+  status              MerchantPricingTranslationBatchStatus @default(READY)
+  providerBatchId     String?                               @db.Text
+  inputFileId         String?                               @db.Text
+  outputFileId        String?                               @db.Text
+  errorFileId         String?                               @db.Text
+  submissionStartedAt DateTime?                             @db.Timestamptz(3)
+  lastSubmitAttemptAt DateTime?                             @db.Timestamptz(3)
+  submitAttemptCount  Int                                   @default(0)
+  nextSubmitAt        DateTime?                             @db.Timestamptz(3)
+  submittedAt         DateTime?                             @db.Timestamptz(3)
+  lastPolledAt        DateTime?                             @db.Timestamptz(3)
+  nextPollAt          DateTime?                             @db.Timestamptz(3)
+  pollSequence        Int                                   @default(0)
+  completedAt         DateTime?                             @db.Timestamptz(3)
+  failureCode         String?                               @db.VarChar(128)
+  createdAt           DateTime                              @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                              @default(now()) @updatedAt @db.Timestamptz(3)
+
+  run          MerchantPricingTranslationRun        @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  currentItems MerchantPricingTranslationItem[]      @relation("MerchantPricingTranslationItemCurrentBatch")
+  items        MerchantPricingTranslationBatchItem[]
+
+  @@unique([provider, providerBatchId], map: "MerchantPricingTranslationBatch_provider_batch_key")
+  @@index([runId, status, createdAt], map: "MerchantPricingTranslationBatch_run_status_created_idx")
+  @@index([status, nextSubmitAt, createdAt], map: "MerchantPricingTranslationBatch_submit_due_idx")
+  @@index([status, nextPollAt, createdAt], map: "MerchantPricingTranslationBatch_poll_due_idx")
+  @@schema("billing")
+}
+
+model MerchantPricingTranslationBatchItem {
+  id                String   @id @default(cuid()) @db.Text
+  batchId           String   @db.Text
+  translationItemId String   @db.Text
+  providerCustomId  String   @unique(map: "MerchantPricingTranslationBatchItem_custom_id_key") @db.VarChar(255)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+
+  batch           MerchantPricingTranslationBatch @relation(fields: [batchId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  translationItem MerchantPricingTranslationItem  @relation(fields: [translationItemId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+
+  @@unique([batchId, translationItemId], map: "MerchantPricingTranslationBatchItem_batch_item_key")
+  @@index([translationItemId, createdAt], map: "MerchantPricingTranslationBatchItem_item_created_idx")
   @@schema("billing")
 }
 
@@ -1134,6 +1316,7 @@ model UsageEvent {
   correctionOfUsageEvent   UsageEvent?       @relation("UsageEventCorrection", fields: [correctionOfUsageEventId], references: [id], onDelete: SetNull)
   corrections              UsageEvent[]      @relation("UsageEventCorrection")
   committedReservation     UsageReservation? @relation("CommittedReservation")
+  compensatedReservation   UsageReservation? @relation("CompensatedReservation")
 
   sourceType String?
   sourceId   String?
@@ -1295,6 +1478,12 @@ model UsageReservation {
   committedUsageEventId String?     @unique
   committedUsageEvent   UsageEvent? @relation("CommittedReservation", fields: [committedUsageEventId], references: [id], onDelete: SetNull)
 
+  compensationUsageEventId String?                                  @unique
+  compensationUsageEvent   UsageEvent?                              @relation("CompensatedReservation", fields: [compensationUsageEventId], references: [id], onDelete: Restrict)
+  compensationReason       UsageReservationCompensationReason?
+  compensationDisposition  UsageReservationCompensationDisposition?
+  compensatedAt            DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1310,19 +1499,34 @@ model UsageReservation {
 model PlatformBillingPolicy {
   id String @id @default("default")
 
-  globalPauseNewRecoveries      Boolean @default(false)
-  globalPauseAutomatedWhatsapp  Boolean @default(false)
-  lifetimeFreeRecoveryAllowance Int     @default(5)
-  minimumUpgradePremiumBps      Int     @default(2000)
-  absoluteOutboundHardLimit     Int
-  defaultWarningPercent         Int
-  defaultOutboundSoftLimit      Int     @default(1000)
-  defaultOutboundHardLimit      Int     @default(2000)
-  terminalMessageReservedSlots  Int     @default(1)
-  version                       Int     @default(0)
+  globalPauseNewRecoveries         Boolean @default(false)
+  globalPauseAutomatedWhatsapp     Boolean @default(false)
+  lifetimeFreeRecoveryAllowance    Int     @default(5)
+  minimumUpgradePremiumBps         Int     @default(2000)
+  absoluteOutboundHardLimit        Int
+  defaultWarningPercent            Int
+  defaultOutboundSoftLimit         Int     @default(1000)
+  defaultOutboundHardLimit         Int     @default(2000)
+  terminalMessageReservedSlots     Int     @default(1)
+  whatsappRecipientSuppressionDays Int     @default(7)
+  version                          Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@schema("billing")
+}
+
+enum UsageReservationCompensationReason {
+  WHATSAPP_RECIPIENT_UNDELIVERABLE
+
+  @@schema("billing")
+}
+
+enum UsageReservationCompensationDisposition {
+  RESTORED_SPENDABLE
+  HELD_FOR_REFUND
+  HISTORICAL_ONLY
 
   @@schema("billing")
 }
@@ -1624,6 +1828,7 @@ model Shop {
   recoveryPolicyOverrideAuditEvents ShopRecoveryPolicyOverrideAuditEvent[]
   featurePreferences                ShopFeaturePreference[]
   whatsappTemplateVariants          WhatsAppTemplateVariant[]
+  whatsappRecipientReachability     WhatsAppRecipientReachability[]
   merchantSupportThread             MerchantSupportThread?
 
   // Commerce domain
@@ -1883,6 +2088,7 @@ model PlatformAdmin {
   createdCommerceTranslationModelConfigurations CommerceTranslationModelConfiguration[] @relation("CommerceTranslationModelConfigurationCreator")
   updatedCommerceTranslationModelConfigurations CommerceTranslationModelConfiguration[] @relation("CommerceTranslationModelConfigurationUpdater")
   requestedCommerceStoreCategoryTranslationRuns CommerceStoreCategoryTranslationRun[]   @relation("CommerceStoreCategoryTranslationRunRequester")
+  requestedMerchantPricingTranslationRuns        MerchantPricingTranslationRun[]         @relation("MerchantPricingTranslationRunRequester")
   createdCommercePromptTemplateCategories       CommercePromptTemplateCategory[]        @relation("CommercePromptTemplateCategoryCreator")
   updatedCommercePromptTemplateCategories       CommercePromptTemplateCategory[]        @relation("CommercePromptTemplateCategoryUpdater")
   createdCommercePromptTemplates                CommercePromptTemplate[]                @relation("CommercePromptTemplateCreator")
@@ -2731,6 +2937,7 @@ model CommerceTranslationModelConfiguration {
   providerModelId  String              @db.VarChar(255)
   displayName      String              @db.VarChar(255)
   enabled          Boolean             @default(true)
+  automaticDefault Boolean             @default(false)
   editVersion      Int                 @default(1)
   createdByAdminId String              @db.Text
   updatedByAdminId String              @db.Text
@@ -2740,8 +2947,9 @@ model CommerceTranslationModelConfiguration {
   credential  CommerceTranslationProviderCredential @relation("CommerceTranslationModelCredential", fields: [environment, provider], references: [environment, provider], onDelete: Restrict, onUpdate: Restrict)
   createdBy   PlatformAdmin                         @relation("CommerceTranslationModelConfigurationCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   updatedBy   PlatformAdmin                         @relation("CommerceTranslationModelConfigurationUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  runs        CommerceStoreCategoryTranslationRun[]
-  auditEvents CommerceAuditEvent[]
+  runs                       CommerceStoreCategoryTranslationRun[]
+  merchantPricingTranslationRuns MerchantPricingTranslationRun[]
+  auditEvents                CommerceAuditEvent[]
 
   @@unique([environment, provider, providerModelId])
   @@unique([environment, displayName])

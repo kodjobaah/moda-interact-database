@@ -49,6 +49,9 @@
     "test:arch027-woocommerce-billing-schema": "node scripts/validate-arch027-woocommerce-billing-schema.mjs",
     "test:arch027-woocommerce-billing-migration": "node scripts/validate-arch027-woocommerce-billing-migration.mjs",
     "test:arch027-woocommerce-billing:postgres": "node scripts/test-arch027-woocommerce-billing-postgres.mjs",
+    "test:arch028-whatsapp-failure-schema": "node scripts/validate-arch028-whatsapp-failure-schema.mjs",
+    "test:arch028-whatsapp-failure:postgres": "node scripts/test-arch028-whatsapp-failure-postgres.mjs",
+    "test:arch028-recovery-outreach-recipient": "node scripts/validate-arch028-recovery-outreach-recipient.mjs",
     "test:arch026-shared-international-context-schema": "node scripts/validate-arch026-shared-international-context-schema.mjs",
     "test:arch026-shared-international-context-migration": "node scripts/validate-arch026-shared-international-context-migration.mjs",
     "test:arch026-shared-international-context-migration:fresh": "node scripts/test-arch026-shared-international-context-postgres.mjs --mode fresh",
@@ -59,7 +62,10 @@
     "test:arch029-store-category-localisation": "node scripts/validate-arch029-store-category-localisation.mjs",
     "test:arch029-translation-runtime": "node scripts/validate-arch029-translation-runtime.mjs",
     "test:arch029-prompt-revision-provenance": "node scripts/validate-arch029-prompt-revision-provenance.mjs",
-    "test:arch030-commerce-capability-shop-platform": "node scripts/validate-arch030-commerce-capability-shop-platform.mjs"
+    "test:arch030-commerce-capability-shop-platform": "node scripts/validate-arch030-commerce-capability-shop-platform.mjs",
+    "test:arch031-automatic-merchant-pricing-translation-state": "node scripts/validate-arch031-automatic-merchant-pricing-translation-state.mjs",
+    "test:arch031-automatic-merchant-pricing-translation-state:postgres:fresh": "node scripts/test-arch031-automatic-merchant-pricing-translation-state-postgres.mjs --mode fresh",
+    "test:arch031-automatic-merchant-pricing-translation-state:postgres:upgrade": "node scripts/test-arch031-automatic-merchant-pricing-translation-state-postgres.mjs --mode upgrade"
   },
   "keywords": [],
   "author": "",
