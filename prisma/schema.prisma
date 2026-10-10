@@ -763,6 +763,14 @@ enum MerchantPricingPlanKind {
   @@schema("billing")
 }
 
+enum MerchantPricingPlanPublicationStatus {
+  TRANSLATING
+  TRANSLATION_FAILED
+  READY
+
+  @@schema("billing")
+}
+
 enum MerchantPricingAllowancePeriod {
   LIFETIME
   EVERY_30_DAYS
@@ -857,6 +865,8 @@ model MerchantPricingPlan {
   displayName                        String
   planKind                           MerchantPricingPlanKind
   isActive                           Boolean                        @default(true)
+  publicationStatus                  MerchantPricingPlanPublicationStatus @default(READY)
+  currentTranslationRunId            String?                        @unique(map: "MerchantPricingPlan_current_translation_run_key") @db.Text
   cataloguePosition                  Int
   featured                           Boolean                        @default(false)
   includedRecoveryCredits            Int
@@ -879,12 +889,14 @@ model MerchantPricingPlan {
   billingOperations BillingOperation[]
   highlights        MerchantPricingPlanHighlight[]
   features          MerchantPricingPlanFeature[]
-  commerceModel     CommerceModelCatalogueEntry?     @relation("MerchantPricingPlanCommerceModel", fields: [commerceModelId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  commerceModel         CommerceModelCatalogueEntry?       @relation("MerchantPricingPlanCommerceModel", fields: [commerceModelId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  currentTranslationRun MerchantPricingTranslationRun?      @relation("MerchantPricingPlanCurrentTranslationRun", fields: [currentTranslationRunId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([isActive, cataloguePosition])
+  @@index([publicationStatus, isActive, cataloguePosition], map: "MerchantPricingPlan_publication_active_position_idx")
   @@index([planKind, isActive])
   @@index([commerceModelId])
   @@schema("billing")
@@ -965,6 +977,7 @@ model MerchantPricingTranslationRun {
   requestedBy      PlatformAdmin                         @relation("MerchantPricingTranslationRunRequester", fields: [requestedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   items            MerchantPricingTranslationItem[]
   batches          MerchantPricingTranslationBatch[]
+  currentForPlan   MerchantPricingPlan?                     @relation("MerchantPricingPlanCurrentTranslationRun")
 
   @@index([shopifyPlanHandle, status, requestedAt], map: "MerchantPricingTranslationRun_handle_status_requested_idx")
   @@index([status, requestedAt], map: "MerchantPricingTranslationRun_status_requested_idx")

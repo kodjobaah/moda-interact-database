@@ -361,7 +361,7 @@ async function main() {
     console.log(`ISOLATION container=${containerName} image=pgvector/pgvector:pg17 network=none mode=${mode}`);
 
     const names = migrationNames();
-    assert.equal(names.at(-1), targetMigration, "ARCH-031 migration must be the latest ordered migration");
+    assert.ok(names.includes(targetMigration), "ARCH-031 automatic Merchant Pricing translation migration must remain present");
     for (const name of names) {
       if (name === targetMigration) break;
       applyMigration(name);

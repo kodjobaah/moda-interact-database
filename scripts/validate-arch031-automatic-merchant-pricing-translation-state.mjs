@@ -17,10 +17,9 @@ function prismaBlock(kind, name) {
   return match[1];
 }
 
-assert.equal(
-  migrationNames.at(-1),
-  target,
-  "ARCH-031 migration must remain the latest ordered migration",
+assert.ok(
+  migrationNames.includes(target),
+  "ARCH-031 automatic Merchant Pricing translation migration must remain present",
 );
 assert.deepEqual(
   migrationNames.filter((name) => name.includes("arch031_automatic_merchant_pricing_translation_state")),

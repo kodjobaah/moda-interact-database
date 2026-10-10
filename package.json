@@ -69,7 +69,10 @@
     "test:arch030-commerce-capability-shop-platform": "node scripts/validate-arch030-commerce-capability-shop-platform.mjs",
     "test:arch031-automatic-merchant-pricing-translation-state": "node scripts/validate-arch031-automatic-merchant-pricing-translation-state.mjs",
     "test:arch031-automatic-merchant-pricing-translation-state:postgres:fresh": "node scripts/test-arch031-automatic-merchant-pricing-translation-state-postgres.mjs --mode fresh",
-    "test:arch031-automatic-merchant-pricing-translation-state:postgres:upgrade": "node scripts/test-arch031-automatic-merchant-pricing-translation-state-postgres.mjs --mode upgrade"
+    "test:arch031-automatic-merchant-pricing-translation-state:postgres:upgrade": "node scripts/test-arch031-automatic-merchant-pricing-translation-state-postgres.mjs --mode upgrade",
+    "test:arch031-merchant-pricing-publication-lifecycle": "node scripts/validate-arch031-merchant-pricing-publication-lifecycle.mjs",
+    "test:arch031-merchant-pricing-publication-lifecycle:postgres:fresh": "node scripts/test-arch031-merchant-pricing-publication-lifecycle-postgres.mjs --mode fresh",
+    "test:arch031-merchant-pricing-publication-lifecycle:postgres:upgrade": "node scripts/test-arch031-merchant-pricing-publication-lifecycle-postgres.mjs --mode upgrade"
   },
   "keywords": [],
   "author": "",
