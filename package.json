@@ -62,7 +62,10 @@
     "test:arch029-store-category-localisation": "node scripts/validate-arch029-store-category-localisation.mjs",
     "test:arch029-translation-runtime": "node scripts/validate-arch029-translation-runtime.mjs",
     "test:arch029-prompt-revision-provenance": "node scripts/validate-arch029-prompt-revision-provenance.mjs",
-    "test:arch030-commerce-capability-shop-platform": "node scripts/validate-arch030-commerce-capability-shop-platform.mjs"
+    "test:arch030-commerce-capability-shop-platform": "node scripts/validate-arch030-commerce-capability-shop-platform.mjs",
+    "test:arch031-automatic-merchant-pricing-translation-state": "node scripts/validate-arch031-automatic-merchant-pricing-translation-state.mjs",
+    "test:arch031-automatic-merchant-pricing-translation-state:postgres:fresh": "node scripts/test-arch031-automatic-merchant-pricing-translation-state-postgres.mjs --mode fresh",
+    "test:arch031-automatic-merchant-pricing-translation-state:postgres:upgrade": "node scripts/test-arch031-automatic-merchant-pricing-translation-state-postgres.mjs --mode upgrade"
   },
   "keywords": [],
   "author": "",
