@@ -368,6 +368,7 @@ model RecoveryOutreachAttempt {
 
   checkoutRecoveryId String
   checkoutRecovery   CheckoutRecovery        @relation(fields: [checkoutRecoveryId], references: [id], onDelete: Cascade)
+  recipient          String                  @db.VarChar(64)
   sequence           Int
   trigger            RecoveryOutreachTrigger
   status             RecoveryOutreachStatus  @default(PENDING)
@@ -802,6 +803,53 @@ enum BillingOperationState {
   @@schema("billing")
 }
 
+enum MerchantPricingTranslationRunStatus {
+  PENDING
+  PROCESSING
+  READY_TO_APPLY
+  APPLIED
+  FAILED
+  STALE
+
+  @@schema("billing")
+}
+
+enum MerchantPricingTranslationEntityKind {
+  PLAN
+  HIGHLIGHT
+
+  @@schema("billing")
+}
+
+enum MerchantPricingTranslationField {
+  TITLE
+  DESCRIPTION
+
+  @@schema("billing")
+}
+
+enum MerchantPricingTranslationItemStatus {
+  PENDING
+  AVAILABLE
+  FAILED
+
+  @@schema("billing")
+}
+
+enum MerchantPricingTranslationBatchStatus {
+  READY
+  SUBMITTING
+  SUBMISSION_UNKNOWN
+  SUBMITTED
+  PROVIDER_COMPLETED
+  COMPLETED
+  FAILED
+  EXPIRED
+  CANCELLED
+
+  @@schema("billing")
+}
+
 model MerchantPricingPlan {
   id                String @id @default(cuid())
   shopifyPlanHandle String @unique
@@ -887,6 +935,117 @@ model MerchantPricingPlanHighlightTranslation {
   updatedAt DateTime @updatedAt
 
   @@unique([merchantPricingPlanHighlightId, locale])
+  @@schema("billing")
+}
+
+model MerchantPricingTranslationRun {
+  id                              String                              @id @default(cuid()) @db.Text
+  shopifyPlanHandle               String                              @db.Text
+  environment                     CommerceEnvironment
+  translationModelConfigurationId String                              @db.Text
+  provider                        String                              @db.VarChar(64)
+  providerModelId                 String                              @db.VarChar(255)
+  modelConfigurationVersion       Int
+  sourceSchemaVersion             Int                                 @default(1)
+  sourceHash                      String                              @db.VarChar(64)
+  sourceSnapshot                  Json                                @db.JsonB
+  status                          MerchantPricingTranslationRunStatus @default(PENDING)
+  requestedByAdminId              String                              @db.Text
+  requestedAt                     DateTime                            @default(now()) @db.Timestamptz(3)
+  startedAt                       DateTime?                           @db.Timestamptz(3)
+  readyToApplyAt                  DateTime?                           @db.Timestamptz(3)
+  appliedAt                       DateTime?                           @db.Timestamptz(3)
+  completedAt                     DateTime?                           @db.Timestamptz(3)
+  appliedMerchantPricingPlanId    String?                             @db.Text
+  failureCode                     String?                             @db.VarChar(128)
+  createdAt                       DateTime                            @default(now()) @db.Timestamptz(3)
+  updatedAt                       DateTime                            @default(now()) @updatedAt @db.Timestamptz(3)
+
+  translationModel CommerceTranslationModelConfiguration @relation(fields: [translationModelConfigurationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  requestedBy      PlatformAdmin                         @relation("MerchantPricingTranslationRunRequester", fields: [requestedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  items            MerchantPricingTranslationItem[]
+  batches          MerchantPricingTranslationBatch[]
+
+  @@index([shopifyPlanHandle, status, requestedAt], map: "MerchantPricingTranslationRun_handle_status_requested_idx")
+  @@index([status, requestedAt], map: "MerchantPricingTranslationRun_status_requested_idx")
+  @@index([translationModelConfigurationId, requestedAt], map: "MerchantPricingTranslationRun_model_requested_idx")
+  @@schema("billing")
+}
+
+model MerchantPricingTranslationItem {
+  id                String                               @id @default(cuid()) @db.Text
+  runId             String                               @db.Text
+  sourceEntityKind  MerchantPricingTranslationEntityKind
+  sourceContentKey  String?                              @db.Uuid
+  sourceField       MerchantPricingTranslationField
+  sourceLanguageTag String                               @db.VarChar(16)
+  targetLanguageTag String                               @db.VarChar(16)
+  sourceText        String                               @db.Text
+  translatedText    String?                              @db.Text
+  status            MerchantPricingTranslationItemStatus @default(PENDING)
+  failureCode       String?                              @db.VarChar(128)
+  retryCount        Int                                  @default(0)
+  nextAttemptAt     DateTime?                            @db.Timestamptz(3)
+  currentBatchId    String?                              @db.Text
+  completedAt       DateTime?                            @db.Timestamptz(3)
+  createdAt         DateTime                             @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime                             @default(now()) @updatedAt @db.Timestamptz(3)
+
+  run          MerchantPricingTranslationRun         @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  currentBatch MerchantPricingTranslationBatch?      @relation("MerchantPricingTranslationItemCurrentBatch", fields: [currentBatchId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  batchItems   MerchantPricingTranslationBatchItem[]
+
+  @@index([status, currentBatchId, nextAttemptAt, createdAt], map: "MerchantPricingTranslationItem_status_batch_retry_idx")
+  @@index([runId, targetLanguageTag], map: "MerchantPricingTranslationItem_run_locale_idx")
+  @@schema("billing")
+}
+
+model MerchantPricingTranslationBatch {
+  id                  String                                @id @default(cuid()) @db.Text
+  runId               String                                @db.Text
+  provider            String                                @db.VarChar(64)
+  model               String                                @db.VarChar(255)
+  status              MerchantPricingTranslationBatchStatus @default(READY)
+  providerBatchId     String?                               @db.Text
+  inputFileId         String?                               @db.Text
+  outputFileId        String?                               @db.Text
+  errorFileId         String?                               @db.Text
+  submissionStartedAt DateTime?                             @db.Timestamptz(3)
+  lastSubmitAttemptAt DateTime?                             @db.Timestamptz(3)
+  submitAttemptCount  Int                                   @default(0)
+  nextSubmitAt        DateTime?                             @db.Timestamptz(3)
+  submittedAt         DateTime?                             @db.Timestamptz(3)
+  lastPolledAt        DateTime?                             @db.Timestamptz(3)
+  nextPollAt          DateTime?                             @db.Timestamptz(3)
+  pollSequence        Int                                   @default(0)
+  completedAt         DateTime?                             @db.Timestamptz(3)
+  failureCode         String?                               @db.VarChar(128)
+  createdAt           DateTime                              @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                              @default(now()) @updatedAt @db.Timestamptz(3)
+
+  run          MerchantPricingTranslationRun        @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  currentItems MerchantPricingTranslationItem[]      @relation("MerchantPricingTranslationItemCurrentBatch")
+  items        MerchantPricingTranslationBatchItem[]
+
+  @@unique([provider, providerBatchId], map: "MerchantPricingTranslationBatch_provider_batch_key")
+  @@index([runId, status, createdAt], map: "MerchantPricingTranslationBatch_run_status_created_idx")
+  @@index([status, nextSubmitAt, createdAt], map: "MerchantPricingTranslationBatch_submit_due_idx")
+  @@index([status, nextPollAt, createdAt], map: "MerchantPricingTranslationBatch_poll_due_idx")
+  @@schema("billing")
+}
+
+model MerchantPricingTranslationBatchItem {
+  id                String   @id @default(cuid()) @db.Text
+  batchId           String   @db.Text
+  translationItemId String   @db.Text
+  providerCustomId  String   @unique(map: "MerchantPricingTranslationBatchItem_custom_id_key") @db.VarChar(255)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+
+  batch           MerchantPricingTranslationBatch @relation(fields: [batchId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  translationItem MerchantPricingTranslationItem  @relation(fields: [translationItemId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+
+  @@unique([batchId, translationItemId], map: "MerchantPricingTranslationBatchItem_batch_item_key")
+  @@index([translationItemId, createdAt], map: "MerchantPricingTranslationBatchItem_item_created_idx")
   @@schema("billing")
 }
 
@@ -1699,8 +1858,84 @@ model WooCommerceInstallation {
   revokedAt          DateTime?                     @db.Timestamptz(3)
   createdAt          DateTime                      @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime                      @default(now()) @updatedAt @db.Timestamptz(3)
+  restReadGrant      WooCommerceRestReadGrant?
+  restReadAttempts   WooCommerceRestReadAttempt[]
 
+  // Required for shop-bound composite foreign keys on the outgoing REST grant.
+  @@unique([id, shopId], map: "WooCommerceInstallation_id_shopId_key")
   @@index([status, shopId], map: "WooCommerceInstallation_status_shopId_idx")
+  @@schema("woocommerce")
+}
+
+// Credentials for Moda -> WooCommerce wc/v3 reads. This is independent of the
+// inbound Woo plugin -> Moda credentialDigest on WooCommerceInstallation.
+enum WooCommerceRestReadGrantStatus {
+  ACTIVE
+  INVALID
+  REVOKED
+
+  @@schema("woocommerce")
+}
+
+enum WooCommerceRestReadAttemptStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+
+  @@schema("woocommerce")
+}
+
+model WooCommerceRestReadAttempt {
+  id                        String                               @id @default(cuid()) @db.Text
+  installationId            String                               @db.Text
+  shopId                    String                               @db.Text
+  installation              WooCommerceInstallation              @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Cascade, onUpdate: Restrict)
+  tokenDigest               Bytes                                @unique(map: "WooCommerceRestReadAttempt_tokenDigest_key")
+  attemptSequence           BigInt                               @unique(map: "WooCommerceRestReadAttempt_attemptSequence_key") @default(autoincrement())
+  credentialVersionSnapshot Int
+  status                    WooCommerceRestReadAttemptStatus     @default(PENDING)
+  expiresAt                 DateTime                             @db.Timestamptz(3)
+  consumedAt                DateTime?                            @db.Timestamptz(3)
+  consumptionTransactionId  BigInt?
+  failureCode               String?                              @db.VarChar(64)
+  createdAt                 DateTime                             @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime                             @default(now()) @updatedAt @db.Timestamptz(3)
+  authorisedGrant           WooCommerceRestReadGrant?
+
+  @@index([installationId, status, expiresAt], map: "WooCommerceRestReadAttempt_installation_pending_idx")
+  @@index([createdAt], map: "WooCommerceRestReadAttempt_createdAt_idx")
+  @@schema("woocommerce")
+}
+
+model WooCommerceRestReadGrant {
+  id                            String                         @id @default(cuid()) @db.Text
+  installationId                String                         @unique(map: "WooCommerceRestReadGrant_installationId_key") @db.Text
+  shopId                        String                         @db.Text
+  installation                  WooCommerceInstallation        @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Cascade, onUpdate: Restrict)
+  authorizationAttemptId        String                         @unique(map: "WooCommerceRestReadGrant_authorizationAttemptId_key") @db.Text
+  authorizationAttempt          WooCommerceRestReadAttempt     @relation(fields: [authorizationAttemptId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  authorizationAttemptSequence  BigInt
+  credentialVersionSnapshot     Int
+  rotationVersion               Int                            @default(1)
+  status                        WooCommerceRestReadGrantStatus @default(ACTIVE)
+  // A single AEAD ciphertext contains both Woo consumer key and consumer secret.
+  credentialCiphertext          Bytes
+  credentialNonce               Bytes
+  credentialAuthTag             Bytes
+  encryptionKeyId               String                         @db.VarChar(128)
+  providerKeyId                 String                         @db.VarChar(128)
+  authorizedScope               String                         @db.VarChar(16)
+  verifiedAt                    DateTime                       @db.Timestamptz(3)
+  grantedAt                     DateTime                       @default(now()) @db.Timestamptz(3)
+  revokedAt                     DateTime?                      @db.Timestamptz(3)
+  invalidatedAt                 DateTime?                      @db.Timestamptz(3)
+  createdAt                     DateTime                       @default(now()) @db.Timestamptz(3)
+  updatedAt                     DateTime                       @default(now()) @updatedAt @db.Timestamptz(3)
+
+  // Prisma requires the full defining-side key of a composite 1:1 relation to be unique.
+  // installationId remains independently unique: exactly one grant per installation.
+  @@unique([installationId, shopId], map: "WooCommerceRestReadGrant_installationId_shopId_key")
+  @@index([shopId, status], map: "WooCommerceRestReadGrant_shop_status_idx")
   @@schema("woocommerce")
 }
 
@@ -1929,6 +2164,7 @@ model PlatformAdmin {
   createdCommerceTranslationModelConfigurations CommerceTranslationModelConfiguration[] @relation("CommerceTranslationModelConfigurationCreator")
   updatedCommerceTranslationModelConfigurations CommerceTranslationModelConfiguration[] @relation("CommerceTranslationModelConfigurationUpdater")
   requestedCommerceStoreCategoryTranslationRuns CommerceStoreCategoryTranslationRun[]   @relation("CommerceStoreCategoryTranslationRunRequester")
+  requestedMerchantPricingTranslationRuns        MerchantPricingTranslationRun[]         @relation("MerchantPricingTranslationRunRequester")
   createdCommercePromptTemplateCategories       CommercePromptTemplateCategory[]        @relation("CommercePromptTemplateCategoryCreator")
   updatedCommercePromptTemplateCategories       CommercePromptTemplateCategory[]        @relation("CommercePromptTemplateCategoryUpdater")
   createdCommercePromptTemplates                CommercePromptTemplate[]                @relation("CommercePromptTemplateCreator")
@@ -2777,6 +3013,7 @@ model CommerceTranslationModelConfiguration {
   providerModelId  String              @db.VarChar(255)
   displayName      String              @db.VarChar(255)
   enabled          Boolean             @default(true)
+  automaticDefault Boolean             @default(false)
   editVersion      Int                 @default(1)
   createdByAdminId String              @db.Text
   updatedByAdminId String              @db.Text
@@ -2786,8 +3023,9 @@ model CommerceTranslationModelConfiguration {
   credential  CommerceTranslationProviderCredential @relation("CommerceTranslationModelCredential", fields: [environment, provider], references: [environment, provider], onDelete: Restrict, onUpdate: Restrict)
   createdBy   PlatformAdmin                         @relation("CommerceTranslationModelConfigurationCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   updatedBy   PlatformAdmin                         @relation("CommerceTranslationModelConfigurationUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  runs        CommerceStoreCategoryTranslationRun[]
-  auditEvents CommerceAuditEvent[]
+  runs                       CommerceStoreCategoryTranslationRun[]
+  merchantPricingTranslationRuns MerchantPricingTranslationRun[]
+  auditEvents                CommerceAuditEvent[]
 
   @@unique([environment, provider, providerModelId])
   @@unique([environment, displayName])

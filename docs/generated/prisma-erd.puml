@@ -703,6 +703,7 @@ entity "RecoveryOutreachAttempt" as RecoveryOutreachAttempt {
 + id [PK] : String
 --
   # checkoutRecoveryId : [FK] CheckoutRecovery
+  * recipient : String
   * sequence : Int
   * trigger : RecoveryOutreachTrigger
   * status : RecoveryOutreachStatus
