@@ -66,7 +66,7 @@ function successful(id) {
   return `UPDATE woocommerce."WooCommerceRestReadAttempt" SET "status"='SUCCEEDED',"consumedAt"=clock_timestamp()
     WHERE "id"='${id}' AND "status"='PENDING'`;
 }
-function grantValues(id, seq, {install = 'woo-read-install', shop = 'woo-read-shop', rotation = 1} = {}) {
+function grantValues(id, seq, {rotation = 1} = {}) {
   return `"authorizationAttemptId"='${id}',"authorizationAttemptSequence"=${seq},
     "credentialVersionSnapshot"=1,"rotationVersion"=${rotation},"status"='ACTIVE',
     "credentialCiphertext"=decode('a1b2c3','hex'),"credentialNonce"=decode(repeat('02',12),'hex'),
