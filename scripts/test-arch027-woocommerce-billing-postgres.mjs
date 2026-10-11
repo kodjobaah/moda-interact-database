@@ -1,41 +1,67 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
+import {randomUUID} from 'node:crypto';
 import {readFileSync, readdirSync} from 'node:fs';
+import {setTimeout as delay} from 'node:timers/promises';
 
 const targetMigration = '20261008110000_arch027_woocommerce_billing_persistence';
+const optionalRefundAuditMigration = '20261011110000_arch027_woocommerce_refund_optional_audit_money';
 const modeIndex = process.argv.indexOf('--mode');
-const mode = modeIndex < 0 ? undefined : process.argv[modeIndex + 1];
-assert.ok(['fresh', 'upgrade'].includes(mode), 'Pass an explicit --mode fresh|upgrade');
+const requestedMode = modeIndex < 0 ? undefined : process.argv[modeIndex + 1];
+assert.ok(modeIndex < 0 || ['fresh', 'upgrade'].includes(requestedMode),
+  'Use --mode fresh|upgrade, or omit --mode to run both rehearsals');
+const modes = requestedMode ? [requestedMode] : ['fresh', 'upgrade'];
+const databaseNames = {
+  fresh: 'arch027_fresh_fixture',
+  upgrade: 'arch027_upgrade_fixture',
+};
+const containerName = `moda-arch027-database002-${randomUUID()}`;
+let containerStarted = false;
+let mode;
+let databaseName;
+let databaseUrl;
 
-const databaseVariable = mode === 'fresh' ? 'ARCH027_FRESH_DATABASE_URL' : 'ARCH027_UPGRADE_DATABASE_URL';
-const databaseUrl = process.env[databaseVariable];
-assert.ok(databaseUrl, `${databaseVariable} must name a disposable PostgreSQL 17 database`);
-let parsedUrl;
-try {
-  parsedUrl = new URL(databaseUrl);
-} catch (error) {
-  throw new Error(`${databaseVariable} must be a PostgreSQL URL`, {cause: error});
-}
-assert.ok(['postgres:', 'postgresql:'].includes(parsedUrl.protocol), `${databaseVariable} must use PostgreSQL`);
-const databaseName = decodeURIComponent(parsedUrl.pathname.replace(/^\//, ''));
-assert.equal(databaseName, `arch027_${mode}_fixture`,
-  `${databaseVariable} must target the dedicated arch027_${mode}_fixture database`);
-
-function psql(sql, {capture = false} = {}) {
-  const args = ['-X', '-v', 'ON_ERROR_STOP=1', '--set=VERBOSITY=terse'];
-  if (capture) args.push('-A', '-t', '-q');
-  else args.push('-q');
-  args.push(databaseUrl);
+function docker(args, options = {}) {
   try {
-    return execFileSync('psql', args, {
+    return execFileSync('docker', args, {
       encoding: 'utf8',
-      input: sql,
       maxBuffer: 32 * 1024 * 1024,
-    }).trim();
+      ...options,
+    });
   } catch (error) {
     const detail = error.stderr?.toString().trim();
-    throw new Error(`psql failed${detail ? `: ${detail}` : ''}`, {cause: error});
+    throw new Error(`Docker command failed${detail ? `: ${detail}` : ''}`, {cause: error});
   }
+}
+
+function psql(sql, {capture = false} = {}) {
+  // The URL resolves inside the invocation-owned container, not on the host.
+  const args = ['exec', '-i', containerName, 'psql', '-X', '-v', 'ON_ERROR_STOP=1',
+    '--set=VERBOSITY=terse'];
+  if (capture) args.push('-A', '-t', '-q');
+  else args.push('-q');
+  args.push('--dbname', databaseUrl);
+  try {
+    return docker(args, {input: sql}).trim();
+  } catch (error) {
+    throw new Error(`psql failed for ${databaseName}: ${error.message}`, {cause: error});
+  }
+}
+
+async function awaitPostgres() {
+  for (let attempt = 1; attempt <= 90; attempt += 1) {
+    try {
+      execFileSync('docker', [
+        'exec', containerName, 'psql', '-X', '-q', '-v', 'ON_ERROR_STOP=1',
+        '-U', 'postgres', '-d', 'postgres', '-c', 'SELECT 1',
+      ], {stdio: 'ignore'});
+      return;
+    } catch {
+      if (attempt === 90) break;
+      await delay(1000);
+    }
+  }
+  throw new Error('Invocation-owned PostgreSQL 17 container did not become ready');
 }
 
 function jsonQuery(sql) {
@@ -493,15 +519,117 @@ UPDATE woocommerce."WooCommerceBillingWebhookReceipt" SET "processedAt"=CURRENT_
   console.log('PASS Free Woo subscription retains NULL recurring identity alongside one-time charge evidence');
 }
 
-async function main() {
+function runOptionalRefundAuditCases() {
+  // The DATABASE-001 checks above already completed a refund for the original
+  // Woo purchase. Use distinct ACTIVE purchases so the one-completed-refund
+  // unique index does not mask the DATABASE-002 constraint assertions.
+  const refundPurchaseIds = {
+    noMoney: 'arch027-audit-null-purchase',
+    withMoney: 'arch027-audit-paired-purchase',
+    invalid: 'arch027-audit-negative-purchase',
+  };
+  psql(`BEGIN;
+${Object.values(refundPurchaseIds).map(id => insertWooPurchase({id})).join('\n')}
+UPDATE billing."RecoveryCreditPurchase"
+SET "status"='ACTIVE', "currentAmount"=10,
+    "providerReference"='woo-audit-' || "id",
+    "providerPurchaseAmount"=5, "providerPurchaseCurrency"='USD',
+    "providerValuationConfirmedAt"=CURRENT_TIMESTAMP,
+    "providerPriceSnapshot"='{"bundle":"refund-audit"}'::jsonb
+WHERE "id" IN (${Object.values(refundPurchaseIds).map(id => `'${id}'`).join(',')});
+COMMIT;`);
+
+  const requiredColumns = `"id","shopId","purchaseId","source",
+    "purchaseCreditsGrantedSnapshot","currentAmountAtRequestSnapshot",
+    "reservedAmountAtRequestSnapshot","availableAmountAtRequestSnapshot",
+    "purchaseProviderAmountSnapshot","purchaseProviderCurrencySnapshot",
+    "requestKey","provider","status","finalCreditQuantity",
+    "providerAmount","providerCurrency","providerReference","providerActionKind",
+    "providerConfirmedAt","updatedAt"`;
+  const insertRefund = (id, {purchaseId = refundPurchaseIds.invalid,
+    amount = 'NULL', currency = 'NULL', quantity = '2',
+    reference = `'provider-${id}'`, action = "'REFUND'", confirmedAt = 'CURRENT_TIMESTAMP'} = {}) =>
+    `INSERT INTO billing."RecoveryCreditRefund" (${requiredColumns}) VALUES (
+      '${id}','arch027-shop-woo-free','${purchaseId}','MERCHANT_UI',
+      10,10,0,10,5,'USD','${id}','WOOCOMMERCE','COMPLETED',${quantity},
+      ${amount},${currency},${reference},${action},${confirmedAt},CURRENT_TIMESTAMP
+    )`;
+
+  psql(insertRefund('arch027-refund-no-audit-money', {purchaseId: refundPurchaseIds.noMoney}));
+  psql(insertRefund('arch027-refund-valid-audit-money', {
+    purchaseId: refundPurchaseIds.withMoney, amount: '2.5', currency: "'USD'",
+  }));
+  assert.equal(jsonQuery(`SELECT count(*)::int FROM billing."RecoveryCreditRefund"
+    WHERE "id" IN ('arch027-refund-no-audit-money', 'arch027-refund-valid-audit-money')
+      AND "status"='COMPLETED' AND "providerActionKind"='REFUND'
+      AND "providerConfirmedAt" IS NOT NULL;`), 2);
+  assert.equal(jsonQuery(`SELECT count(*)::int FROM billing."RecoveryCreditRefund"
+    WHERE "id"='arch027-refund-no-audit-money'
+      AND "providerAmount" IS NULL AND "providerCurrency" IS NULL;`), 1);
+  console.log('PASS completed Woo refunds accept absent OR valid paired audit money');
+  expectRejected('one completed refund per purchase remains enforced',
+    insertRefund('arch027-refund-duplicate-completed', {purchaseId: refundPurchaseIds.noMoney}), '23505');
+
+  expectRejected('completed Woo refund rejects amount without currency',
+    insertRefund('arch027-corrected-only-amount', {amount: '2.5'}));
+  expectRejected('completed Woo refund rejects currency without amount',
+    insertRefund('arch027-corrected-only-currency', {currency: "'USD'"}));
+  expectRejected('completed Woo refund rejects negative audit amount',
+    insertRefund('arch027-corrected-negative-amount', {amount: '-1', currency: "'USD'"}));
+  expectRejected('completed Woo refund rejects malformed currency',
+    insertRefund('arch027-corrected-bad-currency', {amount: '2', currency: "'usd'"}));
+  expectRejected('completed Woo refund rejects missing provider reference',
+    insertRefund('arch027-corrected-no-reference', {reference: 'NULL'}));
+  expectRejected('completed Woo refund rejects blank provider reference',
+    insertRefund('arch027-corrected-blank-reference', {reference: "'  '"}));
+  expectRejected('completed Woo refund rejects missing REFUND action',
+    insertRefund('arch027-corrected-no-action', {action: 'NULL'}));
+  expectRejected('completed Woo refund rejects non-REFUND action',
+    insertRefund('arch027-corrected-credit-action', {action: "'CREDIT'"}));
+  expectRejected('completed Woo refund rejects missing settled credit quantity',
+    insertRefund('arch027-corrected-null-quantity', {quantity: 'NULL'}));
+  expectRejected('completed Woo refund rejects missing provider confirmation time',
+    insertRefund('arch027-corrected-no-confirmed-at', {confirmedAt: 'NULL'}));
+  expectRejected('completed Woo refund rejects zero settled credit quantity',
+    insertRefund('arch027-corrected-zero-quantity', {quantity: '0'}));
+
+  expectRejected('non-completed Woo refund still requires money pair',
+    `UPDATE billing."RecoveryCreditRefund" SET "providerCurrency"=NULL
+       WHERE "id"='arch027-woo-refund-money-pair'`);
+  expectRejected('Shopify refund still requires period identity after correction',
+    `INSERT INTO billing."RecoveryCreditRefund" ("id","shopId","purchaseId","source",
+      "purchaseCreditsGrantedSnapshot","currentAmountAtRequestSnapshot",
+      "reservedAmountAtRequestSnapshot","availableAmountAtRequestSnapshot",
+      "providerSubscriptionIdSnapshot","planHandleSnapshot","eventHandleSnapshot",
+      "purchaseProviderAmountSnapshot","purchaseProviderCurrencySnapshot",
+      "requestKey","provider","updatedAt") VALUES (
+      'arch027-corrected-shopify-no-period','arch027-shop-shopify',
+      'arch027-shopify-positive','MERCHANT_UI',10,10,0,10,
+      'shopify-arch027-contract','paid','pack',1,'USD',
+      'arch027-corrected-shopify-no-period','SHOPIFY',CURRENT_TIMESTAMP
+    )`);
+  expectRejectedWithMessage('purchase provider ownership guard remains effective after correction',
+    `UPDATE billing."RecoveryCreditPurchase" SET "provider"='SHOPIFY'
+       WHERE "id"='arch027-woo-purchase-free'`,
+    'ARCH027 purchase provider change would mismatch existing refunds');
+  console.log('PASS effective refund contract retains provider and Shopify guards');
+}
+
+async function runRehearsal(nextMode) {
+  mode = nextMode;
+  databaseName = databaseNames[mode];
+  databaseUrl = process.env[mode === 'fresh'
+    ? 'ARCH027_FRESH_DATABASE_URL' : 'ARCH027_UPGRADE_DATABASE_URL'];
+
   const identity = psql(`SELECT current_database() || '|' || current_setting('server_version_num')::int;`, {capture: true});
   const [connectedDatabase, versionText] = identity.split('|');
-  assert.equal(connectedDatabase, databaseName, 'explicit database URL resolved to an unexpected database');
-  assert.ok(Number(versionText) >= 170000, 'use the approved PostgreSQL 17 / pgvector runtime');
+  assert.equal(connectedDatabase, databaseName, 'test URL resolved to an unexpected database');
+  assert.equal(Math.floor(Number(versionText) / 10000), 17, 'use the approved PostgreSQL 17 runtime');
   const existingTables = Number(psql(`SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
     WHERE c.relkind IN ('r','p') AND n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname NOT LIKE 'pg_toast%';`, {capture: true}));
   assert.equal(existingTables, 0, `${databaseName} must be a fresh disposable database with no user tables`);
 
+  console.log(`ISOLATION container=${containerName} database=${databaseName} mode=${mode} image=pgvector/pgvector:pg17`);
   const migrations = migrationNames();
   assert.ok(migrations.includes(targetMigration), 'accepted ARCH-027 migration must remain in the ordered chain');
   for (const name of migrations) {
@@ -519,7 +647,46 @@ async function main() {
   if (mode === 'upgrade') assertLegacyUpgrade(before);
   seedRuntimeRows();
   runBehaviorCases();
+  assert.ok(migrations.includes(optionalRefundAuditMigration), 'DATABASE-002 migration must be in chain');
+  applyMigration(optionalRefundAuditMigration);
+  runOptionalRefundAuditCases();
   console.log(`ARCH-027 ${mode} PostgreSQL migration rehearsal passed on PostgreSQL ${Number(versionText) / 10000}.`);
+}
+
+async function main() {
+  // Never trust externally supplied DATABASE_URL or ARCH027_* URLs for destructive
+  // migration rehearsals. Provision both databases inside a private Docker container.
+  const priorUrls = {
+    ARCH027_FRESH_DATABASE_URL: process.env.ARCH027_FRESH_DATABASE_URL,
+    ARCH027_UPGRADE_DATABASE_URL: process.env.ARCH027_UPGRADE_DATABASE_URL,
+  };
+  try {
+    docker(['run', '--detach', '--rm', '--name', containerName, '--network', 'none',
+      '--env', 'POSTGRES_PASSWORD=fixture-only',
+      '--env', `POSTGRES_DB=${databaseNames.fresh}`,
+      'pgvector/pgvector:pg17']);
+    containerStarted = true;
+    await awaitPostgres();
+    docker(['exec', containerName, 'createdb', '-U', 'postgres', databaseNames.upgrade]);
+
+    // These PostgreSQL URLs are valid only INSIDE the private container where
+    // docker exec runs psql. They never target a host or deployed database.
+    process.env.ARCH027_FRESH_DATABASE_URL =
+      `postgresql://postgres:fixture-only@127.0.0.1:5432/${databaseNames.fresh}`;
+    process.env.ARCH027_UPGRADE_DATABASE_URL =
+      `postgresql://postgres:fixture-only@127.0.0.1:5432/${databaseNames.upgrade}`;
+
+    for (const selectedMode of modes) await runRehearsal(selectedMode);
+  } finally {
+    for (const [name, previous] of Object.entries(priorUrls)) {
+      if (previous === undefined) delete process.env[name];
+      else process.env[name] = previous;
+    }
+    if (containerStarted) {
+      docker(['rm', '--force', '--volumes', containerName]);
+      console.log(`CLEANUP removed invocation-owned container ${containerName}`);
+    }
+  }
 }
 
 main().catch(error => {
