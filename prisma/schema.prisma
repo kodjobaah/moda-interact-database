@@ -1845,6 +1845,7 @@ model Shop {
   merchantSupportThread             MerchantSupportThread?
   mcpOperationalIncidents           McpOperationalIncident[]
   mcpOperationalEvents              McpOperationalEvent[]
+  operationalIncidents              OperationalIncident[]
 
   // Commerce domain
   customers               Customer[]
@@ -2199,6 +2200,9 @@ model PlatformAdmin {
   updatedAt       DateTime          @updatedAt
 
   assignedMerchantSupportThreads            MerchantSupportThread[]
+  ownedOperationalIncidents                  OperationalIncident[] @relation("OperationalIncidentOwner")
+  resolvedOperationalIncidents               OperationalIncident[] @relation("OperationalIncidentResolver")
+  operationalIncidentEvents                  OperationalIncidentEvent[]
   merchantSupportMessages                   MerchantSupportMessage[]
   merchantTranslationReconciliationRequests MerchantTranslationReconciliationRequest[]
   shopBillingPolicyOverrides                ShopBillingPolicyOverride[]
@@ -2268,6 +2272,56 @@ model McpOperationalEvent {
 
   @@index([incidentKey, occurredAt])
   @@index([shopId, occurredAt])
+  @@schema("support")
+}
+
+// ARCH-033: generic, internal-only operational issue; not a merchant-facing ticket.
+model OperationalIncident {
+  id                          String    @id @default(cuid()) @db.Text
+  incidentKey                 String    @unique @db.VarChar(64)
+  sourceService               String    @db.VarChar(64)
+  environment                 String    @db.VarChar(32)
+  category                    String    @db.VarChar(64)
+  reasonCode                  String    @db.VarChar(128)
+  resourceKey                 String    @db.VarChar(128)
+  shopId                      String?   @db.Text
+  shop                        Shop?     @relation(fields: [shopId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  severity                    String    @db.VarChar(16)
+  status                      String    @default("OPEN") @db.VarChar(16)
+  occurrenceCount             Int       @default(1)
+  firstOccurredAt             DateTime  @db.Timestamptz(3)
+  lastOccurredAt              DateTime  @db.Timestamptz(3)
+  lastCorrelationId           String    @db.VarChar(128)
+  ownerPlatformAdminId        String?   @db.Text
+  ownerPlatformAdmin          PlatformAdmin? @relation("OperationalIncidentOwner", fields: [ownerPlatformAdminId], references: [id], onDelete: Restrict)
+  assignedAt                  DateTime? @db.Timestamptz(3)
+  resolvedAt                  DateTime? @db.Timestamptz(3)
+  resolvedByPlatformAdminId   String?   @db.Text
+  resolvedByPlatformAdmin     PlatformAdmin? @relation("OperationalIncidentResolver", fields: [resolvedByPlatformAdminId], references: [id], onDelete: Restrict)
+  resolutionNote              String?   @db.VarChar(1000)
+  revision                    Int       @default(0)
+  events                      OperationalIncidentEvent[]
+
+  @@index([environment, status, lastOccurredAt])
+  @@index([sourceService, status, lastOccurredAt])
+  @@index([ownerPlatformAdminId, status])
+  @@index([shopId, status])
+  @@schema("support")
+}
+
+// Immutable occurrence/transition history; a duplicate occurrence uses the same UUID.
+model OperationalIncidentEvent {
+  id                      String    @id @db.Uuid
+  incidentId              String    @db.Text
+  incident                OperationalIncident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  eventType               String    @db.VarChar(32)
+  actorPlatformAdminId    String?   @db.Text
+  actorPlatformAdmin      PlatformAdmin? @relation(fields: [actorPlatformAdminId], references: [id], onDelete: Restrict)
+  correlationId           String?   @db.VarChar(128)
+  occurredAt              DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([incidentId, occurredAt])
+  @@index([actorPlatformAdminId, occurredAt])
   @@schema("support")
 }
 
