@@ -4,7 +4,8 @@ import { randomUUID } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 
-const target = "20261011160000_arch033_generic_operational_incidents";
+const target = "20261011210000_arch033_drop_legacy_mcp_operational_incidents";
+const genericMigration = "20261011160000_arch033_generic_operational_incidents";
 const mode = process.argv.at(process.argv.indexOf("--mode") + 1);
 assert.ok(["fresh", "upgrade"].includes(mode), "Use --mode fresh|upgrade");
 const container = `moda-arch033-incidents-${randomUUID()}`;
@@ -33,11 +34,11 @@ function migration(name) {
   console.log(`APPLIED ${name}`);
 }
 const shop = `INSERT INTO commerce."Shop" ("id","domain","platform","updatedAt") VALUES ('arch033-shop','arch033.example.invalid','SHOPIFY',now());`;
-const legacy = `INSERT INTO support."McpOperationalIncident" ("id","incidentKey","shopId","capabilityKey","reasonCode","firstOccurredAt","lastOccurredAt","lastErrorId") VALUES ('arch033-legacy','arch033-legacy-key','arch033-shop','product_search','MCP_WOOCOMMERCE_REST_GRANT_REVOKED',now(),now(),'00000000-0000-4000-8000-000000000001');`;
 const newIncident = `INSERT INTO support."OperationalIncident" ("id","incidentKey","sourceService","environment","category","reasonCode","resourceKey","shopId","severity","firstOccurredAt","lastOccurredAt","lastCorrelationId") VALUES ('arch033-incident','${'a'.repeat(64)}','background','test','INTEGRATION_ACCESS','SHOPIFY_ACCESS_REVOKED','recovery:123','arch033-shop','HIGH',now(),now(),'corr-1')`;
 function tests() {
+  assert.equal(scalar(`SELECT count(*) FROM information_schema.tables WHERE table_schema='support' AND table_name IN ('McpOperationalIncident','McpOperationalEvent')`), '0', 'legacy MCP incident tables must be gone');
+  assert.equal(scalar(`SELECT count(*) FROM information_schema.tables WHERE table_schema='support' AND table_name IN ('MerchantSupportThread','MerchantSupportMessage')`), '2', 'merchant support must be preserved');
   assert.equal(scalar(`SELECT count(*) FROM information_schema.tables WHERE table_schema='support' AND table_name IN ('OperationalIncident','OperationalIncidentEvent')`), '2');
-  assert.equal(scalar(`SELECT count(*) FROM support."McpOperationalIncident" WHERE "id"='arch033-legacy'`), '1', "old MCP incident preserved");
   sql(newIncident + ';');
   rejected('duplicate incident', newIncident.replace('arch033-incident','arch033-incident-2'), '23505');
   rejected('bad environment', newIncident.replace('arch033-incident','arch033-incident-3').replace('a'.repeat(64), 'c'.repeat(64)).replace("'test'","'production-test'"), '23514');
@@ -57,7 +58,7 @@ function tests() {
   // Shopless incidents permitted for infrastructure-level failures.
   sql(newIncident.replace('arch033-incident', 'arch033-platform').replace('a'.repeat(64), 'b'.repeat(64)).replace("'arch033-shop'",'NULL') + ';');
   assert.equal(scalar(`SELECT count(*) FROM support."OperationalIncident" WHERE "shopId" IS NULL`),'1');
-  console.log('PASS generic schema, MCP history, CAS, identity, validation and audit integrity');
+  console.log('PASS generic schema, CAS, identity, validation and audit integrity');
 }
 async function main() {
   try {
@@ -68,11 +69,15 @@ async function main() {
     assert.equal(names.at(-1),target,'ARCH-033 migration must be the last migration');
     for (const name of names) {
       if (mode === 'upgrade' && name === target) {
-        sql(shop); sql(legacy);
+        // The existing database has applied ARCH-032 and ARCH-033's generic schema.
+        // Preserve a live legacy fixture across the forward-only cleanup migration.
+        sql(`INSERT INTO support."McpOperationalIncident" ("id","incidentKey","shopId","capabilityKey","reasonCode","firstOccurredAt","lastOccurredAt","lastErrorId") VALUES ('arch033-legacy','${'e'.repeat(64)}','arch033-shop','product_search','MCP_WOOCOMMERCE_REST_GRANT_REVOKED',now(),now(),'00000000-0000-4000-8000-000000000030');`);
+        sql(`INSERT INTO support."McpOperationalEvent" ("id","shopId","incidentKey","capabilityKey","reasonCode","eventType") VALUES ('00000000-0000-4000-8000-000000000031','arch033-shop','${'e'.repeat(64)}','product_search','MCP_WOOCOMMERCE_REST_GRANT_REVOKED','MCP_TOOL_EXECUTION_BLOCKED');`);
+        assert.equal(scalar(`SELECT count(*) FROM support."McpOperationalEvent"`), '1');
       }
       migration(name);
+      if (name === genericMigration) sql(shop);
     }
-    if (mode === 'fresh') { sql(shop); sql(legacy); }
     tests();
     console.log(`PASS ARCH-033 ${mode} disposable PostgreSQL`);
   } finally {
