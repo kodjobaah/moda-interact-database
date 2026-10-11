@@ -1843,6 +1843,8 @@ model Shop {
   whatsappTemplateVariants          WhatsAppTemplateVariant[]
   whatsappRecipientReachability     WhatsAppRecipientReachability[]
   merchantSupportThread             MerchantSupportThread?
+  mcpOperationalIncidents           McpOperationalIncident[]
+  mcpOperationalEvents              McpOperationalEvent[]
 
   // Commerce domain
   customers               Customer[]
@@ -2227,6 +2229,45 @@ enum MerchantSupportMessageState {
   AVAILABLE
   FAILED
 
+  @@schema("support")
+}
+
+// The current actionable operational state for one shop, capability and failure.
+// This is independent of merchant-originated messages needing an Admin reply.
+model McpOperationalIncident {
+  id              String    @id @default(cuid()) @db.Text
+  incidentKey     String    @unique @db.VarChar(64)
+  shopId          String    @db.Text
+  shop            Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  capabilityKey   String    @db.VarChar(128)
+  reasonCode      String    @db.VarChar(128)
+  status          String    @default("OPEN") @db.VarChar(16)
+  occurrenceCount Int       @default(1)
+  firstOccurredAt DateTime  @db.Timestamptz(3)
+  lastOccurredAt  DateTime  @db.Timestamptz(3)
+  lastErrorId     String    @db.Uuid
+  resolvedAt      DateTime? @db.Timestamptz(3)
+
+  @@index([status, lastOccurredAt])
+  @@index([shopId, status])
+  @@schema("support")
+}
+
+// Append-only application events; one identifiable event per failed MCP invocation.
+// Never persist tool arguments, credentials, provider responses or stack traces here.
+model McpOperationalEvent {
+  id            String   @id @db.Uuid
+  shopId        String   @db.Text
+  shop          Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  incidentKey   String   @db.VarChar(64)
+  capabilityKey String   @db.VarChar(128)
+  reasonCode    String   @db.VarChar(128)
+  eventType     String   @db.VarChar(48)
+  actorAdminId  String?  @db.Text
+  occurredAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([incidentKey, occurredAt])
+  @@index([shopId, occurredAt])
   @@schema("support")
 }
 
