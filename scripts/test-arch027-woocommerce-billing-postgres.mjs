@@ -3,9 +3,11 @@ import {execFileSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {readFileSync, readdirSync} from 'node:fs';
 import {setTimeout as delay} from 'node:timers/promises';
+import {runProviderReferenceCases} from './fixtures/arch027-provider-reference-cases.mjs';
 
 const targetMigration = '20261008110000_arch027_woocommerce_billing_persistence';
 const optionalRefundAuditMigration = '20261011110000_arch027_woocommerce_refund_optional_audit_money';
+const providerReferenceMigration = '20261012170000_arch027_relax_billing_operation_provider_reference';
 const modeIndex = process.argv.indexOf('--mode');
 const requestedMode = modeIndex < 0 ? undefined : process.argv[modeIndex + 1];
 assert.ok(modeIndex < 0 || ['fresh', 'upgrade'].includes(requestedMode),
@@ -51,8 +53,12 @@ function psql(sql, {capture = false} = {}) {
 async function awaitPostgres() {
   for (let attempt = 1; attempt <= 90; attempt += 1) {
     try {
+      // The official PostgreSQL entrypoint briefly starts a socket-only server
+      // for initialization and stops it before starting the final TCP server.
+      // A socket-based SELECT 1 can succeed just before that shutdown.
       execFileSync('docker', [
-        'exec', containerName, 'psql', '-X', '-q', '-v', 'ON_ERROR_STOP=1',
+        'exec', '-e', 'PGPASSWORD=fixture-only', containerName, 'psql',
+        '-h', '127.0.0.1', '-X', '-q', '-v', 'ON_ERROR_STOP=1',
         '-U', 'postgres', '-d', 'postgres', '-c', 'SELECT 1',
       ], {stdio: 'ignore'});
       return;
@@ -650,6 +656,17 @@ async function runRehearsal(nextMode) {
   assert.ok(migrations.includes(optionalRefundAuditMigration), 'DATABASE-002 migration must be in chain');
   applyMigration(optionalRefundAuditMigration);
   runOptionalRefundAuditCases();
+  // Upgrade proof: the forward DDL must not rewrite any old billing operation,
+  // including existing NULL references and write-once provider evidence.
+  const beforeProviderCorrection = jsonQuery(`SELECT coalesce(jsonb_agg(to_jsonb(op) ORDER BY op."id"), '[]'::jsonb)::text
+    FROM billing."BillingOperation" AS op;`);
+  assert.ok(migrations.includes(providerReferenceMigration), 'DATABASE-003 migration must be present');
+  applyMigration(providerReferenceMigration);
+  const afterProviderCorrection = jsonQuery(`SELECT coalesce(jsonb_agg(to_jsonb(op) ORDER BY op."id"), '[]'::jsonb)::text
+    FROM billing."BillingOperation" AS op;`);
+  assert.deepEqual(afterProviderCorrection, beforeProviderCorrection,
+    'DATABASE-003 must preserve all pre-existing billing-operation evidence and state');
+  runProviderReferenceCases({psql, jsonQuery, expectRejected, insertOperation, insertWooPurchase});
   console.log(`ARCH-027 ${mode} PostgreSQL migration rehearsal passed on PostgreSQL ${Number(versionText) / 10000}.`);
 }
 
@@ -667,7 +684,8 @@ async function main() {
       'pgvector/pgvector:pg17']);
     containerStarted = true;
     await awaitPostgres();
-    docker(['exec', containerName, 'createdb', '-U', 'postgres', databaseNames.upgrade]);
+    docker(['exec', '-e', 'PGPASSWORD=fixture-only', containerName, 'createdb',
+      '-h', '127.0.0.1', '-U', 'postgres', databaseNames.upgrade]);
 
     // These PostgreSQL URLs are valid only INSIDE the private container where
     // docker exec runs psql. They never target a host or deployed database.

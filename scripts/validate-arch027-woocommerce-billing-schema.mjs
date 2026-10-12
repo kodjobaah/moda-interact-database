@@ -35,6 +35,8 @@ assert.match(operation, /shopId\s+String\s+@db\.Text[\s\S]*?shop\s+Shop\s+@relat
 assert.match(operation, /requestKey\s+String\s+@db\.VarChar\(255\)/);
 assert.match(operation, /requestFingerprint\s+Bytes/);
 assert.match(operation, /quotedCurrency\s+String\?\s+@db\.Char\(3\)/);
+assert.match(operation, /providerReference\s+String\?\s+@db\.VarChar\(255\)/,
+  'providerReference must remain nullable generic provider evidence');
 assert.match(operation, /recoveryCreditPurchaseId\s+String\?\s+@unique\s+@db\.Text/);
 assert.match(operation, /@@unique\(\[shopId, requestKey\]\)/);
 for (const index of [
