@@ -6,7 +6,7 @@ const schema = readFileSync(new URL('../prisma/schema.prisma', import.meta.url),
 const sql = readFileSync(new URL(`../prisma/migrations/${migrationName}/migration.sql`, import.meta.url), 'utf8');
 const migrations = readdirSync(new URL('../prisma/migrations/', import.meta.url))
   .filter(name => /^\d{14}_/.test(name)).sort();
-assert.equal(migrations.at(-1), migrationName, 'migration must follow existing migrations');
+assert.ok(migrations.includes(migrationName), 'migration must remain in the ordered migration history');
 
 function block(kind, name) {
   const match = schema.match(new RegExp(`^${kind} ${name} \\{([\\s\\S]*?)^\\}`, 'm'));

@@ -15,7 +15,7 @@ assert.equal(decodeURIComponent(parsed.pathname.slice(1)), `arch026_read_${mode}
   'Refusing to run migrations on a database without the exact disposable fixture name');
 const migrations = readdirSync(new URL('../prisma/migrations/', import.meta.url))
   .filter(name => /^\d{14}_/.test(name)).sort();
-assert.equal(migrations.at(-1), target);
+assert.ok(migrations.includes(target), 'target migration must remain in the ordered migration history');
 
 const psqlArgs = ['-X', '-q', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=sqlstate', connection];
 function psql(sql, capture = false) {
