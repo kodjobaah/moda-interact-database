@@ -1,0 +1,2 @@
+ALTER TYPE "public"."BackgroundRuntimeLeaseName"
+  ADD VALUE IF NOT EXISTS 'WOO_COUPON_SYNC_DISPATCH';
