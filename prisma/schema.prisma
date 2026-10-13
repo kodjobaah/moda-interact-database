@@ -889,6 +889,7 @@ model MerchantPricingPlan {
   billingOperations BillingOperation[]
   highlights        MerchantPricingPlanHighlight[]
   features          MerchantPricingPlanFeature[]
+  commerceModelPolicies CommerceModelPolicy[]
   commerceModel         CommerceModelCatalogueEntry?       @relation("MerchantPricingPlanCommerceModel", fields: [commerceModelId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   currentTranslationRun MerchantPricingTranslationRun?      @relation("MerchantPricingPlanCurrentTranslationRun", fields: [currentTranslationRunId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
@@ -1793,6 +1794,7 @@ model Shop {
   externalConnectionAudits        CommerceExternalConnectionAudit[]
   commerceAgentConfigurations     CommerceAgentConfiguration[]
   commerceModelAvailability       CommerceModelAvailability?
+  commerceModelPolicies           CommerceModelPolicy[]
   commerceStudioAccess            CommerceStudioMerchantAccess[]
   commerceAuditEvents             CommerceAuditEvent[]
   commerceShopProfile             CommerceShopProfile?
@@ -2172,6 +2174,8 @@ model PlatformAdmin {
   updatedCommerceModelCatalogueEntries          CommerceModelCatalogueEntry[]           @relation("CommerceModelCatalogueEntryUpdater")
   createdCommerceModelAvailabilities            CommerceModelAvailability[]             @relation("CommerceModelAvailabilityCreator")
   updatedCommerceModelAvailabilities            CommerceModelAvailability[]             @relation("CommerceModelAvailabilityUpdater")
+  createdCommerceModelPolicies                  CommerceModelPolicy[]                   @relation("CommerceModelPolicyCreator")
+  updatedCommerceModelPolicies                  CommerceModelPolicy[]                   @relation("CommerceModelPolicyUpdater")
   updatedCommerceOpenRouterCredentials          CommerceOpenRouterCredential[]          @relation("CommerceOpenRouterCredentialUpdater")
   updatedCommerceEmbeddingConfigurations        CommerceEmbeddingConfiguration[]        @relation("CommerceEmbeddingConfigurationUpdater")
   updatedCommerceTranslationProviderCredentials CommerceTranslationProviderCredential[] @relation("CommerceTranslationProviderCredentialUpdater")
@@ -2800,6 +2804,7 @@ model CommerceAuditEvent {
   toolRevisionId                  String?                                @db.Text
   shopId                          String?                                @db.Text
   modelCatalogueEntryId           String?                                @db.Text
+  modelPolicyId                   String?                               @db.Text
   modelAvailabilityId             String?                                @db.Text
   translationModelConfigurationId String?                                @db.Text
   promptTemplateCategoryId        String?                                @db.Text
@@ -2840,6 +2845,7 @@ model CommerceAuditEvent {
   @@index([shopId, createdAt, id])
   @@index([modelCatalogueEntryId, createdAt, id])
   @@index([modelAvailabilityId, createdAt, id])
+  @@index([modelPolicyId, createdAt, id])
   @@index([translationModelConfigurationId, createdAt, id])
   @@index([promptTemplateCategoryId, createdAt, id])
   @@index([promptTemplateId, createdAt, id])
@@ -2988,6 +2994,35 @@ model CommerceModelCatalogueEntry {
   @@unique([availabilityId, provider, providerModelId])
   @@index([availabilityId, enabled, displayName, id])
   @@index([provider, providerModelId])
+  @@schema("commerce")
+}
+
+// Model-independent execution budgets. LIVE and PREVIEW are isolated by context.
+// Sparse JSON keys on PRICE_PLAN/SHOP rows mean inherit, not null/zero.
+model CommerceModelPolicy {
+  id                    String                     @id @default(cuid()) @db.Text
+  environment           CommerceEnvironment
+  context               CommerceModelPolicyContext
+  scope                 CommerceModelPolicyScope
+  merchantPricingPlanId String?                    @db.Text
+  shopId                String?                    @db.Text
+  budget                Json                       @db.JsonB
+  budgetSchemaVersion   Int                        @default(1)
+  editVersion           Int                        @default(1)
+  createdByAdminId      String?                    @db.Text
+  updatedByAdminId      String?                    @db.Text
+  createdAt             DateTime                   @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                   @default(now()) @updatedAt @db.Timestamptz(3)
+
+  merchantPricingPlan   MerchantPricingPlan?       @relation(fields: [merchantPricingPlanId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  shop                  Shop?                      @relation(fields: [shopId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy             PlatformAdmin?            @relation("CommerceModelPolicyCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy             PlatformAdmin?            @relation("CommerceModelPolicyUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  // Scope-specific unique indexes and invariants are enforced in migration SQL.
+  @@index([environment, context, scope])
+  @@index([merchantPricingPlanId])
+  @@index([shopId])
   @@schema("commerce")
 }
 
@@ -3578,6 +3613,21 @@ enum CommerceToolRevisionStatus {
   @@schema("commerce")
 }
 
+enum CommerceModelPolicyContext {
+  LIVE
+  PREVIEW
+
+  @@schema("commerce")
+}
+
+enum CommerceModelPolicyScope {
+  PLATFORM
+  PRICE_PLAN
+  SHOP
+
+  @@schema("commerce")
+}
+
 enum CommerceModelAvailabilityScope {
   PLATFORM
   SHOP
@@ -3730,6 +3780,11 @@ enum CommerceAuditAction {
   UPDATE_MERCHANT_STUDIO_ACCESS
   DISABLE_MERCHANT_STUDIO_ACCESS
   BIND_MERCHANT_STUDIO_IDENTITY
+  SET_LIVE_PLATFORM_BUDGET
+  SET_LIVE_PLAN_BUDGET_OVERRIDE
+  SET_LIVE_SHOP_BUDGET_OVERRIDE
+  SET_PREVIEW_PLATFORM_BUDGET
+  SET_PREVIEW_SHOP_BUDGET_OVERRIDE
   CREATE_MODEL_AVAILABILITY
   UPDATE_MODEL_AVAILABILITY
   ENABLE_MODEL_AVAILABILITY
