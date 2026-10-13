@@ -74,7 +74,10 @@
     "test:arch031-merchant-pricing-publication-lifecycle:postgres:fresh": "node scripts/test-arch031-merchant-pricing-publication-lifecycle-postgres.mjs --mode fresh",
     "test:arch031-merchant-pricing-publication-lifecycle:postgres:upgrade": "node scripts/test-arch031-merchant-pricing-publication-lifecycle-postgres.mjs --mode upgrade",
     "test:arch033-operational-incidents:postgres:fresh": "node scripts/test-arch033-operational-incidents-postgres.mjs --mode fresh",
-    "test:arch033-operational-incidents:postgres:upgrade": "node scripts/test-arch033-operational-incidents-postgres.mjs --mode upgrade"
+    "test:arch033-operational-incidents:postgres:upgrade": "node scripts/test-arch033-operational-incidents-postgres.mjs --mode upgrade",
+    "test:arch036-woo-coupon-dispatch-runtime-lease": "node scripts/validate-arch036-woo-coupon-dispatch-runtime-lease.mjs",
+    "test:arch036-woo-coupon-dispatch-runtime-lease:postgres:fresh": "node scripts/test-arch036-woo-coupon-dispatch-runtime-lease-postgres.mjs --mode fresh",
+    "test:arch036-woo-coupon-dispatch-runtime-lease:postgres:upgrade": "node scripts/test-arch036-woo-coupon-dispatch-runtime-lease-postgres.mjs --mode upgrade"
   },
   "keywords": [],
   "author": "",
