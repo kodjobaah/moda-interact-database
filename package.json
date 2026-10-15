@@ -80,7 +80,10 @@
     "test:arch036-woo-coupon-dispatch-runtime-lease:postgres:upgrade": "node scripts/test-arch036-woo-coupon-dispatch-runtime-lease-postgres.mjs --mode upgrade",
     "test:arch038-model-policy-schema": "node scripts/validate-arch038-model-policy-schema.mjs",
     "test:arch038-model-policy:postgres:fresh": "node scripts/test-arch038-model-policy-postgres.mjs --mode fresh",
-    "test:arch038-model-policy:postgres:upgrade": "node scripts/test-arch038-model-policy-postgres.mjs --mode upgrade"
+    "test:arch038-model-policy:postgres:upgrade": "node scripts/test-arch038-model-policy-postgres.mjs --mode upgrade",
+    "test:arch032-mcp-platform-policy-schema": "node scripts/validate-arch032-mcp-platform-policy-schema.mjs",
+    "test:arch032-mcp-platform-policy:postgres:fresh": "node scripts/test-arch032-mcp-platform-policy-postgres.mjs --mode fresh",
+    "test:arch032-mcp-platform-policy:postgres:upgrade": "node scripts/test-arch032-mcp-platform-policy-postgres.mjs --mode upgrade"
   },
   "keywords": [],
   "author": "",

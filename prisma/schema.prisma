@@ -1523,6 +1523,8 @@ model PlatformBillingPolicy {
   defaultOutboundHardLimit         Int     @default(2000)
   terminalMessageReservedSlots     Int     @default(1)
   whatsappRecipientSuppressionDays Int     @default(7)
+  // Seeded once by ARCH-032 migration for all Commerce environments; later Admin edits use version CAS.
+  mcpExecutionPolicy               Json?   @db.JsonB
   version                          Int     @default(0)
 
   createdAt DateTime @default(now())
