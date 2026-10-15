@@ -77,6 +77,44 @@ const additionalHistoricalRecoveries = Array.from({ length: 12 }, (_, index) => 
 
 const seededRecoveries = [...demoRecoveries, ...additionalHistoricalRecoveries];
 
+// Keep this development seed consistent with the authoritative migration.
+// Repeat seeding must not overwrite merchant/operator edits to this policy.
+const MCP_POLICY_DEFAULTS = {
+  "schemaVersion": 1,
+  "environments": {
+    "LOCAL": {
+      "toolDeadlineMs": 10000,
+      "providerResponseTimeoutMs": 10000,
+      "maxProviderRequests": 12,
+      "maxResponseBytes": 262144
+    },
+    "TEST": {
+      "toolDeadlineMs": 10000,
+      "providerResponseTimeoutMs": 10000,
+      "maxProviderRequests": 12,
+      "maxResponseBytes": 262144
+    },
+    "DEVELOPMENT": {
+      "toolDeadlineMs": 10000,
+      "providerResponseTimeoutMs": 10000,
+      "maxProviderRequests": 12,
+      "maxResponseBytes": 262144
+    },
+    "STAGING": {
+      "toolDeadlineMs": 10000,
+      "providerResponseTimeoutMs": 10000,
+      "maxProviderRequests": 12,
+      "maxResponseBytes": 262144
+    },
+    "PRODUCTION": {
+      "toolDeadlineMs": 10000,
+      "providerResponseTimeoutMs": 10000,
+      "maxProviderRequests": 12,
+      "maxResponseBytes": 262144
+    }
+  }
+};
+
 async function main() {
   const features = [
     { key: "checkout_recovery", displayName: "Checkout Recovery", activationMode: "ALWAYS_ENABLED", systemRequired: true, active: true },
@@ -130,14 +168,14 @@ async function main() {
       defaultOutboundSoftLimit: 1000,
       defaultOutboundHardLimit: 2000,
       terminalMessageReservedSlots: 1,
+      globalPauseNewRecoveries: false,
+      globalPauseAutomatedWhatsapp: false,
+      whatsappRecipientSuppressionDays: 7,
+      mcpExecutionPolicy: MCP_POLICY_DEFAULTS,
     },
-    update: {
-      lifetimeFreeRecoveryAllowance: 5,
-      minimumUpgradePremiumBps: 2000,
-      defaultOutboundSoftLimit: 1000,
-      defaultOutboundHardLimit: 2000,
-      terminalMessageReservedSlots: 1,
-    },
+    // The migration has already populated this singleton after a reset.
+    // Re-running demo seed must never overwrite an operator's policy changes.
+    update: {},
   });
   console.log("Platform billing policy seeded.");
 
@@ -146,7 +184,8 @@ async function main() {
   });
 
   if (!session?.shop) {
-    throw new Error("Cannot seed dashboard data: no Shopify session was found.");
+    console.log("Skipping Shopify demo data: no Shopify session was found. Platform policies and billing plans are seeded.");
+    return;
   }
 
   const demoShopDomain = session.shop.trim().toLowerCase();
