@@ -39,8 +39,8 @@ const policyTable = '"billing"."PlatformBillingPolicy"';
 function policy() { return json(`SELECT to_jsonb(p)::text FROM ${policyTable} AS p WHERE "id" = 'default';`); }
 function billingFields(value) {
   // Whole-row compare excluding precisely the expected mutable CAS/JSONB fields.
-  const { mcpExecutionPolicy: _mcp, version: _version, updatedAt: _updated, ...rest } = value;
-  return rest;
+  return Object.fromEntries(Object.entries(value).filter(([key]) =>
+    !['mcpExecutionPolicy', 'version', 'updatedAt'].includes(key)));
 }
 function write(expectedVersion, expression) {
   const updated = scalar(`WITH changed AS (

@@ -109,10 +109,10 @@ assert.doesNotMatch(providerReferenceSql, /\b(?:CREATE|DROP|ALTER)\s+(?:TRIGGER|
 assert.doesNotMatch(providerReferenceSql, /\b(?:INSERT|UPDATE|DELETE|TRUNCATE)\s+(?:FROM|INTO|"|billing\.)/i,
   'forward migration must not fabricate or rewrite provider evidence');
 const originalKindShape = migration.match(
-  /CONSTRAINT "BillingOperation_kind_shape_check"\s+CHECK\s*\(([\s\S]*?)\n    \),\s*CONSTRAINT "BillingOperation_state_provider_reference_check"/,
+  /CONSTRAINT "BillingOperation_kind_shape_check"\s+CHECK\s*\(([\s\S]*?)\n[ ]{4}\),\s*CONSTRAINT "BillingOperation_state_provider_reference_check"/,
 )?.[1];
 const correctedKindShape = providerReferenceSql.match(
-  /ADD CONSTRAINT "BillingOperation_kind_shape_check"\s+CHECK\s*\(([\s\S]*?)\n    \);/,
+  /ADD CONSTRAINT "BillingOperation_kind_shape_check"\s+CHECK\s*\(([\s\S]*?)\n[ ]{4}\);/,
 )?.[1];
 assert.ok(originalKindShape && correctedKindShape, 'original and corrected operation shape CHECKs must exist');
 const referenceRequired = /\s+AND "providerReference" IS NOT NULL AND btrim\("providerReference"\) <> ''/g;
