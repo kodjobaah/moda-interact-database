@@ -5,7 +5,6 @@
 -- network/Meta/Redis operations must never occur under these locks.
 CREATE TYPE "whatsapp"."ConversationControlMode" AS ENUM ('AI', 'HUMAN');
 CREATE TYPE "commerce"."RecoveryOutreachInitiator" AS ENUM ('HUMAN', 'AGENT', 'AUTOMATION');
-ALTER TYPE "commerce"."RecoveryOutreachTrigger" ADD VALUE 'POST_WINDOW_FOLLOW_UP';
 CREATE TYPE "whatsapp"."MerchantConversationSendKind" AS ENUM ('HUMAN_TEXT', 'RECOVERY_FOLLOW_UP_TEMPLATE');
 CREATE TYPE "whatsapp"."MerchantConversationSendState" AS ENUM ('ACCEPTED','CLAIMED','DISPATCH_ADMITTED','SENT','FAILED','CANCELLED','UNKNOWN');
 CREATE TYPE "commerce"."HumanMessagingRestrictionStatus" AS ENUM ('ACTIVE','SUSPENDED');
