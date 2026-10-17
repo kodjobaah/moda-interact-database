@@ -3,8 +3,10 @@ import { readFileSync, readdirSync } from 'node:fs';
 
 const root = new URL('../', import.meta.url);
 const schema = readFileSync(new URL('prisma/schema.prisma', root), 'utf8');
-const migrationId = '20261017150000_arch043_platform_configuration';
-const sql = readFileSync(new URL(`prisma/migrations/${migrationId}/migration.sql`, root), 'utf8');
+const originalMigrationId = '20261017150000_arch043_platform_configuration';
+const forwardMigrationId = '20261017194500_arch043_remove_platform_configuration_audit_secret_redacted';
+const sql = readFileSync(new URL(`prisma/migrations/${originalMigrationId}/migration.sql`, root), 'utf8');
+const forwardSql = readFileSync(new URL(`prisma/migrations/${forwardMigrationId}/migration.sql`, root), 'utf8');
 const model = name => {
   const matches = [...schema.matchAll(new RegExp(`model ${name} \\{([\\s\\S]*?)\\n\\}`, 'g'))];
   assert.equal(matches.length, 1, `${name} must be defined exactly once`);
@@ -41,5 +43,10 @@ for (const token of ['AES-256-GCM', 'wrappingKeyId', 'authTag', 'ciphertext', 'n
   if (token === "'disabled'") assert.ok(sql.includes('"kind":"disabled"'));
   else assert.ok(sql.includes(token), `Missing ${token}`);
 }
-assert.equal(readdirSync(new URL('prisma/migrations/', root)).filter(x => /^\d{14}_/.test(x)).sort().at(-1), migrationId);
-console.log('PASS ARCH-043 exact schema, additive migration and structural SQL protections');
+assert.equal(readdirSync(new URL('prisma/migrations/', root)).filter(x => /^\d{14}_/.test(x)).sort().at(-1), forwardMigrationId);
+// Preserve the immutable baseline migration and verify that the forward migration
+// only drops the one previously defined audit JSON shape constraint.
+const forwardCommands = forwardSql.replace(/^--.*$/gm, '').trim();
+assert.match(forwardCommands, /^ALTER TABLE "public"\."PlatformConfigurationAudit"\s+DROP CONSTRAINT "PlatformConfigurationAudit_secret_redacted";$/);
+assert.doesNotMatch(forwardCommands, /DROP TABLE|DROP COLUMN|INSERT INTO|DELETE FROM/i);
+console.log('PASS ARCH-043 schema, original migration protections and audit forward migration');

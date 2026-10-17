@@ -10,6 +10,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 const mode = process.argv.at(process.argv.indexOf('--mode') + 1);
 assert.ok(['fresh', 'upgrade'].includes(mode), 'Pass --mode fresh or --mode upgrade');
 const target = '20261017150000_arch043_platform_configuration';
+const forwardMigrationId = '20261017194500_arch043_remove_platform_configuration_audit_secret_redacted';
 const migrations = new URL('../prisma/migrations/', import.meta.url);
 const container = `moda-arch043-db001-${randomUUID()}`;
 const db = 'arch043_configuration_fixture';
@@ -116,17 +117,17 @@ function assertGuards() {
       ['invalid tombstone', { ...disabled, SECRET: 'sensitive' }],
     ]) rejected(`${key}: ${name}`, `${prefix}${json(value)},now());`);
     psql(`${prefix}${json(disabled)},now());`);
-    const badAudit = `INSERT INTO ${audit} ("id","environment","key","expectedVersion",
-      "resultingVersion","afterValue","actorId") VALUES (${id()},'test',${quote(key)},0,1,`;
-    for (const [name, value] of [
-      ['unredacted after', sealed('YQ==')],
-      ['extra field', { ...redacted(true), ciphertext: 'YQ==' }],
-      ['wrong redacted flag', { redacted: false, configured: true }],
-      ['missing configured', { redacted: true }],
-    ]) rejected(`${key}: ${name}`, `${badAudit}${json(value)},'arch043-admin');`);
-    rejected(`${key}: unredacted before`, `${badAudit}${json(redacted(true))},'arch043-admin');`.replace(
-      '"afterValue","actorId"', '"afterValue","actorId","beforeValue"').replace(
-      `${json(redacted(true))},'arch043-admin'`, `${json(redacted(true))},'arch043-admin',${json(sealed('YQ=='))}`));
+    // The forward migration permits additional safe audit metadata for every
+    // configuration key, including previously fixed-shape secret keys.
+    // Application writers are still responsible for redacting secret material.
+    const auditId = randomUUID();
+    const before = { ...redacted(true), operation: 'IMPORT' };
+    const after = { ...redacted(true), operation: 'ROTATE', changedFields: ['appSecret'] };
+    psql(`INSERT INTO ${audit} ("id","environment","key","expectedVersion",
+      "resultingVersion","beforeValue","afterValue","actorId") VALUES
+      (${quote(auditId)},'test',${quote(key)},0,1,${json(before)},${json(after)},'arch043-admin');`);
+    assert.deepEqual(JSON.parse(scalar(`SELECT "afterValue"::text FROM ${audit}
+      WHERE "id"=${quote(auditId)};`)), after);
   }
   rejected('blank environment', `INSERT INTO ${config} ("id","environment","key","value","updatedAt")
     VALUES (${id()},'  ','commerce.preview','{}',now());`);
@@ -207,7 +208,7 @@ async function assertTransactions() {
   rejected('audit UPDATE', `UPDATE ${audit} SET "reason"='tamper' WHERE "environment"='test';`);
   rejected('audit DELETE', `DELETE FROM ${audit} WHERE "environment"='test';`);
   rejected('audit TRUNCATE', `TRUNCATE ${audit};`);
-  console.log('PASS create/CAS, concurrent writers, reset, stale replay, rollback, revocation, redaction and append-only history');
+  console.log('PASS create/CAS, concurrent writers, reset, stale replay, rollback, extensible redacted audit and append-only history');
 }
 async function main() {
   try {
@@ -222,7 +223,7 @@ async function main() {
     assert.ok(ready, 'Disposable PostgreSQL did not become ready');
     console.log(`ISOLATION ${mode} postgres=pgvector/pg17 network=none container=${container}`);
     const names = readdirSync(migrations).filter(name => /^\d{14}_/.test(name)).sort();
-    assert.equal(names.at(-1), target);
+    assert.equal(names.at(-1), forwardMigrationId);
     let before = null;
     for (const name of names) {
       if (name === target) {
@@ -249,6 +250,16 @@ async function main() {
     for (const key of ['shops','background','billing']) assert.equal(after[key], before[key], `${key} must be preserved`);
     assert.equal(scalar(`SELECT count(*) FROM ${config};`), '0', 'no operational values may be seeded');
     assert.equal(scalar(`SELECT count(*) FROM ${audit};`), '0', 'no audit entries may be seeded');
+    assert.equal(scalar(`SELECT count(*) FROM pg_constraint
+      WHERE conrelid='"public"."PlatformConfigurationAudit"'::regclass
+        AND conname='PlatformConfigurationAudit_secret_redacted';`), '0',
+      'the forward migration must remove only the secret audit shape constraint');
+    for (const constraint of ['PlatformConfigurationAudit_revision_step',
+      'PlatformConfigurationAudit_after_object', 'PlatformConfigurationAudit_before_object']) {
+      assert.equal(scalar(`SELECT count(*) FROM pg_constraint
+        WHERE conrelid='"public"."PlatformConfigurationAudit"'::regclass
+          AND conname=${quote(constraint)};`), '1', `${constraint} must remain enforced`);
+    }
     if (mode === 'upgrade') {
       assert.equal(scalar(`SELECT "version" FROM "public"."BackgroundRuntimeConfig"
         WHERE "id"='arch043-preserved-config';`), '7');
