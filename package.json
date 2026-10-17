@@ -83,7 +83,10 @@
     "test:arch038-model-policy:postgres:upgrade": "node scripts/test-arch038-model-policy-postgres.mjs --mode upgrade",
     "test:arch032-mcp-platform-policy-schema": "node scripts/validate-arch032-mcp-platform-policy-schema.mjs",
     "test:arch032-mcp-platform-policy:postgres:fresh": "node scripts/test-arch032-mcp-platform-policy-postgres.mjs --mode fresh",
-    "test:arch032-mcp-platform-policy:postgres:upgrade": "node scripts/test-arch032-mcp-platform-policy-postgres.mjs --mode upgrade"
+    "test:arch032-mcp-platform-policy:postgres:upgrade": "node scripts/test-arch032-mcp-platform-policy-postgres.mjs --mode upgrade",
+    "test:arch043-platform-configuration-schema": "node scripts/validate-arch043-platform-configuration-schema.mjs",
+    "test:arch043-platform-configuration:postgres:fresh": "node scripts/test-arch043-platform-configuration-postgres.mjs --mode fresh",
+    "test:arch043-platform-configuration:postgres:upgrade": "node scripts/test-arch043-platform-configuration-postgres.mjs --mode upgrade"
   },
   "keywords": [],
   "author": "",

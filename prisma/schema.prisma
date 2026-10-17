@@ -2163,6 +2163,43 @@ enum PlatformAdminRole {
   @@schema("public")
 }
 
+// ARCH-043: environment-scoped platform policy values and sealed application secrets.
+// Authorised writers must perform CAS mutations and audit inserts atomically.
+model PlatformConfiguration {
+  id          String   @id @default(cuid())
+  environment String   @db.VarChar(32)
+  key         String   @db.VarChar(128)
+  value       Json
+  version     Int      @default(1)
+  updatedBy   String?  @db.VarChar(191)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([environment, key])
+  @@index([environment, updatedAt])
+  @@schema("public")
+}
+
+// Historical actor identifiers deliberately do not FK to mutable Admin accounts.
+// Audit values for secret keys are SQL-constrained to redacted status only.
+model PlatformConfigurationAudit {
+  id               String   @id @default(cuid())
+  environment      String   @db.VarChar(32)
+  key              String   @db.VarChar(128)
+  expectedVersion  Int
+  resultingVersion Int
+  beforeValue      Json?
+  afterValue       Json
+  actorId          String   @db.VarChar(191)
+  reason           String?  @db.VarChar(1000)
+  createdAt        DateTime @default(now())
+
+  @@unique([environment, key, resultingVersion])
+  @@index([environment, key, createdAt])
+  @@index([actorId, createdAt])
+  @@schema("public")
+}
+
 model PlatformAdmin {
   createdCommerceToolRevisions                  CommerceToolRevision[]                  @relation("CommerceToolRevisionCreator")
   publishedCommerceToolRevisions                CommerceToolRevision[]                  @relation("CommerceToolRevisionPublisher")
