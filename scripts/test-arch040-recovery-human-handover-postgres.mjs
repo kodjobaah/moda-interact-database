@@ -103,10 +103,12 @@ async function main() {
     INSERT INTO "public"."PlatformAdmin" ("id","email","updatedAt") VALUES
       ('admin-040','admin-040@example.test',now());
     INSERT INTO "commerce"."CheckoutRecovery" ("id","shopId","checkoutToken","lastExternalActivityAt","updatedAt") VALUES
-      ('r1','s1','recovery-one',now(),now()),('r2','s2','recovery-two',now(),now());
+      ('r1','s1','recovery-one',now(),now()),('r2','s2','recovery-two',now(),now()),
+      ('r3','s1','recovery-three',now(),now()),('r4','s2','recovery-four',now(),now()),
+      ('r5','s1','recovery-five',now(),now());
     INSERT INTO "whatsapp"."Conversation" ("id","shopId","checkoutRecoveryId","type","updatedAt") VALUES
       ('c1',NULL,'r1','RECOVERY',now()),('c2','s2','r2','RECOVERY',now()),
-      ('standalone','s1',NULL,'PRODUCT_SUPPORT',now());`);
+      ('c5',NULL,'r5','RECOVERY',now()),('standalone','s1',NULL,'PRODUCT_SUPPORT',now());`);
   assert.equal(scalar(`SELECT "controlMode"||':'||"controlRevision"||':'||coalesce("controlChangedAt"::text,'NULL') FROM "whatsapp"."Conversation" WHERE "id"='c1'`), 'AI:0:NULL');
   assert.equal(scalar(`SELECT count(*) FROM "whatsapp"."Conversation" WHERE "checkoutRecoveryId"='r1'`), '1');
   rejects(`INSERT INTO "whatsapp"."Conversation" ("id","checkoutRecoveryId","type","updatedAt") VALUES ('dup','r1','RECOVERY',now());`, 'one conversation per recovery');
@@ -125,10 +127,19 @@ async function main() {
   rejects(`UPDATE "whatsapp"."ConversationControlEvent" SET "toRevision"=4 WHERE "id"='control-1';`, 'immutable control audit');
   console.log('PASS control CAS, racing writers, monotonic audit and no-op');
 
-  sql(`INSERT INTO "commerce"."RecoveryOutreachAttempt" ("id","checkoutRecoveryId","recipient","sequence","trigger","configuredOfferMode","updatedAt") VALUES
-    ('first','r1','447700900001',1,'INITIAL','NONE',now()),
-    ('follow','r1','447700900001',2,'NO_RESPONSE_FOLLOW_UP','NONE',now()),
-    ('foreign-follow','r2','447700900002',2,'NO_RESPONSE_FOLLOW_UP','NONE',now());`);
+  sql(`INSERT INTO "whatsapp"."ConversationMessage" ("id","conversationId","direction","senderType","content","status","sentAt") VALUES
+    ('m-sent-follow','c5','OUTBOUND','AUTOMATION','Sent follow-up','SENT',now());
+    INSERT INTO "commerce"."RecoveryOutreachAttempt" ("id","checkoutRecoveryId","recipient","sequence","trigger","configuredOfferMode","status","outboundMessageId","sentAt","updatedAt") VALUES
+    ('first','r1','447700900001',1,'INITIAL','NONE','PENDING',NULL,NULL,now()),
+    ('follow','r1','447700900001',2,'NO_RESPONSE_FOLLOW_UP','NONE','PENDING',NULL,NULL,now()),
+    ('foreign-follow','r2','447700900002',2,'NO_RESPONSE_FOLLOW_UP','NONE','PENDING',NULL,NULL,now()),
+    ('failed-follow','r3','447700900003',2,'NO_RESPONSE_FOLLOW_UP','NONE','FAILED',NULL,NULL,now()),
+    ('capacity-follow','r4','447700900004',2,'NO_RESPONSE_FOLLOW_UP','NONE','CAPACITY_BLOCKED',NULL,NULL,now()),
+    ('sent-follow','r5','447700900005',2,'NO_RESPONSE_FOLLOW_UP','NONE','WAITING_FOR_RESPONSE','m-sent-follow',now(),now());`);
+  assert.equal(scalar(`SELECT string_agg("status"::text,',' ORDER BY "status"::text)
+    FROM "commerce"."RecoveryOutreachAttempt" WHERE "sequence"=2
+      AND "id" IN ('follow','failed-follow','capacity-follow','sent-follow')`),
+  'CAPACITY_BLOCKED,FAILED,PENDING,WAITING_FOR_RESPONSE');
   rejects(`INSERT INTO "commerce"."RecoveryOutreachAttempt" ("id","checkoutRecoveryId","recipient","sequence","trigger","configuredOfferMode","updatedAt") VALUES ('third','r1','447700900001',3,'NO_RESPONSE_FOLLOW_UP','NONE',now());`, 'no third recovery outreach');
   rejects(`INSERT INTO "commerce"."RecoveryOutreachAttempt" ("id","checkoutRecoveryId","recipient","sequence","trigger","configuredOfferMode","updatedAt") VALUES ('mismatch','r2','447700900002',1,'POST_WINDOW_FOLLOW_UP','NONE',now());`, 'invalid trigger pairing');
   const attempts = await parallel(['HUMAN','AUTOMATION'].map((actor) => `WITH won AS (
@@ -147,6 +158,7 @@ async function main() {
   sql(`UPDATE "commerce"."RecoveryOutreachAttempt" SET "outboundMessageId"='m-human' WHERE "id"='follow';`);
   assert.equal(scalar(`SELECT count(*) FROM "whatsapp"."ConversationMessage" WHERE "conversationId"='c1' AND "senderType"='HUMAN'`), '2');
   sql(`UPDATE "whatsapp"."ConversationMessage" SET "status"='SENT',"sentAt"=now() WHERE "id"='m-human';`);
+  assert.equal(scalar(`SELECT "status"::text FROM "whatsapp"."ConversationMessage" WHERE "id"='m-human'`), 'SENT');
   console.log('PASS unique shared follow-up, race, provenance and same-conversation FK');
 
   const hex = 'a'.repeat(64);
