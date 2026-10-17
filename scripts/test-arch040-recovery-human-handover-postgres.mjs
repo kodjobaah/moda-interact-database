@@ -140,8 +140,15 @@ async function main() {
     FROM "commerce"."RecoveryOutreachAttempt" WHERE "sequence"=2
       AND "id" IN ('follow','failed-follow','capacity-follow','sent-follow')`),
   'CAPACITY_BLOCKED,FAILED,PENDING,WAITING_FOR_RESPONSE');
-  rejects(`INSERT INTO "commerce"."RecoveryOutreachAttempt" ("id","checkoutRecoveryId","recipient","sequence","trigger","configuredOfferMode","updatedAt") VALUES ('third','r1','447700900001',3,'NO_RESPONSE_FOLLOW_UP','NONE',now());`, 'no third recovery outreach');
-  rejects(`INSERT INTO "commerce"."RecoveryOutreachAttempt" ("id","checkoutRecoveryId","recipient","sequence","trigger","configuredOfferMode","updatedAt") VALUES ('mismatch','r2','447700900002',1,'POST_WINDOW_FOLLOW_UP','NONE',now());`, 'invalid trigger pairing');
+  // Maximum outreach count and sequence/trigger pairing are application
+  // policy, not PostgreSQL CHECK constraints. A future sequence 3 is valid
+  // storage even though current Background policy may reject it.
+  sql(`INSERT INTO "commerce"."RecoveryOutreachAttempt" ("id","checkoutRecoveryId","recipient","sequence","trigger","configuredOfferMode","updatedAt") VALUES ('third','r1','447700900001',3,'NO_RESPONSE_FOLLOW_UP','NONE',now());`);
+  sql(`INSERT INTO "commerce"."RecoveryOutreachAttempt" ("id","checkoutRecoveryId","recipient","sequence","trigger","configuredOfferMode","updatedAt") VALUES ('mismatch','r2','447700900002',1,'POST_WINDOW_FOLLOW_UP','NONE',now());`);
+  assert.equal(scalar(`SELECT count(*) FROM "commerce"."RecoveryOutreachAttempt" WHERE "checkoutRecoveryId"='r1' AND "sequence"=3`), '1');
+  rejects(`INSERT INTO "commerce"."RecoveryOutreachAttempt" ("id","checkoutRecoveryId","recipient","sequence","trigger","configuredOfferMode","updatedAt") VALUES ('duplicate-third','r1','447700900001',3,'NO_RESPONSE_FOLLOW_UP','NONE',now());`, 'unique recovery/sequence remains enforced');
+  rejects(`INSERT INTO "commerce"."RecoveryOutreachAttempt" ("id","checkoutRecoveryId","recipient","sequence","trigger","configuredOfferMode","updatedAt") VALUES ('zero','r2','447700900002',0,'INITIAL','NONE',now());`, 'structural positive sequence remains enforced');
+  assert.equal(scalar(`SELECT count(*) FROM pg_constraint WHERE conrelid='"commerce"."RecoveryOutreachAttempt"'::regclass AND conname IN ('ck_arch016_outreach_trigger_sequence','RecoveryOutreachAttempt_sequence_trigger_check')`), '0');
   const attempts = await parallel(['HUMAN','AUTOMATION'].map((actor) => `WITH won AS (
     UPDATE "commerce"."RecoveryOutreachAttempt"
       SET "initiatedBy"='${actor}', "initiationKey"='follow-${actor}',"claimedAt"=now(),"updatedAt"=now()
@@ -172,6 +179,10 @@ async function main() {
   rejects(humanCmd('bad-tenant','s2','c1','other-shop-key'),'recovery-derived tenant');
   rejects(humanCmd('bad-attempt','s1','c1','wrong-attempt',"'foreign-follow'",'RECOVERY_FOLLOW_UP_TEMPLATE'),'wrong recovery follow-up');
   sql(humanCmd('cmd-follow','s1','c1','follow-key',"'follow'",'RECOVERY_FOLLOW_UP_TEMPLATE'));
+  // Referential/tenant guard must accept a future sequence without embedding
+  // today's sequence-2 business-policy limit in the database function.
+  sql(humanCmd('cmd-third','s1','c1','third-key',"'third'",'RECOVERY_FOLLOW_UP_TEMPLATE'));
+  assert.equal(scalar(`SELECT "recoveryOutreachAttemptId" FROM "whatsapp"."MerchantConversationSendCommand" WHERE "id"='cmd-third'`), 'third');
   rejects(`UPDATE "whatsapp"."MerchantConversationSendCommand" SET "textBody"='tampered' WHERE "id"='cmd-1';`, 'immutable accepted payload');
   rejects(`UPDATE "whatsapp"."MerchantConversationSendCommand" SET "outboundMessageId"='m-foreign' WHERE "id"='cmd-1';`, 'wrong outbound conversation');
   sql(`UPDATE "whatsapp"."MerchantConversationSendCommand" SET "state"='CLAIMED',"leaseToken"='worker-one',
