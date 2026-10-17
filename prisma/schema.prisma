@@ -347,6 +347,15 @@ model CheckoutRecovery {
 enum RecoveryOutreachTrigger {
   INITIAL
   NO_RESPONSE_FOLLOW_UP
+  POST_WINDOW_FOLLOW_UP
+
+  @@schema("commerce")
+}
+
+enum RecoveryOutreachInitiator {
+  HUMAN
+  AGENT
+  AUTOMATION
 
   @@schema("commerce")
 }
@@ -372,6 +381,9 @@ model RecoveryOutreachAttempt {
   sequence           Int
   trigger            RecoveryOutreachTrigger
   status             RecoveryOutreachStatus  @default(PENDING)
+  initiatedBy        RecoveryOutreachInitiator?
+  initiationKey      String?                 @unique @db.VarChar(255)
+  claimedAt          DateTime?               @db.Timestamptz(3)
 
   configuredOfferMode    RecoveryOfferMode
   fixedShopifyDiscountId String?
@@ -389,10 +401,19 @@ model RecoveryOutreachAttempt {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
+  merchantSendCommand MerchantConversationSendCommand?
+
   @@unique([checkoutRecoveryId, sequence])
   @@index([checkoutRecoveryId, status, sequence])
   @@index([status, followUpDueAt])
   @@schema("commerce")
+}
+
+enum ConversationControlMode {
+  AI
+  HUMAN
+
+  @@schema("whatsapp")
 }
 
 enum ConversationType {
@@ -440,6 +461,9 @@ model Conversation {
 
   type    ConversationType
   outcome ConversationOutcome @default(IN_PROGRESS)
+  controlMode ConversationControlMode @default(AI)
+  controlRevision Int @default(0)
+  controlChangedAt DateTime? @db.Timestamptz(3)
 
   languageTag    String?
   languageSource LanguageSource?
@@ -462,6 +486,8 @@ model Conversation {
   updatedAt DateTime @updatedAt
 
   messages ConversationMessage[]
+  controlEvents ConversationControlEvent[]
+  merchantSendCommands MerchantConversationSendCommand[]
 
   @@unique([checkoutRecoveryId])
   @@index([checkoutRecoveryId])
@@ -469,6 +495,80 @@ model Conversation {
   @@index([customerId, lastMessageAt])
   @@index([lastMessageAt])
   @@index([processingStartedAt])
+  @@schema("whatsapp")
+}
+
+model ConversationControlEvent {
+  id String @id @default(cuid())
+  conversationId String
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  fromMode ConversationControlMode
+  toMode ConversationControlMode
+  fromRevision Int
+  toRevision Int
+  occurredAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([conversationId, toRevision])
+  @@index([conversationId, occurredAt, id])
+  @@schema("whatsapp")
+}
+
+enum MerchantConversationSendKind {
+  HUMAN_TEXT
+  RECOVERY_FOLLOW_UP_TEMPLATE
+
+  @@schema("whatsapp")
+}
+
+enum MerchantConversationSendState {
+  ACCEPTED
+  CLAIMED
+  DISPATCH_ADMITTED
+  SENT
+  FAILED
+  CANCELLED
+  UNKNOWN
+
+  @@schema("whatsapp")
+}
+
+model MerchantConversationSendCommand {
+  id String @id @default(cuid())
+  shopId String
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  idempotencyKey String @db.VarChar(128)
+  payloadSha256 String @db.VarChar(64)
+  expectedControlRevision Int
+  kind MerchantConversationSendKind
+  recipientSnapshot String @db.VarChar(64)
+  textBody String? @db.Text
+  templateName String? @db.VarChar(255)
+  templateLanguageCode String? @db.VarChar(32)
+  templateParameters Json?
+  recoveryOutreachAttemptId String? @unique
+  recoveryOutreachAttempt RecoveryOutreachAttempt? @relation(fields: [recoveryOutreachAttemptId], references: [id], onDelete: Restrict)
+  outboundMessageId String? @unique
+  outboundMessage ConversationMessage? @relation(fields: [outboundMessageId], references: [id], onDelete: Restrict)
+  state MerchantConversationSendState @default(ACCEPTED)
+  providerDispatchKey String? @unique @db.VarChar(128)
+  providerDispatchAdmittedAt DateTime? @db.Timestamptz(3)
+  providerDispatchControlRevision Int?
+  providerDispatchRestrictionRevision Int?
+  dispatchAttemptCount Int @default(0)
+  nextAttemptAt DateTime? @db.Timestamptz(3)
+  leaseToken String? @db.VarChar(128)
+  leaseExpiresAt DateTime? @db.Timestamptz(3)
+  acceptedAt DateTime @default(now()) @db.Timestamptz(3)
+  completedAt DateTime? @db.Timestamptz(3)
+  failureCode String? @db.VarChar(128)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([shopId, idempotencyKey])
+  @@index([state, nextAttemptAt, leaseExpiresAt, createdAt, id], map: "MerchantSend_due_idx")
+  @@index([shopId, conversationId, createdAt, id], map: "MerchantSend_shop_conversation_idx")
   @@schema("whatsapp")
 }
 
@@ -524,6 +624,9 @@ model ConversationMessage {
 
   // Meta's WhatsApp message ID
   providerMessageId String? @unique
+  providerDispatchKey String? @unique @db.VarChar(128)
+  providerDispatchAdmittedAt DateTime? @db.Timestamptz(3)
+  providerDispatchControlRevision Int?
 
   // Meta context.id when this message is a reply
   inReplyToProviderId String?
@@ -547,6 +650,7 @@ model ConversationMessage {
   createdAt DateTime @default(now())
 
   recoveryOutreachAttempt RecoveryOutreachAttempt?
+  merchantSendCommand MerchantConversationSendCommand?
 
   sentAt              DateTime?
   deliveredAt         DateTime?
@@ -578,6 +682,45 @@ model WhatsAppRecipientReachability {
   @@unique([shopId, recipient])
   @@index([shopId, suppressUntil])
   @@schema("whatsapp")
+}
+
+enum HumanMessagingRestrictionStatus {
+  ACTIVE
+  SUSPENDED
+
+  @@schema("commerce")
+}
+
+model ShopHumanMessagingRestriction {
+  shopId String @id
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  status HumanMessagingRestrictionStatus @default(ACTIVE)
+  revision Int @default(1)
+  reasonCode String @db.VarChar(128)
+  reasonNote String? @db.VarChar(1024)
+  suspendedAt DateTime? @db.Timestamptz(3)
+  restoredAt DateTime? @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@schema("commerce")
+}
+
+model ShopHumanMessagingRestrictionEvent {
+  id String @id @default(cuid())
+  shopId String
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  fromStatus HumanMessagingRestrictionStatus
+  toStatus HumanMessagingRestrictionStatus
+  revision Int
+  reasonCode String @db.VarChar(128)
+  reasonNote String? @db.VarChar(1024)
+  platformAdminId String
+  platformAdmin PlatformAdmin @relation(fields: [platformAdminId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([shopId, revision])
+  @@index([shopId, createdAt, id])
+  @@schema("commerce")
 }
 
 enum BillingPlanKind {
@@ -1846,6 +1989,9 @@ model Shop {
   featurePreferences                ShopFeaturePreference[]
   whatsappTemplateVariants          WhatsAppTemplateVariant[]
   whatsappRecipientReachability     WhatsAppRecipientReachability[]
+  merchantConversationSendCommands MerchantConversationSendCommand[]
+  humanMessagingRestriction ShopHumanMessagingRestriction?
+  humanMessagingRestrictionEvents ShopHumanMessagingRestrictionEvent[]
   merchantSupportThread             MerchantSupportThread?
   operationalIncidents              OperationalIncident[]
 
@@ -2218,6 +2364,7 @@ model PlatformAdmin {
   billingEconomicsSnapshots                 BillingEconomicsSnapshot[]
   recoveryPolicyOverrides                   ShopRecoveryPolicyOverride[]
   recoveryPolicyOverrideAuditEvents         ShopRecoveryPolicyOverrideAuditEvent[]
+  humanMessagingRestrictionEvents ShopHumanMessagingRestrictionEvent[]
 
   @@unique([provider, providerSubject])
   @@index([active, role])
