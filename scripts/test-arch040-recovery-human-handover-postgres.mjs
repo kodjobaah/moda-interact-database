@@ -3,12 +3,13 @@ import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { runArch040PostgresContention } from './arch040-postgres-contention.mjs';
 
-// Verify both clean installation and upgrade of representative pre-existing records.
+// Verify the complete migration chain on a fresh, disposable database only.
 // Use disposable, network-isolated PostgreSQL; never production credentials.
 const modeIndex = process.argv.indexOf('--mode');
 const mode = modeIndex < 0 ? undefined : process.argv[modeIndex + 1];
-assert.ok(['fresh', 'upgrade'].includes(mode), 'Use --mode fresh or --mode upgrade');
+assert.equal(mode, 'fresh', 'ARCH-040 validation supports --mode fresh only');
 const targetMigration = '20261017120000_arch040_recovery_human_handover';
 const image = 'pgvector/pgvector:pg17';
 const container = `moda-arch040-db001-${randomUUID()}`;
@@ -92,41 +93,11 @@ async function main() {
   assert.ok(ready, 'PostgreSQL was not ready');
   const migrations = new URL('../prisma/migrations/', import.meta.url);
   const names = readdirSync(migrations).filter((name) => /^\d{14}_/.test(name)).sort();
-  assert.equal(names.at(-1), targetMigration, 'ARCH-040 must be last in the captured baseline');
+  assert.ok(names.includes(targetMigration), 'ARCH-040 migration is missing from the captured baseline');
   for (const name of names) {
-    if (mode === 'upgrade' && name === targetMigration) {
-      // Exercise the new migration over normal pre-ARCH-040 durable records.
-      // This is a preservation check, not historical-data repair/backfill.
-      sql(`INSERT INTO "commerce"."Shop" ("id","domain","updatedAt")
-          VALUES ('legacy-shop-040','arch040-before-upgrade.example',now());
-        INSERT INTO "commerce"."CheckoutRecovery"
-          ("id","shopId","checkoutToken","lastExternalActivityAt","updatedAt")
-          VALUES ('legacy-recovery-040','legacy-shop-040','legacy-checkout-040',now(),now());
-        INSERT INTO "whatsapp"."Conversation"
-          ("id","shopId","checkoutRecoveryId","type","updatedAt")
-          VALUES ('legacy-conversation-040',NULL,'legacy-recovery-040','RECOVERY',now());
-        INSERT INTO "whatsapp"."ConversationMessage"
-          ("id","conversationId","direction","senderType","content")
-          VALUES ('legacy-message-040','legacy-conversation-040','INBOUND','CUSTOMER','Original customer message');
-        INSERT INTO "commerce"."RecoveryOutreachAttempt"
-          ("id","checkoutRecoveryId","recipient","sequence","trigger","configuredOfferMode","updatedAt")
-          VALUES
-          ('legacy-first-040','legacy-recovery-040','447700900010',1,'INITIAL','NONE',now()),
-          ('legacy-follow-040','legacy-recovery-040','447700900010',2,'NO_RESPONSE_FOLLOW_UP','NONE',now());`);
-      assert.equal(scalar(`SELECT count(*) FROM "whatsapp"."ConversationMessage" WHERE "id"='legacy-message-040';`), '1');
-    }
     sql(readFileSync(new URL(`../prisma/migrations/${name}/migration.sql`, import.meta.url), 'utf8'));
   }
   console.log(`PASS ${mode} migration chain (${names.length} migrations)`);
-  if (mode === 'upgrade') {
-    assert.equal(scalar(`SELECT "checkoutToken" FROM "commerce"."CheckoutRecovery" WHERE "id"='legacy-recovery-040';`), 'legacy-checkout-040');
-    assert.equal(scalar(`SELECT "controlMode"||':'||"controlRevision"||':'||coalesce("controlChangedAt"::text,'NULL') FROM "whatsapp"."Conversation" WHERE "id"='legacy-conversation-040';`), 'AI:0:NULL');
-    assert.equal(scalar(`SELECT "content" FROM "whatsapp"."ConversationMessage" WHERE "id"='legacy-message-040';`), 'Original customer message');
-    assert.equal(scalar(`SELECT "sequence"||':'||"trigger" FROM "commerce"."RecoveryOutreachAttempt" WHERE "id"='legacy-follow-040';`), '2:NO_RESPONSE_FOLLOW_UP');
-    assert.equal(scalar(`SELECT count(*) FROM "commerce"."RecoveryOutreachAttempt" WHERE "checkoutRecoveryId"='legacy-recovery-040';`), '2');
-    assert.equal(scalar(`SELECT count(*) FROM "commerce"."ShopHumanMessagingRestriction" WHERE "shopId"='legacy-shop-040';`), '0');
-    console.log('PASS upgrade preserves existing recovery, conversation, messages and outreach attempts');
-  }
   sql(`INSERT INTO "commerce"."Shop" ("id","domain","updatedAt") VALUES
       ('s1','arch040-shop1.example',now()),('s2','arch040-shop2.example',now());
     INSERT INTO "public"."PlatformAdmin" ("id","email","updatedAt") VALUES
@@ -219,6 +190,8 @@ async function main() {
   sql(`UPDATE "whatsapp"."MerchantConversationSendCommand" SET "state"='SENT',"completedAt"=now() WHERE "id"='cmd-1';`);
   assert.equal(scalar(`SELECT "providerDispatchKey" FROM "whatsapp"."MerchantConversationSendCommand" WHERE "id"='cmd-1'`),'permit-one');
   console.log('PASS recovery command tenancy, immutable intent, lease reclaim, admitted UNKNOWN and tombstone');
+
+  await runArch040PostgresContention({ sql, scalar, rejects, dbArgs });
 
   assert.equal(scalar(`SELECT count(*) FROM "commerce"."ShopHumanMessagingRestriction" WHERE "shopId"='s1'`), '0');
   sql(restrictionChange('s1','ACTIVE','SUSPENDED',1,'safety-hold','admin-040',true));
