@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const schema = readFileSync(new URL('../prisma/schema.prisma', import.meta.url), 'utf8');
 const migration = readFileSync(new URL('../prisma/migrations/20261018030000_arch040_conversation_moderation_assessments/migration.sql', import.meta.url), 'utf8');
+const templateCorrection = readFileSync(new URL('../prisma/migrations/20261018092000_arch040_moderation_template_content_digest/migration.sql', import.meta.url), 'utf8');
 for (const kind of ['ConversationModerationSubject', 'ConversationModerationDecision']) {
   assert.match(schema, new RegExp(`enum ${kind} \\{`));
   assert.ok(migration.includes(`"whatsapp"."${kind}"`), `Missing SQL enum ${kind}`);
@@ -23,6 +24,14 @@ for (const part of [
   'arch040_moderation_parent_guard', 'arch040_moderation_create_or_reuse', 'arch040_moderation_complete',
   'arch040_moderation_renew_lease', 'arch040_moderation_record_review',
 ]) assert.ok(migration.includes(part), `Missing SQL invariant ${part}`);
+for (const fragment of [
+  'arch040_moderation_template_input_v1',
+  'templateName', 'languageCode', 'parametersPresent',
+  'CREATE OR REPLACE FUNCTION "whatsapp".arch040_moderation_subject_guard',
+  'command_template_name,command_template_language,command_template_parameters',
+  'ARCH040 moderation HUMAN template digest mismatch',
+  'NEW."inputKind"=\'TEXT\' AND message_type=\'TEXT\'',
+]) assert.ok(templateCorrection.includes(fragment), `Missing template moderation correction: ${fragment}`);
 assert.doesNotMatch(migration, /\b(INSERT INTO|ALTER TABLE)\s+"?(billing|support)"?\./i, 'Moderation must not alter billing/support');
 const assessment = schema.split('model ConversationModerationAssessment {')[1]?.split(/\n}\s*\n/)[0] ?? '';
 assert.doesNotMatch(assessment, /actorPlatform|moderationTextBody|moderationRawContent/i,

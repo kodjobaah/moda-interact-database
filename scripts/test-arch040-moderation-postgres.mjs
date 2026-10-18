@@ -131,6 +131,50 @@ async function main() {
   rejected('digest does not match effective text',assessment('false-digest',{digest:'a'.repeat(64)}));
   rejected('text message cannot masquerade as transcript',assessment('false-transcript',{kind:'TRANSCRIPT'}));
   rejected('HUMAN text cannot be submitted as template params',assessment('false-command-kind',{subject:'HUMAN_COMMAND',message:null,command:'cmd1',kind:'TEMPLATE_PARAMETERS'}));
+  // Template moderation MUST derive the digest from the authoritative,
+  // immutable command fields. BG006 consumes the same SQL-produced UTF-8 text.
+  sql(`INSERT INTO "commerce"."RecoveryOutreachAttempt"
+    ("id","checkoutRecoveryId","recipient","sequence","trigger","configuredOfferMode","updatedAt")
+    VALUES ('a-template','r1','447700900001',2,'POST_WINDOW_FOLLOW_UP','NONE',now());
+    INSERT INTO "whatsapp"."MerchantConversationSendCommand"
+    ("id","shopId","conversationId","idempotencyKey","payloadSha256",
+     "expectedControlRevision","kind","recipientSnapshot", "templateName",
+     "templateLanguageCode","templateParameters","recoveryOutreachAttemptId","updatedAt")
+    VALUES ('cmd-template','s1','c1','modtest-template-one',${q('b'.repeat(64))},0,
+     'RECOVERY_FOLLOW_UP_TEMPLATE','447700900001','approved_follow_up','en_GB',
+     '{"body":{"name":"Taylor","order":7},"header":["thanks","again"]}'::jsonb,
+     'a-template',now());`);
+  const templateSql = (params = `'{"body":{"name":"Taylor","order":7},"header":["thanks","again"]}'::jsonb`,
+    name='approved_follow_up', lang='en_GB') =>
+    `SELECT "whatsapp".arch040_moderation_template_input_v1(${q(name)},${q(lang)},${params});`;
+  const canonicalTemplateText = scalar(templateSql());
+  assert.match(canonicalTemplateText,/moda\.whatsapp\.template-parameters\.v1/);
+  assert.equal(canonicalTemplateText,scalar(templateSql(
+    `'{"header":["thanks","again"],"body":{"order":7,"name":"Taylor"}}'::jsonb`)),
+    'JSONB object key order must not change the moderation input');
+  assert.notEqual(canonicalTemplateText,scalar(templateSql(undefined,'other_follow_up')));
+  assert.notEqual(canonicalTemplateText,scalar(templateSql(undefined,undefined,'fr')));
+  assert.notEqual(canonicalTemplateText,scalar(templateSql(
+    `'{"body":{"name":"Taylor","order":8},"header":["thanks","again"]}'::jsonb`)));
+  assert.notEqual(scalar(templateSql('NULL::jsonb')),scalar(templateSql(`'null'::jsonb`)),
+    'SQL NULL and JSON null parameter inputs must not collide');
+  const templateDigest=sha(canonicalTemplateText);
+  sql(assessment('assess-template',{subject:'HUMAN_COMMAND',message:null,
+    command:'cmd-template',kind:'TEMPLATE_PARAMETERS',digest:templateDigest}));
+  rejected('template digest cannot be caller chosen',assessment('tampered-template',{
+    subject:'HUMAN_COMMAND',message:null,command:'cmd-template',kind:'TEMPLATE_PARAMETERS',
+    digest:sha('invented renderer output')}));
+  rejected('AGENT template digest has no authoritative persisted tuple', assessment(
+    'unverifiable-agent-template',{subject:'AGENT_MESSAGE',message:'msg-agent',
+      kind:'TEMPLATE_PARAMETERS',digest:sha('Agent reply')}));
+  rejected('AUTOMATION template digest has no authoritative persisted tuple', assessment(
+    'unverifiable-automation-template',{subject:'AUTOMATION_MESSAGE',message:'msg-auto',
+      kind:'TEMPLATE_PARAMETERS',digest:sha('Automated message')}));
+  assert.equal(scalar(`SELECT "whatsapp".arch040_moderation_create_or_reuse(
+    'duplicate-template','s1','c1','HUMAN_COMMAND',NULL,'cmd-template',
+    ${q(templateDigest)},'TEMPLATE_PARAMETERS','omni-moderation-latest','moderation-v1');`),
+    'assess-template','same canonical template+policy+subject must reuse one assessment');
+  console.log('PASS authoritative template rendering, digests, and fail-closed message parameters');
   rejected('no duplicate raw content column',`SELECT "rawText" FROM ${tbl};`);
   console.log('PASS actor, digest shape, recovery/standalone tenancy, metadata shape');
 
@@ -207,6 +251,30 @@ async function main() {
   assert.equal(scalar(complete('assess1','stale-token','ALLOW')),'f');
   assert.equal(scalar(complete('assess1','lease-A','ALLOW')),'t');
   assert.equal(scalar(`SELECT "decision" FROM ${tbl} WHERE "id"='assess1';`),'ALLOW');
+  // Specifically prove that an existing ALLOW for digest A cannot be
+  // re-used after the linked content changes to digest B.
+  sql(`INSERT INTO "whatsapp"."ConversationMessage"
+    ("id","conversationId","direction","senderType","content")
+    VALUES ('msg-previously-allowed','c1','INBOUND','CUSTOMER','Allowed original');`);
+  sql(assessment('allowed-original',{message:'msg-previously-allowed',content:'Allowed original'}));
+  sql(claim('allowed-original','lease-original'));
+  assert.equal(scalar(complete('allowed-original','lease-original','ALLOW')),'t');
+  assert.equal(scalar(`SELECT "decision" FROM ${tbl} WHERE "id"='allowed-original';`),'ALLOW');
+  sql(`UPDATE "whatsapp"."ConversationMessage" SET "content"='Changed after approval'
+    WHERE "id"='msg-previously-allowed';`);
+  rejected('old ALLOW cannot be reused for changed content',
+    `SELECT "whatsapp".arch040_moderation_create_or_reuse(
+       'not-allowed-to-reuse','s1','c1','CUSTOMER_MESSAGE','msg-previously-allowed',NULL,
+       ${q(sha('Allowed original'))},'TEXT','omni-moderation-latest','moderation-v1');`);
+  const changedId=scalar(`SELECT "whatsapp".arch040_moderation_create_or_reuse(
+    'fresh-unclassified','s1','c1','CUSTOMER_MESSAGE','msg-previously-allowed',NULL,
+    ${q(sha('Changed after approval'))},'TEXT','omni-moderation-latest','moderation-v1');`);
+  assert.equal(changedId,'fresh-unclassified');
+  assert.equal(scalar(`SELECT "decision" FROM ${tbl} WHERE "id"='fresh-unclassified';`),'PENDING');
+  assert.equal(scalar(`SELECT "decision" FROM ${tbl} WHERE "id"='allowed-original';`),'ALLOW',
+    'prior ALLOW remains an immutable historical decision, not effective approval');
+  console.log('PASS changed content cannot reuse a terminal ALLOW');
+
   rejected('terminal decision immutable',`UPDATE ${tbl} SET "decision"='BLOCK',"flagged"=true WHERE "id"='assess1';`);
   assert.equal(scalar(complete('assess1','lease-A','BLOCK')),'f');
   console.log('PASS competing claims, token-CAS classifier completion, terminal immutability');
