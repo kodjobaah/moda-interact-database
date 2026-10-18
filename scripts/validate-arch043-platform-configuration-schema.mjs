@@ -43,7 +43,9 @@ for (const token of ['AES-256-GCM', 'wrappingKeyId', 'authTag', 'ciphertext', 'n
   if (token === "'disabled'") assert.ok(sql.includes('"kind":"disabled"'));
   else assert.ok(sql.includes(token), `Missing ${token}`);
 }
-assert.equal(readdirSync(new URL('prisma/migrations/', root)).filter(x => /^\d{14}_/.test(x)).sort().at(-1), forwardMigrationId);
+const migrationOrder = readdirSync(new URL('prisma/migrations/', root)).filter(x => /^\d{14}_/.test(x)).sort();
+assert.ok(migrationOrder.indexOf(forwardMigrationId) > migrationOrder.indexOf(originalMigrationId),
+  'ARCH-043 correction must follow its original migration; later migrations may be added');
 // Preserve the immutable baseline migration and verify that the forward migration
 // only drops the one previously defined audit JSON shape constraint.
 const forwardCommands = forwardSql.replace(/^--.*$/gm, '').trim();

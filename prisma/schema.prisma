@@ -488,6 +488,7 @@ model Conversation {
   messages ConversationMessage[]
   controlEvents ConversationControlEvent[]
   merchantSendCommands MerchantConversationSendCommand[]
+  moderationAssessments ConversationModerationAssessment[]
 
   @@unique([checkoutRecoveryId])
   @@index([checkoutRecoveryId])
@@ -565,6 +566,8 @@ model MerchantConversationSendCommand {
   failureCode String? @db.VarChar(128)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  moderationAssessments ConversationModerationAssessment[]
 
   @@unique([shopId, idempotencyKey])
   @@index([state, nextAttemptAt, leaseExpiresAt, createdAt, id], map: "MerchantSend_due_idx")
@@ -651,6 +654,7 @@ model ConversationMessage {
 
   recoveryOutreachAttempt RecoveryOutreachAttempt?
   merchantSendCommand MerchantConversationSendCommand?
+  moderationAssessments ConversationModerationAssessment[]
 
   sentAt              DateTime?
   deliveredAt         DateTime?
@@ -661,6 +665,71 @@ model ConversationMessage {
   @@index([conversationId, createdAt])
   @@index([conversationId, createdAt, id])
   @@index([inReplyToProviderId])
+  @@schema("whatsapp")
+}
+
+enum ConversationModerationSubject {
+  CUSTOMER_MESSAGE
+  HUMAN_COMMAND
+  AGENT_MESSAGE
+  AUTOMATION_MESSAGE
+
+  @@schema("whatsapp")
+}
+
+enum ConversationModerationDecision {
+  PENDING
+  CHECKING
+  ALLOW
+  BLOCK
+  REVIEW_REQUIRED
+  RETRYABLE_ERROR
+
+  @@schema("whatsapp")
+}
+
+// The reviewed decision is a content/policy-specific classification only.
+// It never replaces the existing provider-admission or billing fence.
+model ConversationModerationAssessment {
+  id                         String @id @default(cuid())
+  shopId                     String
+  shop                       Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  conversationId             String
+  conversation               Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  subject                    ConversationModerationSubject
+  conversationMessageId      String?
+  conversationMessage        ConversationMessage? @relation(fields: [conversationMessageId], references: [id], onDelete: Cascade)
+  merchantSendCommandId      String?
+  merchantSendCommand        MerchantConversationSendCommand? @relation(fields: [merchantSendCommandId], references: [id], onDelete: Cascade)
+  contentSha256              String @db.VarChar(64)
+  inputKind                  String @db.VarChar(32)
+  requestedModel             String @db.VarChar(96)
+  returnedModel              String? @db.VarChar(96)
+  policyVersion              String @db.VarChar(48)
+  decision                   ConversationModerationDecision @default(PENDING)
+  flagged                    Boolean?
+  categories                 Json?
+  categoryScores             Json?
+  reasonCode                 String? @db.VarChar(96)
+  providerRequestId          String? @db.VarChar(128)
+  attemptCount               Int @default(0)
+  nextAttemptAt              DateTime? @db.Timestamptz(3)
+  leaseToken                 String? @db.VarChar(128)
+  leaseExpiresAt             DateTime? @db.Timestamptz(3)
+  assessedAt                 DateTime? @db.Timestamptz(3)
+  reviewedAt                 DateTime? @db.Timestamptz(3)
+  reviewedByPlatformAdminId  String?
+  reviewedByPlatformAdmin    PlatformAdmin? @relation(fields: [reviewedByPlatformAdminId], references: [id], onDelete: Restrict)
+  reviewDisposition          String? @db.VarChar(32)
+  createdAt                  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt                  DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([conversationMessageId, policyVersion, contentSha256], map: "ConversationModeration_message_content_uq")
+  @@unique([merchantSendCommandId, policyVersion, contentSha256], map: "ConversationModeration_command_content_uq")
+  @@index([decision, nextAttemptAt, leaseExpiresAt, createdAt, id], map: "ConversationModeration_due_idx")
+  @@index([shopId, createdAt, id], map: "ConversationModeration_shop_incidents_idx")
+  @@index([conversationId, createdAt, id], map: "ConversationModeration_conversation_idx")
+  @@index([reviewedByPlatformAdminId, reviewedAt], map: "ConversationModeration_review_idx")
   @@schema("whatsapp")
 }
 
@@ -1990,6 +2059,7 @@ model Shop {
   whatsappTemplateVariants          WhatsAppTemplateVariant[]
   whatsappRecipientReachability     WhatsAppRecipientReachability[]
   merchantConversationSendCommands MerchantConversationSendCommand[]
+  moderationAssessments ConversationModerationAssessment[]
   humanMessagingRestriction ShopHumanMessagingRestriction?
   humanMessagingRestrictionEvents ShopHumanMessagingRestrictionEvent[]
   merchantSupportThread             MerchantSupportThread?
@@ -2402,6 +2472,7 @@ model PlatformAdmin {
   recoveryPolicyOverrides                   ShopRecoveryPolicyOverride[]
   recoveryPolicyOverrideAuditEvents         ShopRecoveryPolicyOverrideAuditEvent[]
   humanMessagingRestrictionEvents ShopHumanMessagingRestrictionEvent[]
+  reviewedModerationAssessments ConversationModerationAssessment[]
 
   @@unique([provider, providerSubject])
   @@index([active, role])
