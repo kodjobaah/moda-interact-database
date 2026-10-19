@@ -401,7 +401,7 @@ model RecoveryOutreachAttempt {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  merchantSendCommand MerchantConversationSendCommand?
+  merchantSendCommands MerchantConversationSendCommand[]
 
   @@unique([checkoutRecoveryId, sequence])
   @@index([checkoutRecoveryId, status, sequence])
@@ -548,7 +548,7 @@ model MerchantConversationSendCommand {
   templateName String? @db.VarChar(255)
   templateLanguageCode String? @db.VarChar(32)
   templateParameters Json?
-  recoveryOutreachAttemptId String? @unique
+  recoveryOutreachAttemptId String?
   recoveryOutreachAttempt RecoveryOutreachAttempt? @relation(fields: [recoveryOutreachAttemptId], references: [id], onDelete: Restrict)
   outboundMessageId String? @unique
   outboundMessage ConversationMessage? @relation(fields: [outboundMessageId], references: [id], onDelete: Restrict)
@@ -570,6 +570,7 @@ model MerchantConversationSendCommand {
   moderationAssessments ConversationModerationAssessment[]
 
   @@unique([shopId, idempotencyKey])
+  @@index([recoveryOutreachAttemptId], map: "MerchantSend_outreach_attempt_idx")
   @@index([state, nextAttemptAt, leaseExpiresAt, createdAt, id], map: "MerchantSend_due_idx")
   @@index([shopId, conversationId, createdAt, id], map: "MerchantSend_shop_conversation_idx")
   @@schema("whatsapp")
