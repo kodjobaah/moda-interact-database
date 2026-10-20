@@ -2513,6 +2513,7 @@ model OperationalIncident {
   firstOccurredAt             DateTime  @db.Timestamptz(3)
   lastOccurredAt              DateTime  @db.Timestamptz(3)
   lastCorrelationId           String    @db.VarChar(128)
+  lastErrorMessage            String?   @db.VarChar(512)
   ownerPlatformAdminId        String?   @db.Text
   ownerPlatformAdmin          PlatformAdmin? @relation("OperationalIncidentOwner", fields: [ownerPlatformAdminId], references: [id], onDelete: Restrict)
   assignedAt                  DateTime? @db.Timestamptz(3)
@@ -2539,6 +2540,7 @@ model OperationalIncidentEvent {
   actorPlatformAdminId    String?   @db.Text
   actorPlatformAdmin      PlatformAdmin? @relation(fields: [actorPlatformAdminId], references: [id], onDelete: Restrict)
   correlationId           String?   @db.VarChar(128)
+  errorMessage            String?   @db.VarChar(512)
   occurredAt              DateTime  @default(now()) @db.Timestamptz(3)
 
   @@index([incidentId, occurredAt])
