@@ -227,7 +227,7 @@ model Customer {
   lastName  String?
 
   shopifyCustomerId String?
-
+  whatsAppConsentEvidence WhatsAppConsentEvidence[]
   phones                  CustomerPhone[]
   recoveries              CheckoutRecovery[]
   standaloneConversations Conversation[]     @relation("StandaloneConversationCustomer")
@@ -236,6 +236,31 @@ model Customer {
   updatedAt DateTime @updatedAt
 
   @@unique([shopId, shopifyCustomerId])
+  @@unique([id, shopId], map: "Customer_id_shopId_key")
+  @@schema("commerce")
+}
+
+enum WhatsAppRecoveryConsentDecision {
+  UNKNOWN
+  GRANTED
+  REVOKED
+  @@schema("commerce")
+}
+
+enum WhatsAppRecoveryConsentSource {
+  SHOPIFY_NATIVE
+  WOO_MODA_CHECKBOX
+  @@schema("commerce")
+}
+
+enum WhatsAppRecoveryNoContactReason {
+  CUSTOMER_STOP
+  MERCHANT_OPT_OUT
+  @@schema("commerce")
+}
+
+enum WhatsAppConsentPurpose {
+  WHATSAPP_CHECKOUT_RECOVERY
   @@schema("commerce")
 }
 
@@ -246,6 +271,22 @@ model CustomerPhone {
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   phone String
+  // Digits-only E.164 recipient, after country-aware runtime normalisation.
+  whatsappCanonicalPhone String? @db.VarChar(15)
+  whatsappPhoneVerifiedAt DateTime? @db.Timestamptz(3)
+  whatsappConsentPurpose WhatsAppConsentPurpose @default(WHATSAPP_CHECKOUT_RECOVERY)
+  whatsappConsentDecision WhatsAppRecoveryConsentDecision @default(UNKNOWN)
+  whatsappConsentSource WhatsAppRecoveryConsentSource?
+  whatsappConsentProviderObservedAt DateTime? @db.Timestamptz(3)
+  whatsappConsentVerifiedAt DateTime? @db.Timestamptz(3)
+  whatsappConsentRevision BigInt @default(0)
+  whatsappConsentDecisionSequence BigInt @default(0)
+  whatsappNoContact Boolean @default(false)
+  whatsappNoContactReason WhatsAppRecoveryNoContactReason?
+  whatsappNoContactAt DateTime? @db.Timestamptz(3)
+  whatsappNoContactRevision BigInt @default(0)
+  whatsappNoContactClearedAt DateTime? @db.Timestamptz(3)
+  whatsAppConsentEvidence WhatsAppConsentEvidence[]
 
   startedAt DateTime  @default(now())
   endedAt   DateTime?
@@ -253,8 +294,11 @@ model CustomerPhone {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([id, customerId], map: "CustomerPhone_id_customerId_key")
   @@index([customerId, endedAt])
   @@index([phone, endedAt])
+  @@index([customerId, whatsappCanonicalPhone, endedAt], map: "CustomerPhone_customer_canonical_active_idx")
+  @@index([whatsappCanonicalPhone, endedAt, customerId], map: "CustomerPhone_canonical_lookup_idx")
   @@schema("commerce")
 }
 
@@ -1999,8 +2043,13 @@ enum ShopPlatform {
 enum WooCommerceInstallationStatus {
   ACTIVE
   REVOKED
-
   @@schema("woocommerce")
+}
+
+enum WhatsAppConsentEvidenceDecision {
+  GRANT
+  REVOKE
+  @@schema("commerce")
 }
 
 model Shop {
@@ -2059,6 +2108,7 @@ model Shop {
   featurePreferences                ShopFeaturePreference[]
   whatsappTemplateVariants          WhatsAppTemplateVariant[]
   whatsappRecipientReachability     WhatsAppRecipientReachability[]
+  whatsAppConsentEvidence WhatsAppConsentEvidence[]
   merchantConversationSendCommands MerchantConversationSendCommand[]
   moderationAssessments ConversationModerationAssessment[]
   humanMessagingRestriction ShopHumanMessagingRestriction?
@@ -2095,11 +2145,45 @@ model WooCommerceInstallation {
   updatedAt          DateTime                      @default(now()) @updatedAt @db.Timestamptz(3)
   restReadGrant      WooCommerceRestReadGrant?
   restReadAttempts   WooCommerceRestReadAttempt[]
+  whatsAppConsentEvidence WhatsAppConsentEvidence[]
 
   // Required for shop-bound composite foreign keys on the outgoing REST grant.
   @@unique([id, shopId], map: "WooCommerceInstallation_id_shopId_key")
   @@index([status, shopId], map: "WooCommerceInstallation_status_shopId_idx")
   @@schema("woocommerce")
+}
+
+// Append-only Woo Moda-checkbox consent facts; CustomerPhone is the sole
+// current permission authority. API verifies the checkout decision and resolves
+// the exact shop-scoped recipient before writing both records atomically.
+model WhatsAppConsentEvidence {
+  id String @id @default(cuid()) @db.Text
+  shopId String @db.Text
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  installationId String @db.Text
+  installation WooCommerceInstallation @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Restrict, onUpdate: Restrict)
+  eventId String @db.VarChar(128)
+  payloadDigest Bytes
+  customerId String @db.Text
+  customer Customer @relation(fields: [customerId, shopId], references: [id, shopId], onDelete: Restrict, onUpdate: Restrict)
+  customerPhoneId String @db.Text
+  customerPhone CustomerPhone @relation(fields: [customerPhoneId, customerId], references: [id, customerId], onDelete: Restrict, onUpdate: Restrict)
+  canonicalPhone String @db.VarChar(15)
+  purpose WhatsAppConsentPurpose @default(WHATSAPP_CHECKOUT_RECOVERY)
+  decision WhatsAppConsentEvidenceDecision
+  decisionSequence BigInt
+  phoneConsentRevision BigInt
+  decisionAt DateTime @db.Timestamptz(3)
+  disclosureText String? @db.VarChar(4000)
+  disclosureVersion String? @db.VarChar(128)
+  disclosureLocale String? @db.VarChar(64)
+  recordedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([shopId, eventId], map: "WhatsAppConsentEvidence_shop_event_key")
+  @@unique([customerPhoneId, phoneConsentRevision], map: "WhatsAppConsentEvidence_phone_revision_key")
+  @@index([shopId, customerId, recordedAt], map: "WhatsAppConsentEvidence_customer_history_idx")
+  @@index([installationId, recordedAt], map: "WhatsAppConsentEvidence_installation_history_idx")
+  @@schema("commerce")
 }
 
 // Credentials for Moda -> WooCommerce wc/v3 reads. This is independent of the
