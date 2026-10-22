@@ -98,7 +98,10 @@
     "test:arch043-platform-configuration:postgres:upgrade": "node scripts/test-arch043-platform-configuration-postgres.mjs --mode upgrade",
     "test:arch045-consent-schema": "node scripts/validate-arch045-consent-schema.mjs",
     "test:arch045-consent:postgres:fresh": "node scripts/test-arch045-consent-postgres.mjs --mode fresh",
-    "test:arch045-consent:postgres:upgrade": "node scripts/test-arch045-consent-postgres.mjs --mode upgrade"
+    "test:arch045-consent:postgres:upgrade": "node scripts/test-arch045-consent-postgres.mjs --mode upgrade",
+    "test:arch045-general-dispatch-admission": "node scripts/validate-arch045-general-dispatch-admission.mjs",
+    "test:arch045-general-dispatch-admission:postgres:fresh": "node scripts/test-arch045-general-dispatch-admission-postgres.mjs --mode fresh",
+    "test:arch045-general-dispatch-admission:postgres:upgrade": "node scripts/test-arch045-general-dispatch-admission-postgres.mjs --mode upgrade"
   },
   "keywords": [],
   "author": "",
