@@ -1,230 +1,137 @@
-# ARCH-045-DATABASE-002 — WhatsApp consent and privacy persistence
+# ARCH-045 / ARCH-046 — CustomerPhone consent and Woo evidence database contract
 
-This is the database-only contract for ARCH-045 **and** ARCH-046. The SQL
-migration is `20261021170000_arch045_shared_woo_consent_privacy`. Ingress,
-Shopify GraphQL, Woo authentication, phone canonicalisation, notices, Meta
-preflight, sending, billing and WordPress privacy adapters belong to their
-respective service tasks. **No consent event schedules a recovery.**
+**Owner:** `ARCH-045-DATABASE-002` (`moda-interact-database`). This note describes
+only the database boundary. The implementation is an in-flight amendment to the
+already claimed, unmerged Attempt 1.
 
-## Authority and exact recipient
+## Scope and source of truth
 
-- `commerce.CustomerPhone` is the **only** current WhatsApp recovery consent
-  projection. A legacy or new row defaults to `UNKNOWN`, revision/sequence zero,
-  no verified canonical recipient and no inferred grant. Its existing `phone`
-  field may be NULL after erasure, even for ended historical records.
-- `whatsappCanonicalPhone` is the *digits-only* E.164 number without `+`, e.g.
-  `447911123456`. **Never** convert a national number by guessing the shop
-  locale. Node callers must use the published `ARCH-045-SHARED-001` identity
-  implementation and verified country context; the Woo PHP producer uses its
-  identical golden vectors. A malformed/ambiguous phone is not eligible.
-- `Customer.verifiedPrincipalDigest` is a **keyed HMAC-SHA256** of an
-  independently authenticated Shopify Customer GID or Woo account/guest
-  principal, scoped by `verifiedPrincipalPlatform` and `shopId`. No phone or
-  email match can establish identity. Legacy Customers without verification
-  remain valid for preexisting uses but **cannot** acquire new WhatsApp grants.
-  The verified-principal digest must be calculated consistently with privacy
-  fence lookup. The HMAC key must remain available for fence checks for the
-  full legally required fence lifetime; planned key rotation must support old
-  keyed digests rather than silently re-enabling erased identities.
-- `CustomerPhone.whatsappConsentDecision` is `UNKNOWN`, `GRANTED` or `REVOKED`,
-  with purpose fixed to `WHATSAPP_CHECKOUT_RECOVERY`. An eligible grant needs
-  active phone, verified principal, E.164 digits, verification/observation
-  timestamps, strict monotonic `whatsappConsentRevision` and
-  `whatsappConsentDecisionSequence`, and source/epoch compatible with the
-  current shop/installation. A new verified recipient is a new active row;
-  end/revoke the old row and never transfer its grant to a changed phone or
-  to a different Customer. Only one **verified active** phone per Customer is
-  permitted; two Customers may share a phone without sharing authorisation.
-- For Shopify, use `SHOPIFY_NATIVE`, no source epoch/provider ID, and a fresh
-  authoritative customer+recipient status check. For Woo, use
-  `WOO_MODA_CHECKBOX` or `WOO_APPROVED_EXTERNAL`, and match
-  `WooCommerceInstallation.whatsappConsentMode`, provider and
-  `whatsappConsentSourceEpoch`. The mode defaults to `NOT_CONFIGURED`; external
-  providers require explicit approval in the API, not mere DB field presence.
-  Changing A → B → A advances the epoch **twice**; the old A grant fails.
-- Local `CustomerPhone.whatsappNoContact` is a **negative override**, e.g.
-  `CUSTOMER_STOP` or `MERCHANT_OPT_OUT`, with its own revision. It takes
-  precedence over `GRANTED`. A prior local STOP can be cleared only by newer,
-  separately verified affirmative permission with provider observation later
-  than the STOP and an updated consent sequence/revision.
-- `whatsapp.WhatsAppRecipientReachability.permanentNoContact` is another
-  **negative-only** fence, for authenticated shop/recipient STOP without a
-  verified CustomerPhone. It is distinct from the provider-delivery
-  `suppressUntil` and never grants anything; a newer verified grant for the
-  exact shop/recipient is required to clear it. Check both fences at dispatch.
+- `commerce.CustomerPhone` is the **only current permission authority** for
+  checkout-recovery WhatsApp. Older rows and new phones default to `UNKNOWN`.
+  `UNKNOWN`, `REVOKED` and all local no-contact states deny permission.
+- `commerce.WhatsAppConsentEvidence` is the **single new table**, used only for
+  immutable, authenticated Woo Moda-checkout-checkbox opt-in/withdrawal facts.
+  Its history is not a current-consent projection, worklist, recovery queue or
+  evidence-derived scheduler.
+- `SHOPIFY_NATIVE` is set only by the Shopify-authorised provider read/write
+  boundary. `WOO_MODA_CHECKBOX` is set only by Moda's own deliberate, initially
+  unchecked WooCommerce checkout action. There is no third-party provider,
+  merchant source selector or Woo installation consent setting.
+- Existing `commerce.Customer` owns the `shopId` tenant scope, and the existing
+  `woocommerce.WooCommerceInstallation` authenticates the merchant integration.
+  No new Woo checkout identity, principal-digest, privacy-erasure or reachability
+  schema is part of this task. Privacy export, erasure and anti-recollection
+  controls require a separately approved architecture.
 
-## Transactional source/decision/dispatch contract
+## Exact recipient and customer resolution
 
-Callers do not call remote providers or Redis *inside* SQL transactions.
-Always use CAS `WHERE id=:id AND whatsappConsentRevision=:expectedRevision`
-(and provider decision sequence checks) and reject zero updated rows. Check
-`shopId` through `commerce.Customer`, not raw phone; verify the *currently
-active* canonical phone. A Woo GRANT/REVOKE locks the authenticated
-installation/customer, checks mode/provider/epoch, updates the exact phone
-row, and inserts the immutable evidence fact **in the same transaction**.
-The DB trigger also checks that evidence matches current phone state and
-source; it cannot independently validate browser/authentication proof.
+The API/Background boundary supplies a country-aware, validated E.164 canonical
+recipient as **digits without `+`**, for example UK local `07911123456` or
+`+44 7911 123456` both map to `447911123456` when the country context is UK.
+The database checks the digits-only representation but does not itself infer a
+country code from an ambiguous local number. Consumers must use the published
+Shared normalisation/identity contract before writing `whatsappCanonicalPhone`.
 
-The short dispatch fence needs an authenticated shop/Customer/phone ID,
-canonical recipient, verified platform-principal digest and expected phone
-revision. After an out-of-transaction provider preflight:
+Resolve against existing `Customer` + **currently active** `CustomerPhone`,
+scoped to the authenticated merchant, never by phone alone:
 
 ```sql
-BEGIN;
--- Serialize with privacy erasure and STOP even when the negative row is absent.
-SELECT commerce.arch045_lock_verified_principal(
-  :shopId, :shopPlatform::commerce."ShopPlatform", :principalDigest);
-SELECT c."id" FROM commerce."Customer" c
-WHERE c."id" = :customerId AND c."shopId" = :shopId
-  AND c."privacyErasedAt" IS NULL FOR SHARE;
-SELECT whatsapp.arch045_lock_contact_recipient(:shopId, :recipientDigits);
--- For Woo, first SELECT the matching WooCommerceInstallation FOR SHARE.
--- Re-check all eligibility against current committed values under these locks.
-SELECT cp."id", cp."whatsappConsentRevision", cp."whatsappConsentSourceEpoch"
-FROM commerce."CustomerPhone" cp
-JOIN commerce."Customer" c ON c."id" = cp."customerId"
-JOIN commerce."Shop" s ON s."id" = c."shopId"
-WHERE c."shopId" = :shopId AND c."id" = :customerId
-  AND s."status" = 'ACTIVE' AND s."platform" = :shopPlatform::commerce."ShopPlatform"
-  AND c."privacyErasedAt" IS NULL
-  AND c."verifiedPrincipalPlatform" = :shopPlatform::commerce."ShopPlatform"
-  AND c."verifiedPrincipalDigest" = :principalDigest
-  AND cp."id" = :customerPhoneId AND cp."endedAt" IS NULL
-  AND cp."whatsappCanonicalPhone" = :recipientDigits
-  AND cp."whatsappConsentRevision" = :expectedRevision
-  AND cp."whatsappConsentDecision" = 'GRANTED'
-  AND ((s."platform" = 'SHOPIFY' AND cp."whatsappConsentSource" = 'SHOPIFY_NATIVE'
-           AND cp."whatsappConsentSourceEpoch" IS NULL)
-       OR (s."platform" = 'WOOCOMMERCE' AND EXISTS (
-         SELECT 1 FROM woocommerce."WooCommerceInstallation" i
-         WHERE i."shopId"=s."id" AND i."status"='ACTIVE'
-           AND i."whatsappConsentSourceEpoch"=cp."whatsappConsentSourceEpoch"
-           AND ((i."whatsappConsentMode"='MODA_CHECKBOX' AND cp."whatsappConsentSource"='WOO_MODA_CHECKBOX')
-             OR (i."whatsappConsentMode"='APPROVED_EXTERNAL'
-                 AND cp."whatsappConsentSource"='WOO_APPROVED_EXTERNAL'
-                 AND i."whatsappConsentProviderId"=cp."whatsappConsentProviderId"))
-       )))
-  AND NOT cp."whatsappNoContact"
-  AND NOT EXISTS (
-    SELECT 1 FROM commerce."CustomerPrivacyErasureFence" f
-    WHERE f."shopId" = c."shopId" AND f."platform" = :shopPlatform::commerce."ShopPlatform"
-      AND f."principalDigest" = :principalDigest)
-  AND NOT EXISTS (
-    SELECT 1 FROM whatsapp."WhatsAppRecipientReachability" r
-    WHERE r."shopId" = c."shopId" AND r."recipient" = cp."whatsappCanonicalPhone"
-      AND r."permanentNoContact")
-FOR SHARE OF cp, c;
--- The provider preflight (outside this transaction) must separately confirm
--- the current Shopify/Meta permission. Do not send if any row is absent.
-COMMIT;
+SELECT DISTINCT c."id"
+FROM "commerce"."Customer" AS c
+JOIN "commerce"."CustomerPhone" AS cp ON cp."customerId" = c."id"
+WHERE c."shopId" = $1
+  AND cp."whatsappCanonicalPhone" = $2
+  AND cp."endedAt" IS NULL;
 ```
 
-The lock helper for exact recipients is also called by STOP and verified
-CustomerPhone trigger paths, preventing insertion of a missing STOP row from
-racing the final read. All writers should acquire locks in this order:
-verified principal, customer, canonical recipient, phone/installation. A
-transaction that loses a deadlock or serialisation race retries from verified
-source state; it **never** assumes grant. This DB check cannot make a later
-Meta HTTP send atomic with a Shopify customer changing permission in the
-intervening interval; provider preflight, bounded freshness, compensation
-and fail-closed delivery remain Background responsibilities.
+- Zero matches: the owning consumer may create ordinary Customer/CustomerPhone
+  records, without granting permission. Concurrent creations require
+  coordination and rechecking for ambiguity; there is intentionally **no**
+  unique `(shopId, phone)` constraint that merges different Customers.
+- Exactly one distinct Customer match: reuse that Customer only after the
+  consumer independently authenticates and verifies the consent action.
+- Multiple distinct Customer matches: **deny and report ambiguity**; never
+  broadcast, merge Customers or select an arbitrary row. An existing phone
+  match never means the shopper checked the Woo checkbox.
+- A changed recipient must not inherit consent from the previous number.
+  Reset to `UNKNOWN` and require a new verified grant for that exact recipient.
 
-## Woo verified identity, evidence and replay
+## Permission and no-contact ordering
 
-`WooCheckoutCustomerIdentity` is the **one permitted non-consent join entity**:
-existing Commerce `Customer` / `CheckoutRecovery` contain no verified Woo
-account/guest + installation + checkout association. It stores only HMAC
-SHA-256 principal and checkout-key digests, plus installation/shop/customer,
-`ACCOUNT` or `GUEST_SESSION`, generation, verification/expiry and revocation.
-The plugin/API must validate cryptographic server proof, nonce/session binding,
-login/logout and checkout provenance before writing it. There are unique
-active checkout and active principal/session-generation constraints scoped to
-**installation**, not globally by checkout key. Rotation revokes the old row,
-increments generation and inserts a new one; a revoked row cannot reactivate.
-An identity association expires at most 30 days after verification (this is
-**session retention**, not consent expiry). Purge expired and revoked links by
-ordinary non-consent housekeeping; never use them as current permission.
+`whatsappConsentRevision` increases on every accepted consent/phone-state
+change; `whatsappConsentDecisionSequence` increases on each new permission
+observation/decision. Writers use a compare-and-set on the expected revision
+under a short transaction, and never regress an accepted observation timestamp.
+No prior phone match, migration, installation credential rotation/reconnection,
+manual merchant action, or imported checkout turns `UNKNOWN` into `GRANTED`.
 
-Exactly one history table, `WooWhatsAppConsentEvidence`, stores an ordinary
-accepted GRANT/REVOKE *fact*. Source epoch/revision, decision sequence, current
-phone revision, exact recipient, validated disclosure text/version/locale,
-optional verified checkout binding, event ID, recorded time and HMAC of the
-**canonical request** are captured at the same commit as the phone decision.
-It has **no readiness, lease, claim, retry, polling, ack or recovery worklist**.
-`UNIQUE(shopId,eventId)` ensures only one fact per event. The database rejects
-an already-visible same-ID/different-digest event and treats an identical replay
-as a no-op **before** requiring the old event to match today's consent state.
-The API MUST also compare stored `payloadDigest` with the incoming digest if
-`ON CONFLICT DO NOTHING` returns no row, since a concurrently committed insert
-might not have been visible to the BEFORE INSERT trigger. Equal means identical
-idempotent retry; unequal means a rejected conflicting replay (never a new
-decision). The API must resolve this duplicate **before** advancing the current
-phone consent revision. Older separately named GRANT events cannot advance the
-CAS sequence after a REVOKE.
+`whatsappNoContact` with `CUSTOMER_STOP` is a terminal, stronger local override:
+Shopify `GRANTED` or Woo grant can update the provider decision but **cannot
+clear customer STOP**. Merchant `MERCHANT_OPT_OUT` is suppression only. Its
+removal requires a currently valid `GRANTED` decision and does not mint consent
+or override `CUSTOMER_STOP`. Merchant authentication/authorization and
+standalone STOP fan-out to all relevant merchants are consumer-owned. The
+existing `whatsapp.WhatsAppRecipientReachability` remains unchanged and must
+not be confused with this permission model.
 
-## Privacy rights, fences and erasure
+Dispatch consumers must read current `CustomerPhone` by exact shop+recipient
+and require **all**: active phone, decision `GRANTED`, matching canonical
+recipient, and no local no-contact override. A Woo permission also must have
+been written with matching audit evidence as an atomic transaction. No
+`CheckoutRecovery` is created solely because consent is missing, and a consent
+change neither schedules recovery nor charges credits.
 
-- Privacy callers validate and authorise an actual Shopify/Woo privacy request;
-  the DB cannot verify Shopify signatures, Woo identity proof or a lawful basis.
-  No raw customer ID, phone, session token or checkout key is stored in
-  `CustomerPrivacyErasureFence`: only shop/platform/HMAC principal digest,
-  erasure cutoff and monotonic revision. The row **persists** across erasure,
-  protects the old lifecycle, and is not a positive consent authority.
-- Acquire `commerce.arch045_lock_verified_principal` for **every** authenticated
-  principal digest (Woo guest/account plus Shopify GID as applicable), in
-  deterministic digest order. Fence insertion itself also acquires that lock.
-  In the **same transaction**, insert/upsert the fence, pseudonymise all Woo
-  evidence fields, set `Customer.privacyErasedAt`/revision and clear Customer
-  contact/name/provider IDs/verified digest, clear `phone`, canonical phone,
-  source, verification and STOP contact metadata on **all** active and ended
-  CustomerPhone rows, then remove Woo identity associations. A redacted
-  Customer is terminal: future writes of phone/contact PII and grants fail.
-- Ordinary Woo evidence is DB-immutable. A one-way privacy UPDATE may NULL
-  `customerId`, `customerPhoneId`, identity ID, recipient, disclosure,
-  provider ID/time and checkout digest and set `redactedAt`; subsequent UPDATE
-  cannot restore them. The HMAC payload digest, opaque non-PII event ID,
-  decision, source epoch/revision and revision counts remain as integrity
-  metadata **only where an approved legal retention basis exists**; otherwise
-  authorised erasure may DELETE evidence inside a transaction with
-  `SET LOCAL moda.verified_privacy_erasure = 'on'`. For full-shop teardown,
-  fence deletion additionally requires `SET LOCAL moda.verified_shop_teardown = 'on'`.
-  Never use these settings outside verified erasure/shop-teardown operations;
-  application/database access controls must restrict them to trusted handlers.
-- An erasure fence denies reuse of its old principal digest, even for a new
-  Customer row or guest binding. A truly **new verified customer lifecycle**
-  with independent authenticated principal/epoch/digest can bind a new row;
-  a source retry/restore using the old identity cannot. If the provider reuses
-  the same principal after deletion, do not infer a new lifecycle from a
-  timestamp alone: require an independently verified reauthorisation design
-  before relaxing the tombstone. No automatic fence expiry is defined.
-- Whole-shop deletion must clear/redact evidence before removing its referenced
-  Customer/identity rows and use a verified teardown context for any direct
-  evidence deletion. Tenant-scoped cascades remove remaining rows and fences.
-  `WooConsentEvidence` foreign keys deliberately do **not** silently delete
-  audit rows on Customer/identity deletion.
-- Retention/export/legal basis and signing/HMAC secret lifecycle are explicit
-  deployment decisions, not claims made by this migration. Ordinary retention
-  is governed by the merchant privacy policy and applicable law, **never**
-  by an invented 72-hour consent timer.
+## Atomic Woo grant / withdrawal and audit history
 
-## Migration and validation / rollback
+The Woo API verifies the merchant installation and deliberate checkout checkbox
+origin **before** the transaction. It updates the selected CustomerPhone and
+inserts one `WhatsAppConsentEvidence` row in the **same database transaction**.
+The deferred constraint trigger rejects a committed Woo decision that lacks a
+matching `(customerPhoneId, canonicalPhone, revision, sequence, decisionAt,
+decision)` evidence fact; the evidence insert guard checks the current state and
+an active installation. A withdrawal uses `REVOKE` with `CustomerPhone.REVOKED`.
+A regrant requires a later decision/sequence and a new event ID.
 
-The migration creates enums, nullable/additive columns and indexed new tables;
-existing phone/installation records remain UNKNOWN/NOT_CONFIGURED. No current
-consent or CheckoutRecovery is fabricated. Preserve old writes as UNKNOWN
-until both producers/consumers enforce the new verified principal and
-conditional revision contracts. Deploy migration first, then approved Shared
-package/consumers, then enable Shopify/Woo consent ingress only after privacy
-and STOP writers and send fences are live. Rolling back the app must disable
-new consent-producing paths; do **not** drop tombstones or evidence through a
-blind down migration. No destructive/down migration is provided.
+Evidence stores `shopId`, `installationId`, `customerId`, `customerPhoneId`,
+canonical recipient, purpose, decision, accepted revision/sequence, decision
+instant, event ID, SHA-256-sized payload digest and optional disclosure wording
+(`GRANT` requires non-empty text, version and locale). Do **not** store raw
+Woo guest sessions, bearer tokens, checkout secrets or provider credentials.
+The database checks tenant-safe composite foreign keys and immutability.
 
-Run `npm run validate`, `npm run prisma:generate`,
-`npm run test:arch045-consent-schema`,
-`npm run test:arch045-consent:postgres:fresh`,
-`npm run test:arch045-consent:postgres:upgrade`, `npm run lint` and
-`git diff --check` in the implementation worktree. The PostgreSQL tests use an
-isolated disposable `pgvector/pgvector:pg17` Docker container (`--network none`)
-and validate source switching/ABA, concurrent CAS, identity takeover, replay,
-privacy and negative STOP constraints. Separate Shopify/API/Woo/System tests
-must cover the authenticated provider/client side and UK local/+44 vectors.
+`(shopId,eventId)` is unique. Identical replay of an accepted event returns a
+no-op even after a later withdrawal; same event ID with a changed payload
+digest is rejected. Concurrent retries must use `INSERT ... ON CONFLICT DO
+NOTHING` plus a **post-conflict digest comparison** within their owning
+transaction: before-insert trigger lookups cannot see another transaction's
+uncommitted row. Do not mistake unique-conflict resolution for matching-payload
+verification.
+
+PostgreSQL cannot establish that an HTTP checkbox submission was genuinely
+made by the shopper: authenticated installation/session binding, checkout
+origin, disclosure displayed, manual merchant suppression authorization and
+provider reads remain with the owning API/Shopify/Woo task.
+
+## Migration and validation
+
+This is a **pre-merge replacement of the existing**
+`20261021170000_arch045_shared_woo_consent_privacy/migration.sql`, not an
+additional undo migration. The amended SQL creates only
+`commerce.WhatsAppConsentEvidence` and adds consent-related fields to
+`commerce.CustomerPhone`; a composite unique index on existing Customer is
+needed for a tenant-safe foreign key. `Shop`, `Customer`, `WooCommerceInstallation`
+and `CustomerPhone` receive Prisma relation declarations only, not extra
+persisted identity/provider/privacy columns. There are no new persisted fields
+on `WhatsAppRecipientReachability`.
+
+The previous disposable-test runs do not validate this changed SQL. Run Prisma
+schema validation/client generation, `test:arch045-consent-schema`, and both
+`test:arch045-consent:postgres:fresh` and
+`test:arch045-consent:postgres:upgrade`. Each PostgreSQL test creates its own
+isolated Docker PostgreSQL/pgvector container and removes it in `finally`.
+If the superseded version of this migration has already been applied to a
+persistent database, do **not** silently rewrite migration history: separately
+plan a reset or a new corrective migration for that environment.
+
+The task's status remains `in_progress`, Attempt 1, developer-owned until fresh
+validation and Completion Report reconciliation are recorded and reviewed.

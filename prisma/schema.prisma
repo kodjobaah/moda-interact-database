@@ -227,16 +227,7 @@ model Customer {
   lastName  String?
 
   shopifyCustomerId String?
-  // Keyed SHA-256 digest of independently verified Shopify/Woo principal.
-  // Unset legacy rows cannot be promoted to GRANTED until identity verification.
-  verifiedPrincipalDigest Bytes?
-  verifiedPrincipalPlatform ShopPlatform?
-  // Terminal redaction barrier on an existing Customer row; never reuse it.
-  privacyErasedAt DateTime? @db.Timestamptz(3)
-  privacyRevision BigInt @default(0)
-
-  wooCheckoutIdentities WooCheckoutCustomerIdentity[]
-  wooConsentEvidence WooWhatsAppConsentEvidence[]
+  whatsAppConsentEvidence WhatsAppConsentEvidence[]
   phones                  CustomerPhone[]
   recoveries              CheckoutRecovery[]
   standaloneConversations Conversation[]     @relation("StandaloneConversationCustomer")
@@ -246,7 +237,6 @@ model Customer {
 
   @@unique([shopId, shopifyCustomerId])
   @@unique([id, shopId], map: "Customer_id_shopId_key")
-  @@unique([shopId, verifiedPrincipalPlatform, verifiedPrincipalDigest], map: "Customer_verified_principal_key")
   @@schema("commerce")
 }
 
@@ -260,7 +250,6 @@ enum WhatsAppRecoveryConsentDecision {
 enum WhatsAppRecoveryConsentSource {
   SHOPIFY_NATIVE
   WOO_MODA_CHECKBOX
-  WOO_APPROVED_EXTERNAL
   @@schema("commerce")
 }
 
@@ -281,16 +270,13 @@ model CustomerPhone {
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
-  // NULL after privacy erasure, including ended/historical rows.
-  phone String?
-  // Shared-canonicalised E.164 digits without +, with verified country context.
+  phone String
+  // Digits-only E.164 recipient, after country-aware runtime normalisation.
   whatsappCanonicalPhone String? @db.VarChar(15)
   whatsappPhoneVerifiedAt DateTime? @db.Timestamptz(3)
   whatsappConsentPurpose WhatsAppConsentPurpose @default(WHATSAPP_CHECKOUT_RECOVERY)
   whatsappConsentDecision WhatsAppRecoveryConsentDecision @default(UNKNOWN)
   whatsappConsentSource WhatsAppRecoveryConsentSource?
-  whatsappConsentProviderId String? @db.VarChar(128)
-  whatsappConsentSourceEpoch BigInt?
   whatsappConsentProviderObservedAt DateTime? @db.Timestamptz(3)
   whatsappConsentVerifiedAt DateTime? @db.Timestamptz(3)
   whatsappConsentRevision BigInt @default(0)
@@ -300,7 +286,7 @@ model CustomerPhone {
   whatsappNoContactAt DateTime? @db.Timestamptz(3)
   whatsappNoContactRevision BigInt @default(0)
   whatsappNoContactClearedAt DateTime? @db.Timestamptz(3)
-  wooConsentEvidence WooWhatsAppConsentEvidence[]
+  whatsAppConsentEvidence WhatsAppConsentEvidence[]
 
   startedAt DateTime  @default(now())
   endedAt   DateTime?
@@ -312,24 +298,7 @@ model CustomerPhone {
   @@index([customerId, endedAt])
   @@index([phone, endedAt])
   @@index([customerId, whatsappCanonicalPhone, endedAt], map: "CustomerPhone_customer_canonical_active_idx")
-  @@schema("commerce")
-}
-
-// Privacy-minimised HMAC-SHA256 of a verified platform principal, never a
-// raw Shopify customer ID, Woo account ID, session or phone. An erasure fence
-// must be locked/checked transactionally before any principal re-association.
-model CustomerPrivacyErasureFence {
-  id String @id @default(cuid())
-  shopId String
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  platform ShopPlatform
-  principalDigest Bytes
-  erasedAt DateTime @default(now()) @db.Timestamptz(3)
-  revision BigInt @default(1)
-  rejectedThroughAt DateTime @db.Timestamptz(3)
-
-  @@unique([shopId, platform, principalDigest], map: "CustomerPrivacyErasureFence_principal_key")
-  @@index([shopId, erasedAt], map: "CustomerPrivacyErasureFence_shop_erased_idx")
+  @@index([whatsappCanonicalPhone, endedAt, customerId], map: "CustomerPhone_canonical_lookup_idx")
   @@schema("commerce")
 }
 
@@ -820,12 +789,6 @@ model WhatsAppRecipientReachability {
   lastFailureAt           DateTime?
   suppressUntil           DateTime?
   lastSuccessfulAt        DateTime?
-  // Negative-only unbound STOP; independent of temporary suppressUntil.
-  permanentNoContact Boolean @default(false)
-  permanentNoContactReason WhatsAppRecoveryNoContactReason?
-  permanentNoContactAt DateTime? @db.Timestamptz(3)
-  permanentNoContactRevision BigInt @default(0)
-  permanentNoContactClearedAt DateTime? @db.Timestamptz(3)
   version                 Int       @default(0)
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
@@ -2083,23 +2046,10 @@ enum WooCommerceInstallationStatus {
   @@schema("woocommerce")
 }
 
-enum WooWhatsAppConsentCollectionMode {
-  NOT_CONFIGURED
-  MODA_CHECKBOX
-  APPROVED_EXTERNAL
-  @@schema("woocommerce")
-}
-
-enum WooCheckoutPrincipalKind {
-  ACCOUNT
-  GUEST_SESSION
-  @@schema("woocommerce")
-}
-
-enum WooWhatsAppConsentEvidenceDecision {
+enum WhatsAppConsentEvidenceDecision {
   GRANT
   REVOKE
-  @@schema("woocommerce")
+  @@schema("commerce")
 }
 
 model Shop {
@@ -2158,9 +2108,7 @@ model Shop {
   featurePreferences                ShopFeaturePreference[]
   whatsappTemplateVariants          WhatsAppTemplateVariant[]
   whatsappRecipientReachability     WhatsAppRecipientReachability[]
-  customerPrivacyErasureFences CustomerPrivacyErasureFence[]
-  wooCheckoutIdentities WooCheckoutCustomerIdentity[]
-  wooConsentEvidence WooWhatsAppConsentEvidence[]
+  whatsAppConsentEvidence WhatsAppConsentEvidence[]
   merchantConversationSendCommands MerchantConversationSendCommand[]
   moderationAssessments ConversationModerationAssessment[]
   humanMessagingRestriction ShopHumanMessagingRestriction?
@@ -2193,17 +2141,11 @@ model WooCommerceInstallation {
   credentialVersion  Int                           @default(1)
   credentialIssuedAt DateTime                      @default(now()) @db.Timestamptz(3)
   revokedAt          DateTime?                     @db.Timestamptz(3)
-  // A source change MUST advance the epoch, even when switching A -> B -> A.
-  whatsappConsentMode WooWhatsAppConsentCollectionMode @default(NOT_CONFIGURED)
-  whatsappConsentProviderId String? @db.VarChar(128)
-  whatsappConsentSourceEpoch BigInt @default(0)
-  whatsappConsentSourceRevision BigInt @default(0)
   createdAt          DateTime                      @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime                      @default(now()) @updatedAt @db.Timestamptz(3)
   restReadGrant      WooCommerceRestReadGrant?
   restReadAttempts   WooCommerceRestReadAttempt[]
-  checkoutIdentities WooCheckoutCustomerIdentity[]
-  whatsappConsentEvidence WooWhatsAppConsentEvidence[]
+  whatsAppConsentEvidence WhatsAppConsentEvidence[]
 
   // Required for shop-bound composite foreign keys on the outgoing REST grant.
   @@unique([id, shopId], map: "WooCommerceInstallation_id_shopId_key")
@@ -2211,76 +2153,37 @@ model WooCommerceInstallation {
   @@schema("woocommerce")
 }
 
-// No existing table safely joins a verified Woo account/cryptographic guest
-// session to checkout AND the existing customer. Store only keyed SHA-256
-// digests of principals and checkout keys; no bearer cookie or raw checkout key.
-model WooCheckoutCustomerIdentity {
+// Append-only Woo Moda-checkbox consent facts; CustomerPhone is the sole
+// current permission authority. API verifies the checkout decision and resolves
+// the exact shop-scoped recipient before writing both records atomically.
+model WhatsAppConsentEvidence {
   id String @id @default(cuid()) @db.Text
   shopId String @db.Text
   shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
   installationId String @db.Text
-  installation WooCommerceInstallation @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Cascade, onUpdate: Restrict)
-  customerId String @db.Text
-  customer Customer @relation(fields: [customerId, shopId], references: [id, shopId], onDelete: Cascade, onUpdate: Restrict)
-  principalKind WooCheckoutPrincipalKind
-  principalDigest Bytes
-  sessionGeneration BigInt @default(1)
-  checkoutKeyDigest Bytes
-  verifiedAt DateTime @db.Timestamptz(3)
-  expiresAt DateTime @db.Timestamptz(3)
-  revokedAt DateTime? @db.Timestamptz(3)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
-  consentEvidence WooWhatsAppConsentEvidence[]
-
-  @@unique([id, installationId, shopId], map: "WooCheckoutIdentity_id_installation_shop_key")
-  @@unique([installationId, principalKind, principalDigest, sessionGeneration, checkoutKeyDigest], map: "WooCheckoutIdentity_generation_checkout_key")
-  @@index([installationId, checkoutKeyDigest, revokedAt], map: "WooCheckoutIdentity_checkout_lookup_idx")
-  @@index([installationId, principalKind, principalDigest, sessionGeneration], map: "WooCheckoutIdentity_principal_lookup_idx")
-  @@index([shopId, customerId, expiresAt], map: "WooCheckoutIdentity_customer_expiry_idx")
-  @@index([expiresAt], map: "WooCheckoutIdentity_expiry_idx")
-  @@schema("woocommerce")
-}
-
-// One immutable ordinary grant/revoke evidence table. This is NOT a queue,
-// scheduler, state projection or authority for WhatsApp dispatch. Verified
-// privacy erasure is the sole exception to append-only facts.
-model WooWhatsAppConsentEvidence {
-  id String @id @default(cuid()) @db.Text
-  shopId String @db.Text
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  installationId String @db.Text
-  installation WooCommerceInstallation @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Cascade, onUpdate: Restrict)
+  installation WooCommerceInstallation @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Restrict, onUpdate: Restrict)
   eventId String @db.VarChar(128)
-  // HMAC of canonical request, including source/epoch, phone and disclosure.
   payloadDigest Bytes
-  customerId String? @db.Text
-  customer Customer? @relation(fields: [customerId, shopId], references: [id, shopId], onDelete: Restrict, onUpdate: Restrict)
-  customerPhoneId String? @db.Text
-  customerPhone CustomerPhone? @relation(fields: [customerPhoneId, customerId], references: [id, customerId], onDelete: Restrict, onUpdate: Restrict)
-  checkoutIdentityId String? @db.Text
-  checkoutIdentity WooCheckoutCustomerIdentity? @relation(fields: [checkoutIdentityId, installationId, shopId], references: [id, installationId, shopId], onDelete: Restrict, onUpdate: Restrict)
-  canonicalPhone String? @db.VarChar(15)
+  customerId String @db.Text
+  customer Customer @relation(fields: [customerId, shopId], references: [id, shopId], onDelete: Restrict, onUpdate: Restrict)
+  customerPhoneId String @db.Text
+  customerPhone CustomerPhone @relation(fields: [customerPhoneId, customerId], references: [id, customerId], onDelete: Restrict, onUpdate: Restrict)
+  canonicalPhone String @db.VarChar(15)
   purpose WhatsAppConsentPurpose @default(WHATSAPP_CHECKOUT_RECOVERY)
-  decision WooWhatsAppConsentEvidenceDecision
-  sourceMode WooWhatsAppConsentCollectionMode
-  providerId String? @db.VarChar(128)
-  sourceEpoch BigInt
-  sourceRevision BigInt
+  decision WhatsAppConsentEvidenceDecision
   decisionSequence BigInt
   phoneConsentRevision BigInt
-  providerOccurredAt DateTime? @db.Timestamptz(3)
+  decisionAt DateTime @db.Timestamptz(3)
   disclosureText String? @db.VarChar(4000)
   disclosureVersion String? @db.VarChar(128)
   disclosureLocale String? @db.VarChar(64)
-  verifiedCheckoutKeyDigest Bytes?
   recordedAt DateTime @default(now()) @db.Timestamptz(3)
-  redactedAt DateTime? @db.Timestamptz(3)
 
-  @@unique([shopId, eventId], map: "WooWhatsAppConsentEvidence_shop_event_key")
-  @@index([shopId, customerId, recordedAt], map: "WooWhatsAppConsentEvidence_customer_history_idx")
-  @@index([installationId, recordedAt], map: "WooWhatsAppConsentEvidence_installation_history_idx")
-  @@schema("woocommerce")
+  @@unique([shopId, eventId], map: "WhatsAppConsentEvidence_shop_event_key")
+  @@unique([customerPhoneId, phoneConsentRevision], map: "WhatsAppConsentEvidence_phone_revision_key")
+  @@index([shopId, customerId, recordedAt], map: "WhatsAppConsentEvidence_customer_history_idx")
+  @@index([installationId, recordedAt], map: "WhatsAppConsentEvidence_installation_history_idx")
+  @@schema("commerce")
 }
 
 // Credentials for Moda -> WooCommerce wc/v3 reads. This is independent of the

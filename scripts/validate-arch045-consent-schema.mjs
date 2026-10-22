@@ -1,60 +1,74 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-// Static owner/contract drift check; live integrity is verified by the
-// separate Docker/PostgreSQL fresh and upgrade tests.
+// Static contract/drift guard. Disposable PG fresh+upgrade suites validate
+// the executable constraints, triggers, isolation and ordered transitions.
 const schema = readFileSync(new URL('../prisma/schema.prisma', import.meta.url), 'utf8');
 const sql = readFileSync(new URL('../prisma/migrations/20261021170000_arch045_shared_woo_consent_privacy/migration.sql', import.meta.url), 'utf8');
-function model(name) {
-  const start = schema.indexOf(`model ${name} {`);
-  assert.ok(start >= 0, `${name} model missing`);
+function block(type, name) {
+  const start = schema.indexOf(`${type} ${name} {`);
+  assert.ok(start >= 0, `${type} ${name} missing`);
   return schema.slice(start, schema.indexOf('\n}', start) + 2);
 }
-const phone = model('CustomerPhone');
-const customer = model('Customer');
-const installation = model('WooCommerceInstallation');
-const reachability = model('WhatsAppRecipientReachability');
-const evidence = model('WooWhatsAppConsentEvidence');
-const identity = model('WooCheckoutCustomerIdentity');
-const erasure = model('CustomerPrivacyErasureFence');
-const checkoutRecovery = model('CheckoutRecovery');
-for (const name of ['whatsappConsentDecision', 'whatsappCanonicalPhone', 'whatsappConsentSource',
-  'whatsappConsentSourceEpoch', 'whatsappConsentRevision', 'whatsappConsentDecisionSequence',
-  'whatsappConsentVerifiedAt', 'whatsappNoContact', 'whatsappNoContactRevision']) {
-  assert.match(phone, new RegExp(`\\b${name}\\b`));
-}
+const phone = block('model', 'CustomerPhone');
+const evidence = block('model', 'WhatsAppConsentEvidence');
+const shop = block('model', 'Shop');
+const customer = block('model', 'Customer');
+const installation = block('model', 'WooCommerceInstallation');
+const reach = block('model', 'WhatsAppRecipientReachability');
+const recovery = block('model', 'CheckoutRecovery');
+for (const field of [
+  'whatsappCanonicalPhone', 'whatsappPhoneVerifiedAt', 'whatsappConsentPurpose',
+  'whatsappConsentDecision', 'whatsappConsentSource', 'whatsappConsentProviderObservedAt',
+  'whatsappConsentVerifiedAt', 'whatsappConsentRevision', 'whatsappConsentDecisionSequence',
+  'whatsappNoContact', 'whatsappNoContactReason', 'whatsappNoContactAt',
+  'whatsappNoContactRevision', 'whatsappNoContactClearedAt',
+]) assert.match(phone, new RegExp(`\\b${field}\\b`), `CustomerPhone missing ${field}`);
 assert.match(phone, /whatsappConsentDecision\s+WhatsAppRecoveryConsentDecision\s+@default\(UNKNOWN\)/);
-assert.match(customer, /privacyErasedAt/);
-assert.match(installation, /whatsappConsentMode\s+WooWhatsAppConsentCollectionMode\s+@default\(NOT_CONFIGURED\)/);
-assert.match(installation, /whatsappConsentSourceEpoch/);
-assert.match(reachability, /permanentNoContact\s+Boolean\s+@default\(false\)/);
-assert.match(reachability, /suppressUntil/);
-for (const name of ['shopId', 'installationId', 'eventId', 'payloadDigest', 'customerId',
-  'customerPhoneId', 'canonicalPhone', 'decision', 'disclosureText', 'disclosureVersion',
-  'disclosureLocale', 'sourceEpoch', 'phoneConsentRevision', 'redactedAt']) {
-  assert.match(evidence, new RegExp(`\\b${name}\\b`));
-}
+assert.match(phone, /whatsappNoContact\s+Boolean\s+@default\(false\)/);
+assert.match(block('enum', 'WhatsAppRecoveryConsentSource'), /SHOPIFY_NATIVE[\s\S]*WOO_MODA_CHECKBOX/);
+assert.doesNotMatch(block('enum', 'WhatsAppRecoveryConsentSource'), /EXTERNAL/);
+assert.match(block('enum', 'WhatsAppConsentEvidenceDecision'), /GRANT[\s\S]*REVOKE/);
+for (const field of [
+  'shopId', 'installationId', 'eventId', 'payloadDigest', 'customerId',
+  'customerPhoneId', 'canonicalPhone', 'decision', 'decisionSequence',
+  'phoneConsentRevision', 'decisionAt', 'disclosureText', 'disclosureVersion',
+  'disclosureLocale', 'recordedAt',
+]) assert.match(evidence, new RegExp(`\\b${field}\\b`), `Evidence missing ${field}`);
 assert.match(evidence, /@@unique\(\[shopId, eventId\]/);
-assert.doesNotMatch(evidence, /\b(?:claim|lease|retry|ack|poll|ready|outbox|nextAttemptAt)\b/i);
-assert.match(identity, /checkoutKeyDigest/);
-assert.match(identity, /sessionGeneration/);
-assert.doesNotMatch(identity, /\b(?:sessionToken|sessionCookie|rawCheckoutKey)\b/);
-assert.match(erasure, /@@unique\(\[shopId, platform, principalDigest\]/);
-assert.doesNotMatch(checkoutRecovery, /consent|privacy/i);
-assert.equal((schema.match(/model WooWhatsAppConsentEvidence\s*{/g) ?? []).length, 1);
-assert.equal((schema.match(/model CustomerPrivacyErasureFence\s*{/g) ?? []).length, 1);
-for (const key of [
-  'CustomerPhone_one_verified_active_per_customer_key',
-  'WooCheckoutIdentity_one_live_checkout_key',
-  'WooCheckoutIdentity_one_live_session_generation',
-  'arch045_customer_privacy_guard',
-  'arch045_customer_phone_guard',
-  'arch045_unbound_stop_guard',
-  'arch045_source_epoch_guard',
-  'arch045_checkout_identity_guard',
-  'arch045_woo_evidence_guard',
-  'arch045_privacy_fence_guard',
-  'arch045_lock_verified_principal',
-]) assert.ok(sql.includes(key), `${key} missing in SQL`);
-assert.doesNotMatch(sql, /\bCREATE (?:QUEUE|WORKLIST|OUTBOX)\b/i);
-console.log('PASS ARCH-045/046 schema boundaries, default deny, evidence, identity, erasure and SQL guards');
+assert.match(evidence, /@@unique\(\[customerPhoneId, phoneConsentRevision\]/);
+assert.match(evidence, /@@schema\("commerce"\)/);
+for (const parent of [shop, customer, installation, phone]) {
+  assert.match(parent, /whatsAppConsentEvidence\s+WhatsAppConsentEvidence\[\]/);
+}
+for (const [name, data] of [['Customer', customer], ['WooCommerceInstallation', installation],
+  ['WhatsAppRecipientReachability', reach]]) {
+  assert.doesNotMatch(data, /verifiedPrincipal|privacyErasedAt|privacyRevision|ConsentMode|ConsentProviderId|ConsentSourceEpoch|ConsentSourceRevision|permanentNoContact|WooCheckoutCustomerIdentity|CustomerPrivacyErasureFence/i,
+    `${name} retains excluded fields`);
+}
+assert.match(customer, /@@unique\(\[id, shopId\]/);
+assert.doesNotMatch(recovery, /consent|privacy/i);
+assert.equal((schema.match(/^model WhatsAppConsentEvidence\s*{/gm) || []).length, 1);
+for (const obsolete of [
+  'WooCheckoutCustomerIdentity', 'WooCheckoutPrincipalKind', 'CustomerPrivacyErasureFence',
+  'WooWhatsAppConsentEvidence', 'WooWhatsAppConsentCollectionMode',
+  'WOO_APPROVED_EXTERNAL', 'whatsappConsentProviderId', 'whatsappConsentSourceEpoch',
+  'verifiedPrincipalDigest', 'privacyErasedAt', 'permanentNoContact',
+]) {
+  assert.ok(!schema.includes(obsolete), `obsolete schema element remains: ${obsolete}`);
+  assert.ok(!sql.includes(obsolete), `obsolete migration element remains: ${obsolete}`);
+}
+const creates = [...sql.matchAll(/CREATE\s+TABLE\s+"([^"]+)"\."([^"]+)"/g)];
+assert.deepEqual(creates.map(m => `${m[1]}.${m[2]}`), ['commerce.WhatsAppConsentEvidence']);
+const alters = [...sql.matchAll(/ALTER\s+TABLE\s+"([^"]+)"\."([^"]+)"/g)];
+assert.deepEqual(alters.map(m => `${m[1]}.${m[2]}`), ['commerce.CustomerPhone']);
+assert.doesNotMatch(sql, /(?:CREATE|ALTER)\s+(?:QUEUE|WORKLIST|OUTBOX)\b/i);
+for (const mechanism of [
+  'CustomerPhone_verified_grant_check', 'CustomerPhone_canonical_check',
+  'CustomerPhone_unique_active_canonical_per_customer_key',
+  'WhatsAppConsentEvidence_shop_event_key', 'WhatsAppConsentEvidence_phone_revision_key',
+  'WhatsAppConsentEvidence_phone_fkey',
+  'arch045_customer_phone_guard', 'arch045_woo_evidence_guard',
+  'arch045_woo_consent_commit_guard', 'DEFERRABLE INITIALLY DEFERRED',
+]) assert.ok(sql.includes(mechanism), `missing SQL guard ${mechanism}`);
+console.log('PASS ARCH-045/046 one-table consent/evidence schema, default deny and exclusions');
