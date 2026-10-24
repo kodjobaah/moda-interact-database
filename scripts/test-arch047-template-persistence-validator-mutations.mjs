@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { validateSchemaText } from './validate-arch047-template-persistence-schema.mjs';
 import { validateMigrationText } from './validate-arch047-template-persistence-migration.mjs';
 
@@ -11,7 +10,7 @@ function replaceOnce(original, before, after) {
   return original.replace(before, after);
 }
 function replaceModelOnce(original, name, before, after) {
-  const matcher = new RegExp(`^model ${name} \u005c\{[\u005cs\u005cS]*?^\u005c}`, 'm');
+  const matcher = new RegExp(`^model ${name} [{][\\s\\S]*?^[}]`, 'm');
   const block = original.match(matcher)?.[0];
   assert.ok(block, `Expected model ${name} missing from fixture`);
   return original.replace(block, replaceOnce(block, before, after));
@@ -37,7 +36,7 @@ probe('missing provider identity unique key', validateMigrationText,
   migration.replace(/^CREATE UNIQUE INDEX "WhatsAppTemplateMetaRegistration_wabaId_providerTemplateNam_key"[^\n]*\n/m, ''),
   /technical unique constraints/);
 probe('required legacy nullable registration reference', validateSchemaText,
-  replaceOnce(schema, 'metaRegistrationId   String? @db.Text', 'metaRegistrationId   String @db.Text'),
+  schema.replace(/metaRegistrationId\s+String\?\s+@db\.Text/, 'metaRegistrationId String @db.Text'),
   /WhatsAppTemplateVariant\.metaRegistrationId/);
 probe('missing frozen parameter binding declaration', validateSchemaText,
   replaceOnce(schema, 'parameterBindingsSnapshot Json      @db.JsonB\n', ''),

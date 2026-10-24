@@ -51,9 +51,14 @@ function schemaOf(name) {
 function expectedFk(model, field, declaration) {
   const attr = declaration.match(/@relation\((.+)\)/)?.[1];
   if (!attr || !attr.includes('fields:')) return null;
-  const target = declaration.split(/\s+/)[0].replace(/[?\[\]]/g, '');
-  const sourceColumns = quoteList(attr.match(/fields:\s*\[([^\]]+)\]/)?.[1] ?? '');
-  const refColumns = quoteList(attr.match(/references:\s*\[([^\]]+)\]/)?.[1] ?? '');
+  const target = declaration.split(/\s+/)[0].replaceAll('?', '').replaceAll('[', '').replaceAll(']', '');
+  const relationColumns = key => {
+    const start = attr.indexOf(`${key}: [`);
+    const end = attr.indexOf(']', start);
+    return start < 0 || end < 0 ? [] : quoteList(attr.slice(start + key.length + 3, end));
+  };
+  const sourceColumns = relationColumns('fields');
+  const refColumns = relationColumns('references');
   assert.ok(sourceColumns.length && refColumns.length, `Malformed ${model}.${field} relation contract`);
   return [schemaOf(model), model, sourceColumns.join(','), schemaOf(target), target, refColumns.join(','),
     (attr.match(/onDelete:\s*(\w+)/)?.[1] ?? 'NoAction').toUpperCase().replace('SETNULL','SET NULL'),
@@ -65,8 +70,12 @@ function expectedIndexesFor(model, declarations) {
     if (/\s@unique(?:\s|$)/.test(declaration)) indexes.push(`unique:${field}`);
   }
   for (const line of declarations.directives) {
-    const match = line.match(/^@@(unique|index)\(\[([^\]]+)\]/);
-    if (match) indexes.push(`${match[1]}:${match[2].replace(/\s+/g, '')}`);
+    const match = line.match(/^@@(unique|index)/);
+    const open = line.indexOf('[');
+    const close = line.lastIndexOf(']');
+    if (match && open >= 0 && close > open) {
+      indexes.push(`${match[1]}:${line.slice(open + 1, close).replace(/\s+/g, '')}`);
+    }
   }
   return indexes;
 }
@@ -94,7 +103,7 @@ export function validateMigrationText(input, predecessorInput = readFileSync(pre
     'CREATE TABLE must create exactly the 11 task-defined whatsapp tables, without obsolete release/Meta history tables');
   const fkExpected = [];
   const indexesExpected = [];
-  for (const [, schemaName, modelName, content] of created) {
+  for (const [, , modelName, content] of created) {
     const contract = CONTRACT.models[modelName];
     const columns = new Map(); let pkCount = 0;
     for (const piece of splitSqlColumns(content)) {
