@@ -226,11 +226,11 @@ model Customer {
   firstName String?
   lastName  String?
 
-  shopifyCustomerId String?
+  shopifyCustomerId       String?
   whatsAppConsentEvidence WhatsAppConsentEvidence[]
   phones                  CustomerPhone[]
   recoveries              CheckoutRecovery[]
-  standaloneConversations Conversation[]     @relation("StandaloneConversationCustomer")
+  standaloneConversations Conversation[]            @relation("StandaloneConversationCustomer")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -244,23 +244,27 @@ enum WhatsAppRecoveryConsentDecision {
   UNKNOWN
   GRANTED
   REVOKED
+
   @@schema("commerce")
 }
 
 enum WhatsAppRecoveryConsentSource {
   SHOPIFY_NATIVE
   WOO_MODA_CHECKBOX
+
   @@schema("commerce")
 }
 
 enum WhatsAppRecoveryNoContactReason {
   CUSTOMER_STOP
   MERCHANT_OPT_OUT
+
   @@schema("commerce")
 }
 
 enum WhatsAppConsentPurpose {
   WHATSAPP_CHECKOUT_RECOVERY
+
   @@schema("commerce")
 }
 
@@ -270,23 +274,23 @@ model CustomerPhone {
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
-  phone String
+  phone                             String
   // Digits-only E.164 recipient, after country-aware runtime normalisation.
-  whatsappCanonicalPhone String? @db.VarChar(15)
-  whatsappPhoneVerifiedAt DateTime? @db.Timestamptz(3)
-  whatsappConsentPurpose WhatsAppConsentPurpose @default(WHATSAPP_CHECKOUT_RECOVERY)
-  whatsappConsentDecision WhatsAppRecoveryConsentDecision @default(UNKNOWN)
-  whatsappConsentSource WhatsAppRecoveryConsentSource?
-  whatsappConsentProviderObservedAt DateTime? @db.Timestamptz(3)
-  whatsappConsentVerifiedAt DateTime? @db.Timestamptz(3)
-  whatsappConsentRevision BigInt @default(0)
-  whatsappConsentDecisionSequence BigInt @default(0)
-  whatsappNoContact Boolean @default(false)
-  whatsappNoContactReason WhatsAppRecoveryNoContactReason?
-  whatsappNoContactAt DateTime? @db.Timestamptz(3)
-  whatsappNoContactRevision BigInt @default(0)
-  whatsappNoContactClearedAt DateTime? @db.Timestamptz(3)
-  whatsAppConsentEvidence WhatsAppConsentEvidence[]
+  whatsappCanonicalPhone            String?                          @db.VarChar(15)
+  whatsappPhoneVerifiedAt           DateTime?                        @db.Timestamptz(3)
+  whatsappConsentPurpose            WhatsAppConsentPurpose           @default(WHATSAPP_CHECKOUT_RECOVERY)
+  whatsappConsentDecision           WhatsAppRecoveryConsentDecision  @default(UNKNOWN)
+  whatsappConsentSource             WhatsAppRecoveryConsentSource?
+  whatsappConsentProviderObservedAt DateTime?                        @db.Timestamptz(3)
+  whatsappConsentVerifiedAt         DateTime?                        @db.Timestamptz(3)
+  whatsappConsentRevision           BigInt                           @default(0)
+  whatsappConsentDecisionSequence   BigInt                           @default(0)
+  whatsappNoContact                 Boolean                          @default(false)
+  whatsappNoContactReason           WhatsAppRecoveryNoContactReason?
+  whatsappNoContactAt               DateTime?                        @db.Timestamptz(3)
+  whatsappNoContactRevision         BigInt                           @default(0)
+  whatsappNoContactClearedAt        DateTime?                        @db.Timestamptz(3)
+  whatsAppConsentEvidence           WhatsAppConsentEvidence[]
 
   startedAt DateTime  @default(now())
   endedAt   DateTime?
@@ -420,14 +424,14 @@ model RecoveryOutreachAttempt {
   id String @id @default(cuid())
 
   checkoutRecoveryId String
-  checkoutRecovery   CheckoutRecovery        @relation(fields: [checkoutRecoveryId], references: [id], onDelete: Cascade)
-  recipient          String                  @db.VarChar(64)
+  checkoutRecovery   CheckoutRecovery           @relation(fields: [checkoutRecoveryId], references: [id], onDelete: Cascade)
+  recipient          String                     @db.VarChar(64)
   sequence           Int
   trigger            RecoveryOutreachTrigger
-  status             RecoveryOutreachStatus  @default(PENDING)
+  status             RecoveryOutreachStatus     @default(PENDING)
   initiatedBy        RecoveryOutreachInitiator?
-  initiationKey      String?                 @unique @db.VarChar(255)
-  claimedAt          DateTime?               @db.Timestamptz(3)
+  initiationKey      String?                    @unique @db.VarChar(255)
+  claimedAt          DateTime?                  @db.Timestamptz(3)
 
   configuredOfferMode    RecoveryOfferMode
   fixedShopifyDiscountId String?
@@ -503,11 +507,11 @@ model Conversation {
   checkoutRecovery   CheckoutRecovery? @relation(fields: [checkoutRecoveryId], references: [id], onDelete: Cascade)
   standaloneScopeKey String?           @unique @db.VarChar(255)
 
-  type    ConversationType
-  outcome ConversationOutcome @default(IN_PROGRESS)
-  controlMode ConversationControlMode @default(AI)
-  controlRevision Int @default(0)
-  controlChangedAt DateTime? @db.Timestamptz(3)
+  type             ConversationType
+  outcome          ConversationOutcome     @default(IN_PROGRESS)
+  controlMode      ConversationControlMode @default(AI)
+  controlRevision  Int                     @default(0)
+  controlChangedAt DateTime?               @db.Timestamptz(3)
 
   languageTag    String?
   languageSource LanguageSource?
@@ -529,9 +533,9 @@ model Conversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  messages ConversationMessage[]
-  controlEvents ConversationControlEvent[]
-  merchantSendCommands MerchantConversationSendCommand[]
+  messages              ConversationMessage[]
+  controlEvents         ConversationControlEvent[]
+  merchantSendCommands  MerchantConversationSendCommand[]
   moderationAssessments ConversationModerationAssessment[]
 
   @@unique([checkoutRecoveryId])
@@ -544,14 +548,14 @@ model Conversation {
 }
 
 model ConversationControlEvent {
-  id String @id @default(cuid())
+  id             String                  @id @default(cuid())
   conversationId String
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  fromMode ConversationControlMode
-  toMode ConversationControlMode
-  fromRevision Int
-  toRevision Int
-  occurredAt DateTime @default(now()) @db.Timestamptz(3)
+  conversation   Conversation            @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  fromMode       ConversationControlMode
+  toMode         ConversationControlMode
+  fromRevision   Int
+  toRevision     Int
+  occurredAt     DateTime                @default(now()) @db.Timestamptz(3)
 
   @@unique([conversationId, toRevision])
   @@index([conversationId, occurredAt, id])
@@ -578,38 +582,38 @@ enum MerchantConversationSendState {
 }
 
 model MerchantConversationSendCommand {
-  id String @id @default(cuid())
-  shopId String
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  conversationId String
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  idempotencyKey String @db.VarChar(128)
-  payloadSha256 String @db.VarChar(64)
-  expectedControlRevision Int
-  kind MerchantConversationSendKind
-  recipientSnapshot String @db.VarChar(64)
-  textBody String? @db.Text
-  templateName String? @db.VarChar(255)
-  templateLanguageCode String? @db.VarChar(32)
-  templateParameters Json?
-  recoveryOutreachAttemptId String?
-  recoveryOutreachAttempt RecoveryOutreachAttempt? @relation(fields: [recoveryOutreachAttemptId], references: [id], onDelete: Restrict)
-  outboundMessageId String? @unique
-  outboundMessage ConversationMessage? @relation(fields: [outboundMessageId], references: [id], onDelete: Restrict)
-  state MerchantConversationSendState @default(ACCEPTED)
-  providerDispatchKey String? @unique @db.VarChar(128)
-  providerDispatchAdmittedAt DateTime? @db.Timestamptz(3)
-  providerDispatchControlRevision Int?
+  id                                  String                        @id @default(cuid())
+  shopId                              String
+  shop                                Shop                          @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  conversationId                      String
+  conversation                        Conversation                  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  idempotencyKey                      String                        @db.VarChar(128)
+  payloadSha256                       String                        @db.VarChar(64)
+  expectedControlRevision             Int
+  kind                                MerchantConversationSendKind
+  recipientSnapshot                   String                        @db.VarChar(64)
+  textBody                            String?                       @db.Text
+  templateName                        String?                       @db.VarChar(255)
+  templateLanguageCode                String?                       @db.VarChar(32)
+  templateParameters                  Json?
+  recoveryOutreachAttemptId           String?
+  recoveryOutreachAttempt             RecoveryOutreachAttempt?      @relation(fields: [recoveryOutreachAttemptId], references: [id], onDelete: Restrict)
+  outboundMessageId                   String?                       @unique
+  outboundMessage                     ConversationMessage?          @relation(fields: [outboundMessageId], references: [id], onDelete: Restrict)
+  state                               MerchantConversationSendState @default(ACCEPTED)
+  providerDispatchKey                 String?                       @unique @db.VarChar(128)
+  providerDispatchAdmittedAt          DateTime?                     @db.Timestamptz(3)
+  providerDispatchControlRevision     Int?
   providerDispatchRestrictionRevision Int?
-  dispatchAttemptCount Int @default(0)
-  nextAttemptAt DateTime? @db.Timestamptz(3)
-  leaseToken String? @db.VarChar(128)
-  leaseExpiresAt DateTime? @db.Timestamptz(3)
-  acceptedAt DateTime @default(now()) @db.Timestamptz(3)
-  completedAt DateTime? @db.Timestamptz(3)
-  failureCode String? @db.VarChar(128)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  dispatchAttemptCount                Int                           @default(0)
+  nextAttemptAt                       DateTime?                     @db.Timestamptz(3)
+  leaseToken                          String?                       @db.VarChar(128)
+  leaseExpiresAt                      DateTime?                     @db.Timestamptz(3)
+  acceptedAt                          DateTime                      @default(now()) @db.Timestamptz(3)
+  completedAt                         DateTime?                     @db.Timestamptz(3)
+  failureCode                         String?                       @db.VarChar(128)
+  createdAt                           DateTime                      @default(now()) @db.Timestamptz(3)
+  updatedAt                           DateTime                      @updatedAt @db.Timestamptz(3)
 
   moderationAssessments ConversationModerationAssessment[]
 
@@ -671,9 +675,9 @@ model ConversationMessage {
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   // Meta's WhatsApp message ID
-  providerMessageId String? @unique
-  providerDispatchKey String? @unique @db.VarChar(128)
-  providerDispatchAdmittedAt DateTime? @db.Timestamptz(3)
+  providerMessageId               String?   @unique
+  providerDispatchKey             String?   @unique @db.VarChar(128)
+  providerDispatchAdmittedAt      DateTime? @db.Timestamptz(3)
   providerDispatchControlRevision Int?
 
   // Meta context.id when this message is a reply
@@ -698,8 +702,8 @@ model ConversationMessage {
   createdAt DateTime @default(now())
 
   recoveryOutreachAttempt RecoveryOutreachAttempt?
-  merchantSendCommand MerchantConversationSendCommand?
-  moderationAssessments ConversationModerationAssessment[]
+  merchantSendCommand     MerchantConversationSendCommand?
+  moderationAssessments   ConversationModerationAssessment[]
 
   sentAt              DateTime?
   deliveredAt         DateTime?
@@ -736,38 +740,38 @@ enum ConversationModerationDecision {
 // The reviewed decision is a content/policy-specific classification only.
 // It never replaces the existing provider-admission or billing fence.
 model ConversationModerationAssessment {
-  id                         String @id @default(cuid())
-  shopId                     String
-  shop                       Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  conversationId             String
-  conversation               Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  subject                    ConversationModerationSubject
-  conversationMessageId      String?
-  conversationMessage        ConversationMessage? @relation(fields: [conversationMessageId], references: [id], onDelete: Cascade)
-  merchantSendCommandId      String?
-  merchantSendCommand        MerchantConversationSendCommand? @relation(fields: [merchantSendCommandId], references: [id], onDelete: Cascade)
-  contentSha256              String @db.VarChar(64)
-  inputKind                  String @db.VarChar(32)
-  requestedModel             String @db.VarChar(96)
-  returnedModel              String? @db.VarChar(96)
-  policyVersion              String @db.VarChar(48)
-  decision                   ConversationModerationDecision @default(PENDING)
-  flagged                    Boolean?
-  categories                 Json?
-  categoryScores             Json?
-  reasonCode                 String? @db.VarChar(96)
-  providerRequestId          String? @db.VarChar(128)
-  attemptCount               Int @default(0)
-  nextAttemptAt              DateTime? @db.Timestamptz(3)
-  leaseToken                 String? @db.VarChar(128)
-  leaseExpiresAt             DateTime? @db.Timestamptz(3)
-  assessedAt                 DateTime? @db.Timestamptz(3)
-  reviewedAt                 DateTime? @db.Timestamptz(3)
-  reviewedByPlatformAdminId  String?
-  reviewedByPlatformAdmin    PlatformAdmin? @relation(fields: [reviewedByPlatformAdminId], references: [id], onDelete: Restrict)
-  reviewDisposition          String? @db.VarChar(32)
-  createdAt                  DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt                  DateTime @updatedAt @db.Timestamptz(3)
+  id                        String                           @id @default(cuid())
+  shopId                    String
+  shop                      Shop                             @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  conversationId            String
+  conversation              Conversation                     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  subject                   ConversationModerationSubject
+  conversationMessageId     String?
+  conversationMessage       ConversationMessage?             @relation(fields: [conversationMessageId], references: [id], onDelete: Cascade)
+  merchantSendCommandId     String?
+  merchantSendCommand       MerchantConversationSendCommand? @relation(fields: [merchantSendCommandId], references: [id], onDelete: Cascade)
+  contentSha256             String                           @db.VarChar(64)
+  inputKind                 String                           @db.VarChar(32)
+  requestedModel            String                           @db.VarChar(96)
+  returnedModel             String?                          @db.VarChar(96)
+  policyVersion             String                           @db.VarChar(48)
+  decision                  ConversationModerationDecision   @default(PENDING)
+  flagged                   Boolean?
+  categories                Json?
+  categoryScores            Json?
+  reasonCode                String?                          @db.VarChar(96)
+  providerRequestId         String?                          @db.VarChar(128)
+  attemptCount              Int                              @default(0)
+  nextAttemptAt             DateTime?                        @db.Timestamptz(3)
+  leaseToken                String?                          @db.VarChar(128)
+  leaseExpiresAt            DateTime?                        @db.Timestamptz(3)
+  assessedAt                DateTime?                        @db.Timestamptz(3)
+  reviewedAt                DateTime?                        @db.Timestamptz(3)
+  reviewedByPlatformAdminId String?
+  reviewedByPlatformAdmin   PlatformAdmin?                   @relation(fields: [reviewedByPlatformAdminId], references: [id], onDelete: Restrict)
+  reviewDisposition         String?                          @db.VarChar(32)
+  createdAt                 DateTime                         @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime                         @updatedAt @db.Timestamptz(3)
 
   @@unique([conversationMessageId, policyVersion, contentSha256], map: "ConversationModeration_message_content_uq")
   @@unique([merchantSendCommandId, policyVersion, contentSha256], map: "ConversationModeration_command_content_uq")
@@ -806,31 +810,31 @@ enum HumanMessagingRestrictionStatus {
 }
 
 model ShopHumanMessagingRestriction {
-  shopId String @id
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  status HumanMessagingRestrictionStatus @default(ACTIVE)
-  revision Int @default(1)
-  reasonCode String @db.VarChar(128)
-  reasonNote String? @db.VarChar(1024)
-  suspendedAt DateTime? @db.Timestamptz(3)
-  restoredAt DateTime? @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  shopId      String                          @id
+  shop        Shop                            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  status      HumanMessagingRestrictionStatus @default(ACTIVE)
+  revision    Int                             @default(1)
+  reasonCode  String                          @db.VarChar(128)
+  reasonNote  String?                         @db.VarChar(1024)
+  suspendedAt DateTime?                       @db.Timestamptz(3)
+  restoredAt  DateTime?                       @db.Timestamptz(3)
+  updatedAt   DateTime                        @updatedAt @db.Timestamptz(3)
 
   @@schema("commerce")
 }
 
 model ShopHumanMessagingRestrictionEvent {
-  id String @id @default(cuid())
-  shopId String
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  fromStatus HumanMessagingRestrictionStatus
-  toStatus HumanMessagingRestrictionStatus
-  revision Int
-  reasonCode String @db.VarChar(128)
-  reasonNote String? @db.VarChar(1024)
+  id              String                          @id @default(cuid())
+  shopId          String
+  shop            Shop                            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  fromStatus      HumanMessagingRestrictionStatus
+  toStatus        HumanMessagingRestrictionStatus
+  revision        Int
+  reasonCode      String                          @db.VarChar(128)
+  reasonNote      String?                         @db.VarChar(1024)
   platformAdminId String
-  platformAdmin PlatformAdmin @relation(fields: [platformAdminId], references: [id], onDelete: Restrict)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  platformAdmin   PlatformAdmin                   @relation(fields: [platformAdminId], references: [id], onDelete: Restrict)
+  createdAt       DateTime                        @default(now()) @db.Timestamptz(3)
 
   @@unique([shopId, revision])
   @@index([shopId, createdAt, id])
@@ -1121,34 +1125,34 @@ model MerchantPricingPlan {
 
   displayName                        String
   planKind                           MerchantPricingPlanKind
-  isActive                           Boolean                        @default(true)
+  isActive                           Boolean                              @default(true)
   publicationStatus                  MerchantPricingPlanPublicationStatus @default(READY)
-  currentTranslationRunId            String?                        @unique(map: "MerchantPricingPlan_current_translation_run_key") @db.Text
+  currentTranslationRunId            String?                              @unique(map: "MerchantPricingPlan_current_translation_run_key") @db.Text
   cataloguePosition                  Int
-  featured                           Boolean                        @default(false)
+  featured                           Boolean                              @default(false)
   includedRecoveryCredits            Int
   allowancePeriod                    MerchantPricingAllowancePeriod
   billingPeriod                      MerchantPricingBillingPeriod
   recurringAmountMinor               Int
-  currency                           String                         @db.Char(3)
-  economicsOverrideEnabled           Boolean                        @default(false)
-  economicsOverrideReason            String?                        @db.Text
+  currency                           String                               @db.Char(3)
+  economicsOverrideEnabled           Boolean                              @default(false)
+  economicsOverrideReason            String?                              @db.Text
   economicsOverrideApprovedAt        DateTime?
   economicsOverrideApprovedByAdminId String?
-  economicsOverrideFailureCodes      String[]                       @default([])
-  economicsOverrideFingerprint       String?                        @db.VarChar(64)
-  shopifyRecoveryUsageEventHandle    String?                        @db.VarChar(255)
+  economicsOverrideFailureCodes      String[]                             @default([])
+  economicsOverrideFingerprint       String?                              @db.VarChar(64)
+  shopifyRecoveryUsageEventHandle    String?                              @db.VarChar(255)
   materializedAt                     DateTime?
-  commerceModelId                    String?                        @db.Text
+  commerceModelId                    String?                              @db.Text
 
-  translations      MerchantPricingPlanTranslation[]
-  usageEvents       MerchantPricingUsageEvent[]
-  billingOperations BillingOperation[]
-  highlights        MerchantPricingPlanHighlight[]
-  features          MerchantPricingPlanFeature[]
+  translations          MerchantPricingPlanTranslation[]
+  usageEvents           MerchantPricingUsageEvent[]
+  billingOperations     BillingOperation[]
+  highlights            MerchantPricingPlanHighlight[]
+  features              MerchantPricingPlanFeature[]
   commerceModelPolicies CommerceModelPolicy[]
-  commerceModel         CommerceModelCatalogueEntry?       @relation("MerchantPricingPlanCommerceModel", fields: [commerceModelId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  currentTranslationRun MerchantPricingTranslationRun?      @relation("MerchantPricingPlanCurrentTranslationRun", fields: [currentTranslationRunId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  commerceModel         CommerceModelCatalogueEntry?     @relation("MerchantPricingPlanCommerceModel", fields: [commerceModelId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  currentTranslationRun MerchantPricingTranslationRun?   @relation("MerchantPricingPlanCurrentTranslationRun", fields: [currentTranslationRunId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1235,7 +1239,7 @@ model MerchantPricingTranslationRun {
   requestedBy      PlatformAdmin                         @relation("MerchantPricingTranslationRunRequester", fields: [requestedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   items            MerchantPricingTranslationItem[]
   batches          MerchantPricingTranslationBatch[]
-  currentForPlan   MerchantPricingPlan?                     @relation("MerchantPricingPlanCurrentTranslationRun")
+  currentForPlan   MerchantPricingPlan?                  @relation("MerchantPricingPlanCurrentTranslationRun")
 
   @@index([shopifyPlanHandle, status, requestedAt], map: "MerchantPricingTranslationRun_handle_status_requested_idx")
   @@index([status, requestedAt], map: "MerchantPricingTranslationRun_status_requested_idx")
@@ -1294,7 +1298,7 @@ model MerchantPricingTranslationBatch {
   createdAt           DateTime                              @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime                              @default(now()) @updatedAt @db.Timestamptz(3)
 
-  run          MerchantPricingTranslationRun        @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  run          MerchantPricingTranslationRun         @relation(fields: [runId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   currentItems MerchantPricingTranslationItem[]      @relation("MerchantPricingTranslationItemCurrentBatch")
   items        MerchantPricingTranslationBatchItem[]
 
@@ -2043,12 +2047,14 @@ enum ShopPlatform {
 enum WooCommerceInstallationStatus {
   ACTIVE
   REVOKED
+
   @@schema("woocommerce")
 }
 
 enum WhatsAppConsentEvidenceDecision {
   GRANT
   REVOKE
+
   @@schema("commerce")
 }
 
@@ -2085,36 +2091,37 @@ model Shop {
   reinstallPendingAt DateTime?
 
   // Configuration / billing
-  settings                          ShopSettings?
-  brand                             ShopBrand?
-  subscription                      Subscription?
-  usageEvents                       UsageEvent[]
-  billingPeriods                    BillingPeriod[]
-  entitlementCounters               ShopEntitlementCounter[]
-  billingPeriodEntitlementCounters  BillingPeriodEntitlementCounter[]
-  usageReservations                 UsageReservation[]
-  billingPolicyOverride             ShopBillingPolicyOverride?
-  billingAuditEvents                BillingAuditEvent[]
-  billingOperations                 BillingOperation[]
-  recoveryCreditPurchases           RecoveryCreditPurchase[]
-  promotionalCreditGrants           PromotionalCreditGrant[]
-  merchantPromotionSelection        MerchantPromotionSelection?
-  promotionCampaigns                PromotionCampaign[]                    @relation("PromotionCampaignTargetShop")
-  recoveryCreditRefunds             RecoveryCreditRefund[]
-  discountCatalogue                 ShopifyDiscountCatalogue?
-  shopifyDiscounts                  ShopifyDiscount[]                      @relation("ShopifyDiscountShop")
-  recoveryPolicyOverride            ShopRecoveryPolicyOverride?
-  recoveryPolicyOverrideAuditEvents ShopRecoveryPolicyOverrideAuditEvent[]
-  featurePreferences                ShopFeaturePreference[]
-  whatsappTemplateVariants          WhatsAppTemplateVariant[]
-  whatsappRecipientReachability     WhatsAppRecipientReachability[]
-  whatsAppConsentEvidence WhatsAppConsentEvidence[]
-  merchantConversationSendCommands MerchantConversationSendCommand[]
-  moderationAssessments ConversationModerationAssessment[]
-  humanMessagingRestriction ShopHumanMessagingRestriction?
-  humanMessagingRestrictionEvents ShopHumanMessagingRestrictionEvent[]
-  merchantSupportThread             MerchantSupportThread?
-  operationalIncidents              OperationalIncident[]
+  settings                           ShopSettings?
+  brand                              ShopBrand?
+  subscription                       Subscription?
+  usageEvents                        UsageEvent[]
+  billingPeriods                     BillingPeriod[]
+  entitlementCounters                ShopEntitlementCounter[]
+  billingPeriodEntitlementCounters   BillingPeriodEntitlementCounter[]
+  usageReservations                  UsageReservation[]
+  billingPolicyOverride              ShopBillingPolicyOverride?
+  billingAuditEvents                 BillingAuditEvent[]
+  billingOperations                  BillingOperation[]
+  recoveryCreditPurchases            RecoveryCreditPurchase[]
+  promotionalCreditGrants            PromotionalCreditGrant[]
+  merchantPromotionSelection         MerchantPromotionSelection?
+  promotionCampaigns                 PromotionCampaign[]                    @relation("PromotionCampaignTargetShop")
+  recoveryCreditRefunds              RecoveryCreditRefund[]
+  discountCatalogue                  ShopifyDiscountCatalogue?
+  shopifyDiscounts                   ShopifyDiscount[]                      @relation("ShopifyDiscountShop")
+  recoveryPolicyOverride             ShopRecoveryPolicyOverride?
+  recoveryPolicyOverrideAuditEvents  ShopRecoveryPolicyOverrideAuditEvent[]
+  featurePreferences                 ShopFeaturePreference[]
+  whatsAppTemplatePublicationTargets WhatsAppTemplatePublicationTarget[]    @relation("WhatsAppTemplatePublicationTargetShop")
+  whatsappTemplateVariants           WhatsAppTemplateVariant[]
+  whatsappRecipientReachability      WhatsAppRecipientReachability[]
+  whatsAppConsentEvidence            WhatsAppConsentEvidence[]
+  merchantConversationSendCommands   MerchantConversationSendCommand[]
+  moderationAssessments              ConversationModerationAssessment[]
+  humanMessagingRestriction          ShopHumanMessagingRestriction?
+  humanMessagingRestrictionEvents    ShopHumanMessagingRestrictionEvent[]
+  merchantSupportThread              MerchantSupportThread?
+  operationalIncidents               OperationalIncident[]
 
   // Commerce domain
   customers               Customer[]
@@ -2132,19 +2139,19 @@ model Shop {
 }
 
 model WooCommerceInstallation {
-  id                 String                        @id @default(cuid()) @db.Text
-  shopId             String                        @unique(map: "WooCommerceInstallation_shopId_key") @db.Text
-  shop               Shop                          @relation(fields: [shopId], references: [id], onDelete: Cascade, onUpdate: Restrict)
-  canonicalSiteUrl   String                        @unique(map: "WooCommerceInstallation_canonicalSiteUrl_key") @db.VarChar(512)
-  status             WooCommerceInstallationStatus @default(ACTIVE)
-  credentialDigest   Bytes
-  credentialVersion  Int                           @default(1)
-  credentialIssuedAt DateTime                      @default(now()) @db.Timestamptz(3)
-  revokedAt          DateTime?                     @db.Timestamptz(3)
-  createdAt          DateTime                      @default(now()) @db.Timestamptz(3)
-  updatedAt          DateTime                      @default(now()) @updatedAt @db.Timestamptz(3)
-  restReadGrant      WooCommerceRestReadGrant?
-  restReadAttempts   WooCommerceRestReadAttempt[]
+  id                      String                        @id @default(cuid()) @db.Text
+  shopId                  String                        @unique(map: "WooCommerceInstallation_shopId_key") @db.Text
+  shop                    Shop                          @relation(fields: [shopId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  canonicalSiteUrl        String                        @unique(map: "WooCommerceInstallation_canonicalSiteUrl_key") @db.VarChar(512)
+  status                  WooCommerceInstallationStatus @default(ACTIVE)
+  credentialDigest        Bytes
+  credentialVersion       Int                           @default(1)
+  credentialIssuedAt      DateTime                      @default(now()) @db.Timestamptz(3)
+  revokedAt               DateTime?                     @db.Timestamptz(3)
+  createdAt               DateTime                      @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime                      @default(now()) @updatedAt @db.Timestamptz(3)
+  restReadGrant           WooCommerceRestReadGrant?
+  restReadAttempts        WooCommerceRestReadAttempt[]
   whatsAppConsentEvidence WhatsAppConsentEvidence[]
 
   // Required for shop-bound composite foreign keys on the outgoing REST grant.
@@ -2157,27 +2164,27 @@ model WooCommerceInstallation {
 // current permission authority. API verifies the checkout decision and resolves
 // the exact shop-scoped recipient before writing both records atomically.
 model WhatsAppConsentEvidence {
-  id String @id @default(cuid()) @db.Text
-  shopId String @db.Text
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  installationId String @db.Text
-  installation WooCommerceInstallation @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Restrict, onUpdate: Restrict)
-  eventId String @db.VarChar(128)
-  payloadDigest Bytes
-  customerId String @db.Text
-  customer Customer @relation(fields: [customerId, shopId], references: [id, shopId], onDelete: Restrict, onUpdate: Restrict)
-  customerPhoneId String @db.Text
-  customerPhone CustomerPhone @relation(fields: [customerPhoneId, customerId], references: [id, customerId], onDelete: Restrict, onUpdate: Restrict)
-  canonicalPhone String @db.VarChar(15)
-  purpose WhatsAppConsentPurpose @default(WHATSAPP_CHECKOUT_RECOVERY)
-  decision WhatsAppConsentEvidenceDecision
-  decisionSequence BigInt
+  id                   String                          @id @default(cuid()) @db.Text
+  shopId               String                          @db.Text
+  shop                 Shop                            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  installationId       String                          @db.Text
+  installation         WooCommerceInstallation         @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Restrict, onUpdate: Restrict)
+  eventId              String                          @db.VarChar(128)
+  payloadDigest        Bytes
+  customerId           String                          @db.Text
+  customer             Customer                        @relation(fields: [customerId, shopId], references: [id, shopId], onDelete: Restrict, onUpdate: Restrict)
+  customerPhoneId      String                          @db.Text
+  customerPhone        CustomerPhone                   @relation(fields: [customerPhoneId, customerId], references: [id, customerId], onDelete: Restrict, onUpdate: Restrict)
+  canonicalPhone       String                          @db.VarChar(15)
+  purpose              WhatsAppConsentPurpose          @default(WHATSAPP_CHECKOUT_RECOVERY)
+  decision             WhatsAppConsentEvidenceDecision
+  decisionSequence     BigInt
   phoneConsentRevision BigInt
-  decisionAt DateTime @db.Timestamptz(3)
-  disclosureText String? @db.VarChar(4000)
-  disclosureVersion String? @db.VarChar(128)
-  disclosureLocale String? @db.VarChar(64)
-  recordedAt DateTime @default(now()) @db.Timestamptz(3)
+  decisionAt           DateTime                        @db.Timestamptz(3)
+  disclosureText       String?                         @db.VarChar(4000)
+  disclosureVersion    String?                         @db.VarChar(128)
+  disclosureLocale     String?                         @db.VarChar(64)
+  recordedAt           DateTime                        @default(now()) @db.Timestamptz(3)
 
   @@unique([shopId, eventId], map: "WhatsAppConsentEvidence_shop_event_key")
   @@unique([customerPhoneId, phoneConsentRevision], map: "WhatsAppConsentEvidence_phone_revision_key")
@@ -2205,20 +2212,20 @@ enum WooCommerceRestReadAttemptStatus {
 }
 
 model WooCommerceRestReadAttempt {
-  id                        String                               @id @default(cuid()) @db.Text
-  installationId            String                               @db.Text
-  shopId                    String                               @db.Text
-  installation              WooCommerceInstallation              @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Cascade, onUpdate: Restrict)
-  tokenDigest               Bytes                                @unique(map: "WooCommerceRestReadAttempt_tokenDigest_key")
-  attemptSequence           BigInt                               @unique(map: "WooCommerceRestReadAttempt_attemptSequence_key") @default(autoincrement())
+  id                        String                           @id @default(cuid()) @db.Text
+  installationId            String                           @db.Text
+  shopId                    String                           @db.Text
+  installation              WooCommerceInstallation          @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Cascade, onUpdate: Restrict)
+  tokenDigest               Bytes                            @unique(map: "WooCommerceRestReadAttempt_tokenDigest_key")
+  attemptSequence           BigInt                           @unique(map: "WooCommerceRestReadAttempt_attemptSequence_key") @default(autoincrement())
   credentialVersionSnapshot Int
-  status                    WooCommerceRestReadAttemptStatus     @default(PENDING)
-  expiresAt                 DateTime                             @db.Timestamptz(3)
-  consumedAt                DateTime?                            @db.Timestamptz(3)
+  status                    WooCommerceRestReadAttemptStatus @default(PENDING)
+  expiresAt                 DateTime                         @db.Timestamptz(3)
+  consumedAt                DateTime?                        @db.Timestamptz(3)
   consumptionTransactionId  BigInt?
-  failureCode               String?                              @db.VarChar(64)
-  createdAt                 DateTime                             @default(now()) @db.Timestamptz(3)
-  updatedAt                 DateTime                             @default(now()) @updatedAt @db.Timestamptz(3)
+  failureCode               String?                          @db.VarChar(64)
+  createdAt                 DateTime                         @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime                         @default(now()) @updatedAt @db.Timestamptz(3)
   authorisedGrant           WooCommerceRestReadGrant?
 
   @@index([installationId, status, expiresAt], map: "WooCommerceRestReadAttempt_installation_pending_idx")
@@ -2227,29 +2234,29 @@ model WooCommerceRestReadAttempt {
 }
 
 model WooCommerceRestReadGrant {
-  id                            String                         @id @default(cuid()) @db.Text
-  installationId                String                         @unique(map: "WooCommerceRestReadGrant_installationId_key") @db.Text
-  shopId                        String                         @db.Text
-  installation                  WooCommerceInstallation        @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Cascade, onUpdate: Restrict)
-  authorizationAttemptId        String                         @unique(map: "WooCommerceRestReadGrant_authorizationAttemptId_key") @db.Text
-  authorizationAttempt          WooCommerceRestReadAttempt     @relation(fields: [authorizationAttemptId], references: [id], onDelete: Cascade, onUpdate: Restrict)
-  authorizationAttemptSequence  BigInt
-  credentialVersionSnapshot     Int
-  rotationVersion               Int                            @default(1)
-  status                        WooCommerceRestReadGrantStatus @default(ACTIVE)
+  id                           String                         @id @default(cuid()) @db.Text
+  installationId               String                         @unique(map: "WooCommerceRestReadGrant_installationId_key") @db.Text
+  shopId                       String                         @db.Text
+  installation                 WooCommerceInstallation        @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Cascade, onUpdate: Restrict)
+  authorizationAttemptId       String                         @unique(map: "WooCommerceRestReadGrant_authorizationAttemptId_key") @db.Text
+  authorizationAttempt         WooCommerceRestReadAttempt     @relation(fields: [authorizationAttemptId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  authorizationAttemptSequence BigInt
+  credentialVersionSnapshot    Int
+  rotationVersion              Int                            @default(1)
+  status                       WooCommerceRestReadGrantStatus @default(ACTIVE)
   // A single AEAD ciphertext contains both Woo consumer key and consumer secret.
-  credentialCiphertext          Bytes
-  credentialNonce               Bytes
-  credentialAuthTag             Bytes
-  encryptionKeyId               String                         @db.VarChar(128)
-  providerKeyId                 String                         @db.VarChar(128)
-  authorizedScope               String                         @db.VarChar(16)
-  verifiedAt                    DateTime                       @db.Timestamptz(3)
-  grantedAt                     DateTime                       @default(now()) @db.Timestamptz(3)
-  revokedAt                     DateTime?                      @db.Timestamptz(3)
-  invalidatedAt                 DateTime?                      @db.Timestamptz(3)
-  createdAt                     DateTime                       @default(now()) @db.Timestamptz(3)
-  updatedAt                     DateTime                       @default(now()) @updatedAt @db.Timestamptz(3)
+  credentialCiphertext         Bytes
+  credentialNonce              Bytes
+  credentialAuthTag            Bytes
+  encryptionKeyId              String                         @db.VarChar(128)
+  providerKeyId                String                         @db.VarChar(128)
+  authorizedScope              String                         @db.VarChar(16)
+  verifiedAt                   DateTime                       @db.Timestamptz(3)
+  grantedAt                    DateTime                       @default(now()) @db.Timestamptz(3)
+  revokedAt                    DateTime?                      @db.Timestamptz(3)
+  invalidatedAt                DateTime?                      @db.Timestamptz(3)
+  createdAt                    DateTime                       @default(now()) @db.Timestamptz(3)
+  updatedAt                    DateTime                       @default(now()) @updatedAt @db.Timestamptz(3)
 
   // Prisma requires the full defining-side key of a composite 1:1 relation to be unique.
   // installationId remains independently unique: exactly one grant per installation.
@@ -2412,20 +2419,326 @@ model WhatsAppTemplateVariant {
   shopId String
   shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  providerAccountId    String
-  purpose              String
-  languageTag          String
-  providerLanguageCode String
-  providerTemplateName String
-  providerTemplateId   String?
-  status               WhatsAppTemplateStatus
-  enabled              Boolean                @default(true)
+  providerAccountId          String
+  purpose                    String
+  languageTag                String
+  providerLanguageCode       String
+  providerTemplateName       String
+  providerTemplateId         String?
+  metaRegistrationId         String?                             @db.Text
+  metaRegistration           WhatsAppTemplateMetaRegistration?   @relation("WhatsAppTemplateVariantMetaRegistration", fields: [metaRegistrationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  publicationPreviousTargets WhatsAppTemplatePublicationTarget[] @relation("WhatsAppTemplatePublicationPreviousVariant")
+  publicationNewTargets      WhatsAppTemplatePublicationTarget[] @relation("WhatsAppTemplatePublicationNewVariant")
+  status                     WhatsAppTemplateStatus
+  enabled                    Boolean                             @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([shopId, providerAccountId, purpose, providerTemplateName, providerLanguageCode], map: "WhatsAppTemplateVariant_identity_key")
   @@index([shopId, providerAccountId, purpose, languageTag, enabled, status])
+  @@index([metaRegistrationId])
+  @@schema("whatsapp")
+}
+
+// ARCH-047: Moda-authored WhatsApp templates, translations, Meta state and publication.
+model WhatsAppTemplateDefinition {
+  id                     String    @id @default(cuid()) @db.Text
+  kind                   String    @db.VarChar(40)
+  purpose                String?   @db.VarChar(96)
+  offerType              String?   @db.VarChar(32)
+  audience               String?   @db.VarChar(24)
+  providerTemplateName   String?   @db.VarChar(255)
+  category               String?   @db.VarChar(32)
+  sourceLanguageTag      String    @db.VarChar(16)
+  astSchemaVersion       Int
+  sourceHash             String    @db.VarChar(64)
+  status                 String    @db.VarChar(32)
+  publishedAt            DateTime? @db.Timestamptz(3)
+  retiredAt              DateTime? @db.Timestamptz(3)
+  createdByAdminId       String    @db.Text
+  clonedFromDefinitionId String?   @db.Text
+  createdAt              DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+
+  createdByAdmin  PlatformAdmin                           @relation("WhatsAppTemplateDefinitionCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  clonedFrom      WhatsAppTemplateDefinition?             @relation("WhatsAppTemplateDefinitionClone", fields: [clonedFromDefinitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  clones          WhatsAppTemplateDefinition[]            @relation("WhatsAppTemplateDefinitionClone")
+  locales         WhatsAppTemplateLocale[]
+  translationRuns WhatsAppTemplateTranslationRun[]
+  publications    WhatsAppTemplatePublicationOperation[]
+  activeWrappers  WhatsAppConversationWrapperActiveSlot[]
+
+  @@index([kind, purpose, createdAt])
+  @@index([status, publishedAt])
+  @@index([createdByAdminId, createdAt])
+  @@index([clonedFromDefinitionId])
+  @@schema("whatsapp")
+}
+
+model WhatsAppTemplateLocale {
+  id                   String    @id @default(cuid()) @db.Text
+  definitionId         String    @db.Text
+  languageTag          String    @db.VarChar(16)
+  providerLanguageCode String?   @db.VarChar(16)
+  localeAst            Json?     @db.JsonB
+  contentHash          String?   @db.VarChar(64)
+  status               String    @db.VarChar(32)
+  reviewedByAdminId    String?   @db.Text
+  reviewedAt           DateTime? @db.Timestamptz(3)
+  createdAt            DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+
+  definition         WhatsAppTemplateDefinition         @relation(fields: [definitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  reviewedByAdmin    PlatformAdmin?                     @relation("WhatsAppTemplateLocaleReviewer", fields: [reviewedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  metaRegistrations  WhatsAppTemplateMetaRegistration[]
+  translationResults WhatsAppTemplateTranslationItem[]  @relation("WhatsAppTemplateTranslationResultLocale")
+
+  @@unique([definitionId, languageTag])
+  @@index([status, updatedAt])
+  @@index([reviewedByAdminId, reviewedAt])
+  @@schema("whatsapp")
+}
+
+model WhatsAppTemplateTranslationRun {
+  id                              String    @id @default(cuid()) @db.Text
+  definitionId                    String    @db.Text
+  translationModelConfigurationId String    @db.Text
+  provider                        String    @db.VarChar(64)
+  providerModelId                 String    @db.VarChar(255)
+  modelConfigurationVersion       Int
+  sourceSchemaVersion             Int
+  sourceHash                      String    @db.VarChar(64)
+  sourceSnapshot                  Json      @db.JsonB
+  status                          String    @db.VarChar(32)
+  requestedByAdminId              String    @db.Text
+  requestedAt                     DateTime  @default(now()) @db.Timestamptz(3)
+  startedAt                       DateTime? @db.Timestamptz(3)
+  completedAt                     DateTime? @db.Timestamptz(3)
+  failureCode                     String?   @db.VarChar(128)
+  createdAt                       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt                       DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+
+  definition       WhatsAppTemplateDefinition            @relation(fields: [definitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  translationModel CommerceTranslationModelConfiguration @relation(fields: [translationModelConfigurationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  requestedBy      PlatformAdmin                         @relation("WhatsAppTemplateTranslationRunRequester", fields: [requestedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  items            WhatsAppTemplateTranslationItem[]
+  batches          WhatsAppTemplateTranslationBatch[]
+
+  @@index([definitionId, status, requestedAt])
+  @@index([status, requestedAt])
+  @@index([translationModelConfigurationId, requestedAt])
+  @@schema("whatsapp")
+}
+
+model WhatsAppTemplateTranslationItem {
+  id                String    @id @default(cuid()) @db.Text
+  runId             String    @db.Text
+  targetLanguageTag String    @db.VarChar(16)
+  translatedAst     Json?     @db.JsonB
+  outputContentHash String?   @db.VarChar(64)
+  resultLocaleId    String?   @db.Text
+  status            String    @db.VarChar(32)
+  failureCode       String?   @db.VarChar(128)
+  retryCount        Int       @default(0)
+  nextAttemptAt     DateTime? @db.Timestamptz(3)
+  currentBatchId    String?   @db.Text
+  completedAt       DateTime? @db.Timestamptz(3)
+  createdAt         DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+
+  run          WhatsAppTemplateTranslationRun         @relation(fields: [runId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  resultLocale WhatsAppTemplateLocale?                @relation("WhatsAppTemplateTranslationResultLocale", fields: [resultLocaleId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  currentBatch WhatsAppTemplateTranslationBatch?      @relation("WhatsAppTemplateTranslationItemCurrentBatch", fields: [currentBatchId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  batchItems   WhatsAppTemplateTranslationBatchItem[]
+
+  @@unique([runId, targetLanguageTag])
+  @@index([status, currentBatchId, nextAttemptAt, createdAt])
+  @@index([resultLocaleId])
+  @@schema("whatsapp")
+}
+
+model WhatsAppTemplateTranslationBatch {
+  id                  String    @id @default(cuid()) @db.Text
+  runId               String    @db.Text
+  provider            String    @db.VarChar(64)
+  model               String    @db.VarChar(255)
+  status              String    @db.VarChar(32)
+  providerBatchId     String?   @db.Text
+  inputFileId         String?   @db.Text
+  outputFileId        String?   @db.Text
+  errorFileId         String?   @db.Text
+  submissionStartedAt DateTime? @db.Timestamptz(3)
+  lastSubmitAttemptAt DateTime? @db.Timestamptz(3)
+  submitAttemptCount  Int       @default(0)
+  nextSubmitAt        DateTime? @db.Timestamptz(3)
+  submittedAt         DateTime? @db.Timestamptz(3)
+  lastPolledAt        DateTime? @db.Timestamptz(3)
+  nextPollAt          DateTime? @db.Timestamptz(3)
+  pollSequence        Int       @default(0)
+  completedAt         DateTime? @db.Timestamptz(3)
+  failureCode         String?   @db.VarChar(128)
+  createdAt           DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+
+  run          WhatsAppTemplateTranslationRun         @relation(fields: [runId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  currentItems WhatsAppTemplateTranslationItem[]      @relation("WhatsAppTemplateTranslationItemCurrentBatch")
+  items        WhatsAppTemplateTranslationBatchItem[]
+
+  @@unique([provider, providerBatchId])
+  @@index([runId, status, createdAt])
+  @@index([status, nextSubmitAt, createdAt])
+  @@index([status, nextPollAt, createdAt])
+  @@schema("whatsapp")
+}
+
+model WhatsAppTemplateTranslationBatchItem {
+  id                String   @id @default(cuid()) @db.Text
+  batchId           String   @db.Text
+  translationItemId String   @db.Text
+  providerCustomId  String   @unique @db.VarChar(255)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+
+  batch           WhatsAppTemplateTranslationBatch @relation(fields: [batchId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  translationItem WhatsAppTemplateTranslationItem  @relation(fields: [translationItemId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([batchId, translationItemId])
+  @@index([translationItemId, createdAt])
+  @@schema("whatsapp")
+}
+
+model WhatsAppTemplateMetaRegistration {
+  id                        String    @id @default(cuid()) @db.Text
+  localeId                  String    @db.Text
+  wabaId                    String    @db.VarChar(191)
+  providerTemplateName      String    @db.VarChar(255)
+  providerLanguageCode      String    @db.VarChar(16)
+  category                  String    @db.VarChar(32)
+  componentsSnapshot        Json      @db.JsonB
+  parameterBindingsSnapshot Json      @db.JsonB
+  submittedContentHash      String    @db.VarChar(64)
+  providerTemplateId        String?   @db.VarChar(191)
+  submissionState           String    @db.VarChar(32)
+  providerStatus            String?   @db.VarChar(32)
+  failureCode               String?   @db.VarChar(128)
+  lastSubmittedAt           DateTime? @db.Timestamptz(3)
+  nextRetryAt               DateTime? @db.Timestamptz(3)
+  lastReconciledAt          DateTime? @db.Timestamptz(3)
+  lastObservedContentHash   String?   @db.VarChar(64)
+  lastObservedCategory      String?   @db.VarChar(32)
+  driftDetectedAt           DateTime? @db.Timestamptz(3)
+  createdAt                 DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+
+  locale             WhatsAppTemplateLocale              @relation(fields: [localeId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  events             WhatsAppTemplateMetaEvent[]
+  variants           WhatsAppTemplateVariant[]           @relation("WhatsAppTemplateVariantMetaRegistration")
+  publicationTargets WhatsAppTemplatePublicationTarget[] @relation("WhatsAppTemplatePublicationTargetMetaRegistration")
+
+  @@unique([wabaId, providerTemplateName, providerLanguageCode])
+  @@unique([wabaId, providerTemplateId])
+  @@index([localeId, createdAt])
+  @@index([submissionState, nextRetryAt, createdAt])
+  @@index([providerStatus, updatedAt])
+  @@index([driftDetectedAt])
+  @@schema("whatsapp")
+}
+
+model WhatsAppTemplateMetaEvent {
+  id                   String    @id @default(cuid()) @db.Text
+  eventIdentity        String    @unique @db.VarChar(191)
+  registrationId       String?   @db.Text
+  source               String    @db.VarChar(32)
+  eventType            String    @db.VarChar(64)
+  outcome              String?   @db.VarChar(32)
+  attemptNumber        Int?
+  wabaId               String    @db.VarChar(191)
+  providerTemplateId   String?   @db.VarChar(191)
+  providerTemplateName String?   @db.VarChar(255)
+  providerLanguageCode String?   @db.VarChar(16)
+  requestDigest        String?   @db.VarChar(64)
+  providerRequestId    String?   @db.VarChar(191)
+  httpStatus           Int?
+  providerStatus       String?   @db.VarChar(32)
+  failureCode          String?   @db.VarChar(128)
+  reasonCode           String?   @db.VarChar(128)
+  evidence             Json?     @db.JsonB
+  receivedAt           DateTime  @default(now()) @db.Timestamptz(3)
+  processedAt          DateTime? @db.Timestamptz(3)
+
+  registration WhatsAppTemplateMetaRegistration? @relation(fields: [registrationId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+
+  @@index([registrationId, receivedAt])
+  @@index([wabaId, providerTemplateName, providerLanguageCode, receivedAt])
+  @@index([processedAt, receivedAt])
+  @@schema("whatsapp")
+}
+
+model WhatsAppTemplatePublicationOperation {
+  id                 String    @id @default(cuid()) @db.Text
+  definitionId       String    @db.Text
+  requestedByAdminId String    @db.Text
+  operationKey       String    @unique @db.VarChar(128)
+  scopeSnapshot      Json      @db.JsonB
+  status             String    @db.VarChar(32)
+  totalTargets       Int?
+  succeededTargets   Int       @default(0)
+  failedTargets      Int       @default(0)
+  nextPageCursor     String?   @db.Text
+  failureCode        String?   @db.VarChar(128)
+  requestedAt        DateTime  @default(now()) @db.Timestamptz(3)
+  completedAt        DateTime? @db.Timestamptz(3)
+  createdAt          DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+
+  definition  WhatsAppTemplateDefinition          @relation(fields: [definitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  requestedBy PlatformAdmin                       @relation("WhatsAppTemplatePublicationRequester", fields: [requestedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  targets     WhatsAppTemplatePublicationTarget[]
+
+  @@index([definitionId, status, createdAt])
+  @@index([status, updatedAt])
+  @@schema("whatsapp")
+}
+
+model WhatsAppTemplatePublicationTarget {
+  id                 String    @id @default(cuid()) @db.Text
+  operationId        String    @db.Text
+  shopId             String    @db.Text
+  languageTag        String    @db.VarChar(16)
+  metaRegistrationId String    @db.Text
+  previousVariantId  String?   @db.Text
+  newVariantId       String?   @db.Text
+  status             String    @db.VarChar(32)
+  failureCode        String?   @db.VarChar(128)
+  retryCount         Int       @default(0)
+  processedAt        DateTime? @db.Timestamptz(3)
+  createdAt          DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+
+  operation        WhatsAppTemplatePublicationOperation @relation(fields: [operationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  shop             Shop                                 @relation("WhatsAppTemplatePublicationTargetShop", fields: [shopId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  metaRegistration WhatsAppTemplateMetaRegistration     @relation("WhatsAppTemplatePublicationTargetMetaRegistration", fields: [metaRegistrationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  previousVariant  WhatsAppTemplateVariant?             @relation("WhatsAppTemplatePublicationPreviousVariant", fields: [previousVariantId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  newVariant       WhatsAppTemplateVariant?             @relation("WhatsAppTemplatePublicationNewVariant", fields: [newVariantId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+
+  @@unique([operationId, shopId, languageTag])
+  @@index([metaRegistrationId])
+  @@index([shopId, status, createdAt])
+  @@index([status, updatedAt])
+  @@schema("whatsapp")
+}
+
+model WhatsAppConversationWrapperActiveSlot {
+  audience         String   @id @db.VarChar(24)
+  definitionId     String   @db.Text
+  editVersion      Int      @default(0)
+  updatedByAdminId String   @db.Text
+  updatedAt        DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  definition WhatsAppTemplateDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy  PlatformAdmin              @relation("WhatsAppConversationWrapperSlotUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([definitionId])
   @@schema("whatsapp")
 }
 
@@ -2502,6 +2815,11 @@ model PlatformConfigurationAudit {
 }
 
 model PlatformAdmin {
+  createdWhatsAppTemplateDefinitions            WhatsAppTemplateDefinition[]            @relation("WhatsAppTemplateDefinitionCreator")
+  reviewedWhatsAppTemplateLocales               WhatsAppTemplateLocale[]                @relation("WhatsAppTemplateLocaleReviewer")
+  requestedWhatsAppTemplateTranslationRuns      WhatsAppTemplateTranslationRun[]        @relation("WhatsAppTemplateTranslationRunRequester")
+  requestedWhatsAppTemplatePublications         WhatsAppTemplatePublicationOperation[]  @relation("WhatsAppTemplatePublicationRequester")
+  updatedWhatsAppConversationWrapperSlots       WhatsAppConversationWrapperActiveSlot[] @relation("WhatsAppConversationWrapperSlotUpdater")
   createdCommerceToolRevisions                  CommerceToolRevision[]                  @relation("CommerceToolRevisionCreator")
   publishedCommerceToolRevisions                CommerceToolRevision[]                  @relation("CommerceToolRevisionPublisher")
   commerceReleases                              CommerceRelease[]
@@ -2522,7 +2840,7 @@ model PlatformAdmin {
   createdCommerceTranslationModelConfigurations CommerceTranslationModelConfiguration[] @relation("CommerceTranslationModelConfigurationCreator")
   updatedCommerceTranslationModelConfigurations CommerceTranslationModelConfiguration[] @relation("CommerceTranslationModelConfigurationUpdater")
   requestedCommerceStoreCategoryTranslationRuns CommerceStoreCategoryTranslationRun[]   @relation("CommerceStoreCategoryTranslationRunRequester")
-  requestedMerchantPricingTranslationRuns        MerchantPricingTranslationRun[]         @relation("MerchantPricingTranslationRunRequester")
+  requestedMerchantPricingTranslationRuns       MerchantPricingTranslationRun[]         @relation("MerchantPricingTranslationRunRequester")
   createdCommercePromptTemplateCategories       CommercePromptTemplateCategory[]        @relation("CommercePromptTemplateCategoryCreator")
   updatedCommercePromptTemplateCategories       CommercePromptTemplateCategory[]        @relation("CommercePromptTemplateCategoryUpdater")
   createdCommercePromptTemplates                CommercePromptTemplate[]                @relation("CommercePromptTemplateCreator")
@@ -2542,9 +2860,9 @@ model PlatformAdmin {
   updatedAt       DateTime          @updatedAt
 
   assignedMerchantSupportThreads            MerchantSupportThread[]
-  ownedOperationalIncidents                  OperationalIncident[] @relation("OperationalIncidentOwner")
-  resolvedOperationalIncidents               OperationalIncident[] @relation("OperationalIncidentResolver")
-  operationalIncidentEvents                  OperationalIncidentEvent[]
+  ownedOperationalIncidents                 OperationalIncident[]                      @relation("OperationalIncidentOwner")
+  resolvedOperationalIncidents              OperationalIncident[]                      @relation("OperationalIncidentResolver")
+  operationalIncidentEvents                 OperationalIncidentEvent[]
   merchantSupportMessages                   MerchantSupportMessage[]
   merchantTranslationReconciliationRequests MerchantTranslationReconciliationRequest[]
   shopBillingPolicyOverrides                ShopBillingPolicyOverride[]
@@ -2556,8 +2874,8 @@ model PlatformAdmin {
   billingEconomicsSnapshots                 BillingEconomicsSnapshot[]
   recoveryPolicyOverrides                   ShopRecoveryPolicyOverride[]
   recoveryPolicyOverrideAuditEvents         ShopRecoveryPolicyOverrideAuditEvent[]
-  humanMessagingRestrictionEvents ShopHumanMessagingRestrictionEvent[]
-  reviewedModerationAssessments ConversationModerationAssessment[]
+  humanMessagingRestrictionEvents           ShopHumanMessagingRestrictionEvent[]
+  reviewedModerationAssessments             ConversationModerationAssessment[]
 
   @@unique([provider, providerSubject])
   @@index([active, role])
@@ -2582,31 +2900,31 @@ enum MerchantSupportMessageState {
 
 // ARCH-033: generic, internal-only operational issue; not a merchant-facing ticket.
 model OperationalIncident {
-  id                          String    @id @default(cuid()) @db.Text
-  incidentKey                 String    @unique @db.VarChar(64)
-  sourceService               String    @db.VarChar(64)
-  environment                 String    @db.VarChar(32)
-  category                    String    @db.VarChar(64)
-  reasonCode                  String    @db.VarChar(128)
-  resourceKey                 String    @db.VarChar(128)
-  shopId                      String?   @db.Text
-  shop                        Shop?     @relation(fields: [shopId], references: [id], onDelete: SetNull, onUpdate: Restrict)
-  severity                    String    @db.VarChar(16)
-  status                      String    @default("OPEN") @db.VarChar(16)
-  occurrenceCount             Int       @default(1)
-  firstOccurredAt             DateTime  @db.Timestamptz(3)
-  lastOccurredAt              DateTime  @db.Timestamptz(3)
-  lastCorrelationId           String    @db.VarChar(128)
-  lastErrorMessage            String?   @db.VarChar(512)
-  ownerPlatformAdminId        String?   @db.Text
-  ownerPlatformAdmin          PlatformAdmin? @relation("OperationalIncidentOwner", fields: [ownerPlatformAdminId], references: [id], onDelete: Restrict)
-  assignedAt                  DateTime? @db.Timestamptz(3)
-  resolvedAt                  DateTime? @db.Timestamptz(3)
-  resolvedByPlatformAdminId   String?   @db.Text
-  resolvedByPlatformAdmin     PlatformAdmin? @relation("OperationalIncidentResolver", fields: [resolvedByPlatformAdminId], references: [id], onDelete: Restrict)
-  resolutionNote              String?   @db.VarChar(1000)
-  revision                    Int       @default(0)
-  events                      OperationalIncidentEvent[]
+  id                        String                     @id @default(cuid()) @db.Text
+  incidentKey               String                     @unique @db.VarChar(64)
+  sourceService             String                     @db.VarChar(64)
+  environment               String                     @db.VarChar(32)
+  category                  String                     @db.VarChar(64)
+  reasonCode                String                     @db.VarChar(128)
+  resourceKey               String                     @db.VarChar(128)
+  shopId                    String?                    @db.Text
+  shop                      Shop?                      @relation(fields: [shopId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  severity                  String                     @db.VarChar(16)
+  status                    String                     @default("OPEN") @db.VarChar(16)
+  occurrenceCount           Int                        @default(1)
+  firstOccurredAt           DateTime                   @db.Timestamptz(3)
+  lastOccurredAt            DateTime                   @db.Timestamptz(3)
+  lastCorrelationId         String                     @db.VarChar(128)
+  lastErrorMessage          String?                    @db.VarChar(512)
+  ownerPlatformAdminId      String?                    @db.Text
+  ownerPlatformAdmin        PlatformAdmin?             @relation("OperationalIncidentOwner", fields: [ownerPlatformAdminId], references: [id], onDelete: Restrict)
+  assignedAt                DateTime?                  @db.Timestamptz(3)
+  resolvedAt                DateTime?                  @db.Timestamptz(3)
+  resolvedByPlatformAdminId String?                    @db.Text
+  resolvedByPlatformAdmin   PlatformAdmin?             @relation("OperationalIncidentResolver", fields: [resolvedByPlatformAdminId], references: [id], onDelete: Restrict)
+  resolutionNote            String?                    @db.VarChar(1000)
+  revision                  Int                        @default(0)
+  events                    OperationalIncidentEvent[]
 
   @@index([environment, status, lastOccurredAt])
   @@index([sourceService, status, lastOccurredAt])
@@ -2617,15 +2935,15 @@ model OperationalIncident {
 
 // Immutable occurrence/transition history; a duplicate occurrence uses the same UUID.
 model OperationalIncidentEvent {
-  id                      String    @id @db.Uuid
-  incidentId              String    @db.Text
-  incident                OperationalIncident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
-  eventType               String    @db.VarChar(32)
-  actorPlatformAdminId    String?   @db.Text
-  actorPlatformAdmin      PlatformAdmin? @relation(fields: [actorPlatformAdminId], references: [id], onDelete: Restrict)
-  correlationId           String?   @db.VarChar(128)
-  errorMessage            String?   @db.VarChar(512)
-  occurredAt              DateTime  @default(now()) @db.Timestamptz(3)
+  id                   String              @id @db.Uuid
+  incidentId           String              @db.Text
+  incident             OperationalIncident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  eventType            String              @db.VarChar(32)
+  actorPlatformAdminId String?             @db.Text
+  actorPlatformAdmin   PlatformAdmin?      @relation(fields: [actorPlatformAdminId], references: [id], onDelete: Restrict)
+  correlationId        String?             @db.VarChar(128)
+  errorMessage         String?             @db.VarChar(512)
+  occurredAt           DateTime            @default(now()) @db.Timestamptz(3)
 
   @@index([incidentId, occurredAt])
   @@index([actorPlatformAdminId, occurredAt])
@@ -3148,7 +3466,7 @@ model CommerceAuditEvent {
   toolRevisionId                  String?                                @db.Text
   shopId                          String?                                @db.Text
   modelCatalogueEntryId           String?                                @db.Text
-  modelPolicyId                   String?                               @db.Text
+  modelPolicyId                   String?                                @db.Text
   modelAvailabilityId             String?                                @db.Text
   translationModelConfigurationId String?                                @db.Text
   promptTemplateCategoryId        String?                                @db.Text
@@ -3358,10 +3676,10 @@ model CommerceModelPolicy {
   createdAt             DateTime                   @default(now()) @db.Timestamptz(3)
   updatedAt             DateTime                   @default(now()) @updatedAt @db.Timestamptz(3)
 
-  merchantPricingPlan   MerchantPricingPlan?       @relation(fields: [merchantPricingPlanId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  shop                  Shop?                      @relation(fields: [shopId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  createdBy             PlatformAdmin?            @relation("CommerceModelPolicyCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  updatedBy             PlatformAdmin?            @relation("CommerceModelPolicyUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  merchantPricingPlan MerchantPricingPlan? @relation(fields: [merchantPricingPlanId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  shop                Shop?                @relation(fields: [shopId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy           PlatformAdmin?       @relation("CommerceModelPolicyCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy           PlatformAdmin?       @relation("CommerceModelPolicyUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   // Scope-specific unique indexes and invariants are enforced in migration SQL.
   @@index([environment, context, scope])
@@ -3467,12 +3785,13 @@ model CommerceTranslationModelConfiguration {
   createdAt        DateTime            @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
 
-  credential  CommerceTranslationProviderCredential @relation("CommerceTranslationModelCredential", fields: [environment, provider], references: [environment, provider], onDelete: Restrict, onUpdate: Restrict)
-  createdBy   PlatformAdmin                         @relation("CommerceTranslationModelConfigurationCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  updatedBy   PlatformAdmin                         @relation("CommerceTranslationModelConfigurationUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  runs                       CommerceStoreCategoryTranslationRun[]
-  merchantPricingTranslationRuns MerchantPricingTranslationRun[]
-  auditEvents                CommerceAuditEvent[]
+  credential                      CommerceTranslationProviderCredential @relation("CommerceTranslationModelCredential", fields: [environment, provider], references: [environment, provider], onDelete: Restrict, onUpdate: Restrict)
+  createdBy                       PlatformAdmin                         @relation("CommerceTranslationModelConfigurationCreator", fields: [createdByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy                       PlatformAdmin                         @relation("CommerceTranslationModelConfigurationUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  runs                            CommerceStoreCategoryTranslationRun[]
+  whatsAppTemplateTranslationRuns WhatsAppTemplateTranslationRun[]
+  merchantPricingTranslationRuns  MerchantPricingTranslationRun[]
+  auditEvents                     CommerceAuditEvent[]
 
   @@unique([environment, provider, providerModelId])
   @@unique([environment, displayName])
@@ -4148,6 +4467,22 @@ enum CommerceAuditAction {
   ENABLE_TRANSLATION_MODEL_CONFIGURATION
   DISABLE_TRANSLATION_MODEL_CONFIGURATION
   REQUEST_PROMPT_TEMPLATE_CATEGORY_TRANSLATION
+  CREATE_WHATSAPP_TEMPLATE_VARIANT
+  UPDATE_WHATSAPP_TEMPLATE_VARIANT
+  ENABLE_WHATSAPP_TEMPLATE_VARIANT
+  DISABLE_WHATSAPP_TEMPLATE_VARIANT
+  BULK_ASSIGN_WHATSAPP_TEMPLATE_VARIANT
+  BULK_UPDATE_WHATSAPP_TEMPLATE_VARIANT
+  CREATE_WHATSAPP_TEMPLATE_DEFINITION
+  CLONE_WHATSAPP_TEMPLATE_DEFINITION
+  REQUEST_WHATSAPP_TEMPLATE_TRANSLATION
+  REVIEW_WHATSAPP_TEMPLATE_LOCALE
+  REQUEST_WHATSAPP_TEMPLATE_META_SUBMISSION
+  PUBLISH_WHATSAPP_TEMPLATE_DEFINITION
+  ASSIGN_WHATSAPP_TEMPLATE_DEFINITION
+  RETIRE_WHATSAPP_TEMPLATE_DEFINITION
+  ACTIVATE_WHATSAPP_CONVERSATION_WRAPPER
+  DEACTIVATE_WHATSAPP_CONVERSATION_WRAPPER
 
   @@schema("commerce")
 }
