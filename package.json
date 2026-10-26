@@ -82,6 +82,8 @@
     "test:arch036-woo-coupon-dispatch-runtime-lease:postgres:fresh": "node scripts/test-arch036-woo-coupon-dispatch-runtime-lease-postgres.mjs --mode fresh",
     "test:arch036-woo-coupon-dispatch-runtime-lease:postgres:upgrade": "node scripts/test-arch036-woo-coupon-dispatch-runtime-lease-postgres.mjs --mode upgrade",
     "test:arch040-recovery-human-handover": "node scripts/validate-arch040-recovery-human-handover.mjs",
+    "test:arch040-human-prepared-schema": "node scripts/validate-arch040-human-prepared-schema.mjs",
+    "test:arch040-human-prepared:postgres": "node scripts/test-arch040-human-prepared-postgres.mjs --mode fresh && node scripts/test-arch040-human-prepared-postgres.mjs --mode upgrade",
     "test:arch040-moderation-schema": "node scripts/validate-arch040-moderation-schema.mjs",
     "test:arch040-moderation:postgres:fresh": "node scripts/test-arch040-moderation-postgres.mjs --mode fresh",
     "test:arch040-recovery-human-handover:postgres:fresh": "node scripts/test-arch040-recovery-human-handover-postgres.mjs --mode fresh",

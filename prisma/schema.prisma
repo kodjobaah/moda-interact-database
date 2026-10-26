@@ -593,6 +593,9 @@ model MerchantConversationSendCommand {
   kind                                MerchantConversationSendKind
   recipientSnapshot                   String                        @db.VarChar(64)
   textBody                            String?                       @db.Text
+  preparedTextBody                    String?                       @db.Text
+  preparedWrapperEvidence             Json?                         @db.JsonB
+  preparedAt                          DateTime?                     @db.Timestamptz(3)
   templateName                        String?                       @db.VarChar(255)
   templateLanguageCode                String?                       @db.VarChar(32)
   templateParameters                  Json?
