@@ -242,8 +242,12 @@ function testPrePermitAndTerminal() {
   sql(prepared('permitted','Approved human text'));
   permit('permitted');
   sql(`UPDATE ${cmdTable} SET "state"='UNKNOWN' WHERE "id"='permitted';`);
-  rejects('provider permit cannot be rewritten',`UPDATE ${cmdTable} SET
-    "providerDispatchKey"='another' WHERE "id"='permitted';`, /23514: ARCH040 one-way provider permit/);
+  rejects('provider key cannot diverge from the linked message',`UPDATE ${cmdTable} SET
+    "providerDispatchKey"='another' WHERE "id"='permitted';`,
+    /23514: ARCH040 command and message provider dispatch mismatch/);
+  rejects('one-way provider permit timestamp cannot be rewritten',`UPDATE ${cmdTable} SET
+    "providerDispatchAdmittedAt"="providerDispatchAdmittedAt" + interval '1 second'
+    WHERE "id"='permitted';`, /23514: ARCH040 one-way provider permit immutable/);
   rejects('post-provider preparation cannot change',prepared('permitted','resend wrapped'),
     /23514: ARCH040 prepared HUMAN content is immutable/);
   rejects('provider-admitted command cannot reopen',`UPDATE ${cmdTable} SET "state"='CLAIMED',
