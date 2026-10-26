@@ -114,6 +114,18 @@ async function main() {
   sql(assessment('assess-standalone',{conversation:'standalone1',message:'msg-standalone',content:'Standalone inbound'}));
   sql(assessment('assess-agent',{subject:'AGENT_MESSAGE',message:'msg-agent',content:'Agent reply'}));
   sql(assessment('assess-auto',{subject:'AUTOMATION_MESSAGE',message:'msg-auto',content:'Automated message'}));
+  // ARCH-040-DATABASE-007: existing HUMAN_TEXT moderation fixtures must first
+  // freeze the exact customer-visible body under the current command lease.
+  // This command has no wrapper, so use an explicit PASSTHROUGH provenance.
+  sql(`UPDATE "whatsapp"."MerchantConversationSendCommand" SET "state"='CLAIMED',
+    "leaseToken"='moderation-command-lease',
+    "leaseExpiresAt"=now()+interval '5 minutes',"dispatchAttemptCount"=1,
+    "updatedAt"=now() WHERE "id"='cmd1';
+    UPDATE "whatsapp"."MerchantConversationSendCommand"
+    SET "preparedTextBody"='Merchant reply',
+      "preparedWrapperEvidence"=${q(JSON.stringify({ schemaVersion:1,outcome:'PASSTHROUGH',
+        reason:'NOT_CONFIGURED',bodySha256:sha('Merchant reply') }))}::jsonb,
+      "preparedAt"=now(),"updatedAt"=now() WHERE "id"='cmd1';`);
   sql(assessment('assess-human',{subject:'HUMAN_COMMAND',message:null,command:'cmd1',content:'Merchant reply'}));
   assert.equal(scalar(`SELECT count(*) FROM ${tbl};`),'5');
   assert.equal(scalar(`SELECT "shopId" FROM ${tbl} WHERE "id"='assess1';`),'s1');
