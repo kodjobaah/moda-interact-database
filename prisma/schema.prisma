@@ -41,19 +41,20 @@ model ShopSettings {
   shopId String @unique
   shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  onboardingCompleted    Boolean           @default(false)
-  plan                   String?
-  recoveryDelayMinutes   Int               @default(30)
-  recoveryOfferMode      RecoveryOfferMode @default(NONE)
-  fixedShopifyDiscountId String?
-  fixedShopifyDiscount   ShopifyDiscount?  @relation("ShopSettingsFixedDiscount", fields: [fixedShopifyDiscountId], references: [id], onDelete: SetNull)
-  followUpEnabled        Boolean           @default(false)
-  followUpDelayMinutes   Int?
-  defaultLanguageTag     String?
-  defaultTimeZone        String?
-  defaultCountryCode     String?
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
+  onboardingCompleted             Boolean           @default(false)
+  plan                            String?
+  recoveryDelayMinutes            Int               @default(30)
+  recoveryOfferMode               RecoveryOfferMode @default(NONE)
+  fixedShopifyDiscountId          String?
+  fixedShopifyDiscount            ShopifyDiscount?  @relation("ShopSettingsFixedDiscount", fields: [fixedShopifyDiscountId], references: [id], onDelete: SetNull)
+  followUpEnabled                 Boolean           @default(false)
+  followUpDelayMinutes            Int?
+  notifyOnInitialRecoveryOutreach Boolean           @default(false)
+  defaultLanguageTag              String?
+  defaultTimeZone                 String?
+  defaultCountryCode              String?
+  createdAt                       DateTime          @default(now())
+  updatedAt                       DateTime          @updatedAt
 
   @@schema("shopify")
 }
@@ -377,9 +378,10 @@ model CheckoutRecovery {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  conversation     Conversation?
-  statusHistory    CheckoutRecoveryStatusHistory[]
-  outreachAttempts RecoveryOutreachAttempt[]
+  conversation            Conversation?
+  statusHistory           CheckoutRecoveryStatusHistory[]
+  outreachAttempts        RecoveryOutreachAttempt[]
+  merchantSupportMessages MerchantSupportMessage[]        @relation("RecoverySupportNotificationTarget")
 
   @@unique([shopId, checkoutToken, generation])
   @@index([shopId, checkoutToken, generation])
@@ -2992,12 +2994,14 @@ model MerchantSupportMessage {
   sourceLanguageTag  String
   displayLanguageTag String?
 
-  platformAdminId String?
-  platformAdmin   PlatformAdmin? @relation(fields: [platformAdminId], references: [id], onDelete: SetNull)
-  shopifyUserId   String?
-  systemCode      String?
-  systemVersion   String?
-  sourceKey       String?        @unique
+  platformAdminId    String?
+  platformAdmin      PlatformAdmin?    @relation(fields: [platformAdminId], references: [id], onDelete: SetNull)
+  shopifyUserId      String?
+  systemCode         String?
+  systemVersion      String?
+  sourceKey          String?           @unique
+  checkoutRecoveryId String?
+  checkoutRecovery   CheckoutRecovery? @relation("RecoverySupportNotificationTarget", fields: [checkoutRecoveryId], references: [id], onDelete: SetNull)
 
   availableAt                    DateTime?
   readAt                         DateTime?
@@ -3010,6 +3014,7 @@ model MerchantSupportMessage {
 
   @@index([threadId, createdAt])
   @@index([platformAdminId])
+  @@index([checkoutRecoveryId])
   @@schema("support")
 }
 
