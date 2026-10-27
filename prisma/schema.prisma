@@ -209,10 +209,12 @@ model ShopBrand {
 
   coverImageUrl String?
 
+  whatsAppMedia Json @default("{}") @db.JsonB
+
   fetchedAt       DateTime @default(now())
   lastRefreshedAt DateTime @updatedAt
 
-  @@schema("shopify")
+  @@schema("commerce")
 }
 
 model Customer {
