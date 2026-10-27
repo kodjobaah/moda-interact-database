@@ -113,7 +113,12 @@
     "test:arch047-template-persistence:postgres:fresh": "node scripts/test-arch047-template-persistence-postgres.mjs --mode fresh",
     "test:arch047-template-persistence:postgres:upgrade": "node scripts/test-arch047-template-persistence-postgres.mjs --mode upgrade",
     "test:arch050-initial-recovery-support-notification:postgres:fresh": "node scripts/test-arch050-initial-recovery-support-notification-postgres.mjs --mode fresh",
-    "test:arch050-initial-recovery-support-notification:postgres:upgrade": "node scripts/test-arch050-initial-recovery-support-notification-postgres.mjs --mode upgrade"
+    "test:arch050-initial-recovery-support-notification:postgres:upgrade": "node scripts/test-arch050-initial-recovery-support-notification-postgres.mjs --mode upgrade",
+    "test:arch049-shopbrand-schema": "node scripts/validate-arch049-shopbrand-schema.mjs",
+    "test:arch049-shopbrand-migration": "node scripts/validate-arch049-shopbrand-migration.mjs",
+    "test:arch049-shopbrand-validator-mutations": "node scripts/test-arch049-shopbrand-validator-mutations.mjs",
+    "test:arch049-shopbrand:postgres:fresh": "node scripts/test-arch049-shopbrand-postgres.mjs --mode fresh",
+    "test:arch049-shopbrand:postgres:upgrade": "node scripts/test-arch049-shopbrand-postgres.mjs --mode upgrade"
   },
   "keywords": [],
   "author": "",
