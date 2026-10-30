@@ -362,10 +362,11 @@ model CheckoutRecovery {
   status     CheckoutRecoveryStatus @default(DETECTED)
   generation Int                    @default(1)
 
-  currency    String?
-  totalPrice  Decimal?
-  checkoutUrl String?
-  lineItems   Json?
+  currency           String?
+  totalPrice         Decimal?
+  checkoutUrl        String?
+  lineItems          Json?
+  wooRestoreSnapshot Json?
 
   detectedAt             DateTime  @default(now())
   lastExternalActivityAt DateTime
