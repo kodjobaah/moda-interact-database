@@ -114,6 +114,8 @@
     "test:arch047-template-persistence:postgres:upgrade": "node scripts/test-arch047-template-persistence-postgres.mjs --mode upgrade",
     "test:arch050-initial-recovery-support-notification:postgres:fresh": "node scripts/test-arch050-initial-recovery-support-notification-postgres.mjs --mode fresh",
     "test:arch050-initial-recovery-support-notification:postgres:upgrade": "node scripts/test-arch050-initial-recovery-support-notification-postgres.mjs --mode upgrade",
+    "test:arch053-woo-restore-snapshot:postgres:fresh": "node scripts/test-arch053-woo-restore-snapshot-postgres.mjs --mode fresh",
+    "test:arch053-woo-restore-snapshot:postgres:upgrade": "node scripts/test-arch053-woo-restore-snapshot-postgres.mjs --mode upgrade",
     "test:arch049-shopbrand-schema": "node scripts/validate-arch049-shopbrand-schema.mjs",
     "test:arch049-shopbrand-migration": "node scripts/validate-arch049-shopbrand-migration.mjs",
     "test:arch049-shopbrand-validator-mutations": "node scripts/test-arch049-shopbrand-validator-mutations.mjs",
