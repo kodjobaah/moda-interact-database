@@ -5,6 +5,8 @@ const root = new URL("..", import.meta.url);
 const read = (path) => readFileSync(new URL(path, root), "utf8");
 const schema = read("prisma/schema.prisma");
 const migration = read("prisma/migrations/20260916150000_arch016_recovery_policy_discounts_outreach_generations/migration.sql");
+const removalMigrationPath = "prisma/migrations/20261031110000_arch016_remove_recovery_lifetime_check/migration.sql";
+const removalMigration = read(removalMigrationPath);
 const erd = read("docs/generated/prisma-erd.puml");
 const failures = [];
 const expect = (condition, message) => {
@@ -41,6 +43,8 @@ for (const required of [
 }
 expect(!migration.includes('DROP CONSTRAINT "CheckoutRecovery_shopId_checkoutToken_key"'),
   "migration must drop the legacy CheckoutRecovery unique index, not a constraint");
+expect(removalMigration.trim() === 'ALTER TABLE "public"."BackgroundRuntimeConfig"\n    DROP CONSTRAINT "ck_arch016_checkout_recovery_lifetime";',
+  "forward migration must drop only the historical checkout recovery lifetime constraint");
 for (const constraint of [
   'CONSTRAINT "ck_arch016_shop_settings_follow_up"',
   'CONSTRAINT "ck_arch016_policy_override_follow_up"',
@@ -93,6 +97,8 @@ const allowed = new Set([
   "prisma/schema.prisma",
   "prisma/migrations/20260916150000_arch016_recovery_policy_discounts_outreach_generations/migration.sql",
   "scripts/validate-arch016-recovery-schema.mjs",
+  "scripts/test-arch016-recovery-lifetime-postgres.mjs",
+  removalMigrationPath,
   "docs/generated/prisma-erd.puml",
   "docs/generated/erd.png",
   "package.json",
