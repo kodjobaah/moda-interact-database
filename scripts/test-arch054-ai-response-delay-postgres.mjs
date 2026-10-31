@@ -84,6 +84,13 @@ function insertFixtures(prefix) {
     'idle conversations keep all pending-AI snapshot fields NULL');
   assert.equal(scalar(`SELECT count(*) FROM "whatsapp"."Conversation" WHERE "id"=${quote(pendingId)} AND "pendingAiNotBeforeAt" IS NOT NULL AND "pendingAiControlRevision"=0 AND "pendingAiDelayMinutes"=0;`), '1',
     'valid zero-delay pending snapshot persists');
+  const timezoneIndependentId = `${prefix}-timezone-independent`;
+  sql(`SET TIME ZONE 'America/Los_Angeles';
+    INSERT INTO "whatsapp"."Conversation"
+      ("id", "type", "pendingTurnStartedAt", "pendingAiNotBeforeAt", "pendingAiControlRevision", "pendingAiDelayMinutes", "updatedAt")
+    VALUES (${quote(timezoneIndependentId)}, 'RECOVERY', ${quote(fixedTime)}, '2026-10-30T12:30:00.000Z', 0, 30, ${quote(fixedTime)});`);
+  assert.equal(scalar(`SELECT count(*) FROM "whatsapp"."Conversation" WHERE "id"=${quote(timezoneIndependentId)};`), '1',
+    'UTC deadline after UTC turn start is accepted under a non-UTC session timezone');
 
   sql(`UPDATE "whatsapp"."Conversation" SET "pendingAiControlRevision"=3, "pendingAiDelayMinutes"=30
     WHERE "id"=${quote(pendingId)};`);
@@ -99,8 +106,8 @@ function insertFixtures(prefix) {
     /Conversation_pendingAiTriple_consistency/, 'negative pending control revisions must be rejected');
   assertRejected(`UPDATE "whatsapp"."Conversation" SET "pendingAiNotBeforeAt"=NULL WHERE "id"=${quote(pendingId)};`,
     /Conversation_pendingAiTriple_consistency/, 'mixed-null pending-AI snapshot must be rejected');
-  assertRejected(`UPDATE "whatsapp"."Conversation" SET "pendingAiNotBeforeAt"='2026-10-30T11:59:59.999Z' WHERE "id"=${quote(pendingId)};`,
-    /Conversation_pendingAiTriple_consistency/, 'deadline before pending-turn start must be rejected');
+  assertRejected(`SET TIME ZONE 'America/Los_Angeles'; UPDATE "whatsapp"."Conversation" SET "pendingAiNotBeforeAt"='2026-10-30T11:59:59.999Z' WHERE "id"=${quote(pendingId)};`,
+    /Conversation_pendingAiTriple_consistency/, 'deadline before pending-turn start must be rejected under a non-UTC session timezone');
   assertRejected(`INSERT INTO "whatsapp"."Conversation"
     ("id", "type", "pendingAiNotBeforeAt", "pendingAiControlRevision", "pendingAiDelayMinutes", "updatedAt")
     VALUES (${quote(`${prefix}-without-start`)}, 'RECOVERY', '2026-10-30T12:30:00.000Z', 0, 0, ${quote(fixedTime)});`,
@@ -110,7 +117,7 @@ function insertFixtures(prefix) {
     'nulling the complete pending-AI snapshot succeeds');
   assert.equal(scalar(`SELECT count(*) FROM pg_indexes WHERE schemaname='whatsapp' AND tablename='Conversation' AND indexname='Conversation_pendingAiNotBeforeAt_id_idx';`), '1',
     'bounded due-scan btree index exists');
-  console.log('PASS default, idle NULLs, valid 0/30, range/type failures, mixed-null, negative revision, timestamp order and due index');
+  console.log('PASS default, idle NULLs, valid 0/30, range/type failures, mixed-null, negative revision, UTC timestamp order in non-UTC sessions and due index');
 }
 
 async function run() {

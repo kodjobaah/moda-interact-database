@@ -33,7 +33,7 @@ ALTER TABLE "whatsapp"."Conversation"
       AND "pendingAiControlRevision" >= 0
       AND "pendingAiDelayMinutes" >= 0
       AND "pendingAiDelayMinutes" <= 30
-      AND "pendingAiNotBeforeAt" >= "pendingTurnStartedAt"
+      AND "pendingAiNotBeforeAt" >= ("pendingTurnStartedAt" AT TIME ZONE 'UTC')
     )
   );
 

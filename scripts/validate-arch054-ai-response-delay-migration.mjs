@@ -29,7 +29,7 @@ for (const invariant of [
   '"pendingAiControlRevision" >= 0',
   '"pendingAiDelayMinutes" >= 0',
   '"pendingAiDelayMinutes" <= 30',
-  '"pendingAiNotBeforeAt" >= "pendingTurnStartedAt"',
+  '"pendingAiNotBeforeAt" >= ("pendingTurnStartedAt" AT TIME ZONE \'UTC\')',
 ]) assert.ok(triple.includes(invariant), `missing consistency invariant: ${invariant}`);
 assert.equal(statements.length, 7, 'migration contains only the scoped field, index, and check changes');
 
