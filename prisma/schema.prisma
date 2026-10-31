@@ -44,6 +44,7 @@ model ShopSettings {
   onboardingCompleted             Boolean           @default(false)
   plan                            String?
   recoveryDelayMinutes            Int               @default(30)
+  aiResponseDelayMinutes          Int               @default(0)
   recoveryOfferMode               RecoveryOfferMode @default(NONE)
   fixedShopifyDiscountId          String?
   fixedShopifyDiscount            ShopifyDiscount?  @relation("ShopSettingsFixedDiscount", fields: [fixedShopifyDiscountId], references: [id], onDelete: SetNull)
@@ -527,6 +528,9 @@ model Conversation {
   inboundVersion           Int       @default(0)
   lastProcessedVersion     Int       @default(0)
   pendingTurnStartedAt     DateTime?
+  pendingAiNotBeforeAt     DateTime? @db.Timestamptz(3)
+  pendingAiControlRevision Int?
+  pendingAiDelayMinutes    Int?
   processingInboundVersion Int?
   processingStartedAt      DateTime?
 
@@ -549,6 +553,7 @@ model Conversation {
   @@index([customerId, lastMessageAt])
   @@index([lastMessageAt])
   @@index([processingStartedAt])
+  @@index([pendingAiNotBeforeAt, id])
   @@schema("whatsapp")
 }
 
