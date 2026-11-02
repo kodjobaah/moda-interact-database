@@ -36,8 +36,11 @@ assert.deepEqual(ddl.split(',').map(x => x.trim()).filter(Boolean), [
 assert.doesNotMatch(migration, /\bDEFAULT\b|\b(?:CREATE|DROP)\s+(?:TABLE|TRIGGER|INDEX)\b|\bINSERT\s+INTO\b/i);
 const dirs = readdirSync(new URL('../prisma/migrations/', import.meta.url))
   .filter(name => /^\d{14}_/.test(name)).sort();
-assert.equal(dirs.at(-1), '20261026080000_arch040_prepared_human_message_content',
-  'Prepared-content migration must remain last in the captured chain');
+const preparedIndex = dirs.indexOf('20261026080000_arch040_prepared_human_message_content');
+const arch055EndIndex = dirs.indexOf('20261102122000_arch055_upload_intake_identity');
+assert.ok(preparedIndex >= 0, 'Prepared-content migration must remain in the canonical chain');
+assert.ok(arch055EndIndex > preparedIndex,
+  'Prepared-content guards must be checked with later ARCH-055 migrations present');
 
 function functionSql(sql, name) {
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

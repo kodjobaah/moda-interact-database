@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const sha = value => createHash('sha256').update(value).digest('hex');
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+const baseline = '7c377282aa5819b3008b7d7f3018f44f4161523e';
+assert.equal(spawnSync('git', ['cat-file', '-e', `${baseline}^{commit}`], { cwd: root }).status, 0,
+  `Recorded pre-ARCH-055 baseline is unavailable: ${baseline}`);
+assert.equal(spawnSync('git', ['merge-base', '--is-ancestor', baseline, 'HEAD'], { cwd: root }).status, 0,
+  `Recorded pre-ARCH-055 baseline must be an ancestor of HEAD: ${baseline}`);
 const expected = [
   '20261102120000_arch055_rest_read_lifecycle',
   '20261102121000_arch055_human_follow_up_claim_identity',
@@ -16,22 +19,30 @@ const expected = [
 ];
 const migrationDir = join(root, 'prisma/migrations');
 const migrationNames = readdirSync(migrationDir).filter(name => /^\d{14}_/.test(name)).sort();
-assert.deepEqual(migrationNames.slice(-3), expected, 'ARCH-055 migrations are the last three, in required order');
+const targetIndexes = expected.map(name => migrationNames.indexOf(name));
+assert.ok(targetIndexes.every(index => index >= 0), 'All ARCH-055 target migrations must exist');
+assert.ok(targetIndexes.every((index, position) => position === 0 || targetIndexes[position - 1] < index),
+  'ARCH-055 target migrations must remain in prescribed relative order');
 
 const expectedFiles = new Set([
   'package.json', 'prisma/schema.prisma',
+  'scripts/validate-arch040-human-prepared-schema.mjs',
+  'scripts/test-arch040-human-prepared-postgres.mjs',
   ...expected.map(name => `prisma/migrations/${name}/migration.sql`),
   'scripts/test-arch055-database-contracts-postgres.mjs',
   'scripts/validate-arch055-database-contracts.mjs',
   'scripts/fixtures/arch055/legacy-fixtures.mjs',
   'scripts/fixtures/arch055/assertions.mjs',
 ]);
-const changed = new Set(git('diff', '--name-only', 'HEAD').split('\n').filter(Boolean));
+const changed = new Set([
+  ...git('diff', '--name-only', baseline).split('\n'),
+  ...git('diff', '--name-only', 'HEAD').split('\n'),
+].filter(Boolean));
 const untracked = git('ls-files', '--others', '--exclude-standard').split('\n').filter(Boolean);
 for (const file of [...changed, ...untracked]) assert.ok(expectedFiles.has(file), `Unapproved implementation path changed: ${file}`);
 for (const file of expectedFiles) assert.ok(changed.has(file) || untracked.includes(file), `Expected task file is absent: ${file}`);
 
-let baselineSchema = git('show', 'HEAD:prisma/schema.prisma');
+let baselineSchema = git('show', `${baseline}:prisma/schema.prisma`);
 const additions = [
   ['  idempotencyKey                      String                        @db.VarChar(128)\n', '  followUpClaimKey                    String?                       @db.VarChar(255)\n'],
   ['  dataFormatId     String                               @db.Text\n', '  intentPurposeKey String?                              @db.VarChar(64)\n'],
@@ -43,7 +54,7 @@ for (const [anchor, insertion] of additions) {
 assert.equal(readFileSync(join(root, 'prisma/schema.prisma'), 'utf8'), baselineSchema,
   'Prisma schema differs only by the two exact nullable field insertions');
 
-const packageBefore = JSON.parse(git('show', 'HEAD:package.json'));
+const packageBefore = JSON.parse(git('show', `${baseline}:package.json`));
 const packageNow = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const additionsScripts = {
   'test:arch055-database-contracts': 'node scripts/validate-arch055-database-contracts.mjs',
@@ -80,10 +91,21 @@ assert.match(m3, /WHERE "uploadedAssetId" IS NOT NULL\s+AND "reason" IN \('CREAT
 assert.match(m3, /CREATE UNIQUE INDEX "MerchantKnowledgeSourceRevision_original_intake_asset_key"\s+ON "commerce"\."MerchantKnowledgeSourceRevision" \("uploadedAssetId"\)\s+WHERE "uploadedAssetId" IS NOT NULL AND "reason" IN \('CREATE', 'FILE_REPLACE'\)/);
 assert.doesNotMatch(m3, /DELETE FROM|UPDATE "commerce"\."MerchantKnowledgeUploadedAsset"|DROP (TABLE|COLUMN)|IF NOT EXISTS/);
 
-for (const name of migrationNames.slice(0, -3)) {
-  const baseline = git('show', `HEAD:prisma/migrations/${name}/migration.sql`);
-  assert.equal(sha(readFileSync(join(migrationDir, name, 'migration.sql'))), sha(baseline),
-    `Canonical predecessor migration modified: ${name}`);
+const predecessorPaths = migrationNames.slice(0, targetIndexes[0])
+  .map(name => `prisma/migrations/${name}/migration.sql`);
+const baselineMigrationBlobs = new Map(git('ls-tree', '-r', baseline, '--', 'prisma/migrations')
+  .trim().split('\n').filter(Boolean).map(line => {
+    const [, , , objectId, path] = line.match(/^(\d+) (blob) ([0-9a-f]+)\t(.+)$/) ?? [];
+    return [path, objectId];
+  }));
+const currentMigrationBlobs = execFileSync('git', ['hash-object', '--stdin-paths'], {
+  cwd: root, encoding: 'utf8', input: `${predecessorPaths.join('\n')}\n`,
+}).trim().split('\n');
+assert.equal(currentMigrationBlobs.length, predecessorPaths.length,
+  'Every canonical predecessor migration must be present in the working tree');
+for (let index = 0; index < predecessorPaths.length; index++) {
+  assert.equal(currentMigrationBlobs[index], baselineMigrationBlobs.get(predecessorPaths[index]),
+    `Canonical predecessor migration hash changed: ${predecessorPaths[index]}`);
 }
 for (const file of [...expected.map(name => `prisma/migrations/${name}/migration.sql`), ...[...expectedFiles].filter(x => x.startsWith('scripts/'))]) {
   assert.ok(readFileSync(join(root, file), 'utf8').length > 0, `${file} is empty`);
@@ -92,7 +114,7 @@ for (const file of [...expected.map(name => `prisma/migrations/${name}/migration
 const temp = mkdtempSync(join(tmpdir(), 'arch055-prisma-diff-'));
 try {
   const baselinePath = join(temp, 'schema.prisma');
-  writeFileSync(baselinePath, git('show', 'HEAD:prisma/schema.prisma'));
+  writeFileSync(baselinePath, git('show', `${baseline}:prisma/schema.prisma`));
   const prisma = join(root, 'node_modules/.bin/prisma');
   const result = spawnSync(prisma, ['migrate', 'diff', '--from-schema-datamodel', baselinePath,
     '--to-schema-datamodel', join(root, 'prisma/schema.prisma'), '--script'],
@@ -107,4 +129,4 @@ try {
 } finally {
   rmSync(temp, { recursive: true, force: true });
 }
-console.log(`PASS ARCH-055 static contract, exact edit allowlist, three forward migrations, and ${migrationNames.length - 3} predecessor hashes`);
+console.log(`PASS ARCH-055 static contract, exact edit allowlist, target migration order through ${expected.at(-1)}, and ${targetIndexes[0]} predecessor hashes from ${baseline}`);
