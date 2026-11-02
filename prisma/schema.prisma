@@ -598,6 +598,7 @@ model MerchantConversationSendCommand {
   conversationId                      String
   conversation                        Conversation                  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   idempotencyKey                      String                        @db.VarChar(128)
+  followUpClaimKey                    String?                       @db.VarChar(255)
   payloadSha256                       String                        @db.VarChar(64)
   expectedControlRevision             Int
   kind                                MerchantConversationSendKind
@@ -4187,6 +4188,7 @@ model MerchantKnowledgeUploadedAsset {
   id               String                               @id @default(cuid()) @db.Text
   shopId           String                               @db.Text
   dataFormatId     String                               @db.Text
+  intentPurposeKey String?                              @db.VarChar(64)
   status           MerchantKnowledgeUploadedAssetStatus @default(PENDING_UPLOAD)
   objectKey        String                               @unique @db.Text
   originalFileName String                               @db.VarChar(255)
