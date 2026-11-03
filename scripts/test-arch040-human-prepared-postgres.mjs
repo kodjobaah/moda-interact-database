@@ -11,6 +11,7 @@ assert.ok(args.length === 2 && args[0] === '--mode' && ['fresh','upgrade'].inclu
   'Usage: node scripts/test-arch040-human-prepared-postgres.mjs --mode fresh|upgrade');
 const mode = args[1];
 const migrationId = '20261026080000_arch040_prepared_human_message_content';
+const migrationEndId = '20261102122000_arch055_upload_intake_identity';
 const container = `moda-arch040-prepared-${randomUUID()}`;
 const database = 'arch040_prepared';
 const image = 'pgvector/pgvector:pg17';
@@ -328,7 +329,11 @@ function checkUpgrade(previousFingerprint) {
 }
 function migrate(names) {
   const root = new URL('../prisma/migrations/', import.meta.url);
-  for (const name of names) sql(readFileSync(new URL(`${name}/migration.sql`,root),'utf8'));
+  for(const name of names){
+    const source=readFileSync(new URL(`${name}/migration.sql`,root),'utf8');
+    sql(source);
+    console.log(`APPLIED ${name} sha256=${sha(source)}`);
+  }
 }
 async function main() {
   docker(['run','-d','--network','none','--name',container,
@@ -346,19 +351,23 @@ async function main() {
   console.log(`PostgreSQL ${version} in isolated ${mode} fixture`);
   const migrations=readdirSync(new URL('../prisma/migrations/',import.meta.url))
     .filter(n=>/^\d{14}_/.test(n)).sort();
-  assert.equal(migrations.at(-1), migrationId);
+  const preparedIndex=migrations.indexOf(migrationId);
+  const endIndex=migrations.indexOf(migrationEndId);
+  assert.ok(preparedIndex>=0,'Prepared-content migration must remain in the canonical chain');
+  assert.ok(endIndex>preparedIndex,'ARCH-040 guards must be tested after ARCH-055 migrations');
+  const throughArch055=migrations.slice(0,endIndex+1);
   if(mode==='fresh') {
-    migrate(migrations);
+    migrate(throughArch055);
     checkColumns();
     seed();
     testPrepared();
     testPrePermitAndTerminal();
     await testConcurrentFreeze();
   } else {
-    migrate(migrations.filter(name=>name!==migrationId));
+    migrate(throughArch055.slice(0,preparedIndex));
     seed();
     const fingerprint=upgradeFixture();
-    migrate([migrationId]);
+    migrate(throughArch055.slice(preparedIndex));
     checkUpgrade(fingerprint);
     // The upgraded schema still accepts a new complete freeze and digest.
     sql(command('new-after-upgrade'));

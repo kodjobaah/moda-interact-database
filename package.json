@@ -126,7 +126,10 @@
     "test:arch049-shopbrand-migration": "node scripts/validate-arch049-shopbrand-migration.mjs",
     "test:arch049-shopbrand-validator-mutations": "node scripts/test-arch049-shopbrand-validator-mutations.mjs",
     "test:arch049-shopbrand:postgres:fresh": "node scripts/test-arch049-shopbrand-postgres.mjs --mode fresh",
-    "test:arch049-shopbrand:postgres:upgrade": "node scripts/test-arch049-shopbrand-postgres.mjs --mode upgrade"
+    "test:arch049-shopbrand:postgres:upgrade": "node scripts/test-arch049-shopbrand-postgres.mjs --mode upgrade",
+    "test:arch055-database-contracts": "node scripts/validate-arch055-database-contracts.mjs",
+    "test:arch055-database-contracts:postgres:fresh": "node scripts/test-arch055-database-contracts-postgres.mjs --mode fresh",
+    "test:arch055-database-contracts:postgres:upgrade": "node scripts/test-arch055-database-contracts-postgres.mjs --mode upgrade"
   },
   "keywords": [],
   "author": "",
