@@ -4,6 +4,11 @@ import { readFileSync } from 'node:fs';
 const read = name => readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
 const schema = read('prisma/schema.prisma');
 const migration = read('prisma/migrations/20261104120000_reference_taxonomy_and_core_product_discovery/migration.sql');
+const grantMigration = read('prisma/migrations/20261104162500_arch058_remove_builtin_contract_hash/migration.sql');
+const grantValidator = grantMigration.slice(
+  grantMigration.indexOf('CREATE OR REPLACE FUNCTION commerce.arch020_grant_tools'),
+  grantMigration.indexOf('UPDATE commerce."CommerceConversationGrant"'),
+);
 const seed = read('prisma/seed.mjs');
 const compact = text => text.replace(/\s+/g, ' ').trim();
 const model = name => {
@@ -70,4 +75,16 @@ assert.match(compact(migration), /ON CONFLICT \("planId", "featureId"\) DO UPDAT
 const productEntries = seed.split('\n').filter(line => /key: "product_search"/.test(line));
 assert.equal(productEntries.length, 1);
 assert.match(productEntries[0], /activationMode: "ALWAYS_ENABLED", systemRequired: true, active: true/);
+assert.match(grantMigration, /^BEGIN;/);
+assert.match(grantMigration, /LOCK TABLE commerce\."CommerceConversationGrant" IN ACCESS EXCLUSIVE MODE/);
+assert.match(grantMigration, /DROP TRIGGER arch020_grant_immutable ON commerce\."CommerceConversationGrant"/);
+assert.match(grantMigration, /CREATE OR REPLACE FUNCTION commerce\.arch020_grant_tools\(v jsonb\)/);
+assert.match(grantMigration, /ARRAY\['kind','toolName','definitionVersion'\]/);
+assert.match(grantMigration, /item->>'definitionVersion' IS DISTINCT FROM '2\.0\.0'/);
+assert.doesNotMatch(grantValidator, /contractHash/);
+assert.match(grantMigration, /jsonb_array_elements\(grant_row\."grantedTools"\) WITH ORDINALITY/);
+assert.match(grantMigration, /CREATE TRIGGER arch020_grant_immutable\s+BEFORE UPDATE ON commerce\."CommerceConversationGrant"\s+FOR EACH ROW EXECUTE FUNCTION commerce\.arch020_immutable\(\)/);
+assert.match(grantMigration, /ARCH058_BUILT_IN_GRANT_SHAPE_UNRECOGNIZED/);
+assert.match(grantMigration, /ARCH058_BUILT_IN_GRANT_POSTCONDITION_FAILED/);
+assert.match(grantMigration, /COMMIT;\s*$/);
 console.log('PASS reference-taxonomy Prisma/SQL contract, required-feature seed, bounded migration and existing grant function extension');

@@ -16,7 +16,10 @@ const published = {
   toolName: names[0], definitionVersion: '1.0.0', capabilityKeys: [names[0]],
 };
 const builtIns = ['commerce_get_discount_options', 'commerce_get_discount_details'].map(toolName => ({
-  kind: 'BUILT_IN', toolName, definitionVersion: '1.0.0', contractHash: hash,
+  kind: 'BUILT_IN', toolName, definitionVersion: '2.0.0',
+}));
+const legacyBuiltIns = builtIns.map(tool => ({
+  ...tool, definitionVersion: '1.0.0', contractHash: hash,
 }));
 
 function seedIdentity({ sql }) {
@@ -151,7 +154,9 @@ export function seedUpgrade(fixture) {
     id: 'reference-unrelated-preference', shopId: 'reference-shop',
     featureId: 'reference-optional', enabled: false, updatedAt: time,
   }));
-  sql(conversationSql('reference-legacy') + grantSql('reference-legacy'));
+  sql(conversationSql('reference-legacy') + grantSql('reference-legacy', {
+    grantedTools: [published, ...legacyBuiltIns],
+  }));
 }
 export function capturePreserved({ json }, complete = false) {
   const preservedTables = [
@@ -176,12 +181,25 @@ export function capturePreserved({ json }, complete = false) {
   }
   return result;
 }
+export function captureLegacyGrant({ json }) {
+  return json(`(SELECT to_jsonb(row) FROM commerce."CommerceConversationGrant" row
+    WHERE id='reference-legacy-grant')`);
+}
+export function assertLegacyGrantConverted({ json }, before) {
+  const after = captureLegacyGrant({ json });
+  const expected = structuredClone(before);
+  expected.grantedTools = expected.grantedTools.map(tool => tool.kind === 'BUILT_IN'
+    ? { kind: tool.kind, toolName: tool.toolName, definitionVersion: '2.0.0' }
+    : tool);
+  assert.deepEqual(after, expected, 'Only legacy built-in hash/version fields may change');
+  console.log('PASS upgrade grant preserved; only built-in contractHash and definitionVersion changed');
+}
 export function captureGuards({ json }) {
   return json(`jsonb_build_object(
     'functions',(SELECT jsonb_agg(jsonb_build_array(oid,proname,proowner,proacl) ORDER BY proname)
       FROM pg_proc WHERE oid IN ('commerce.arch020_grant_tools(jsonb)'::regprocedure,
         'commerce.arch021_conversation_grant_guard()'::regprocedure)),
-    'triggers',(SELECT jsonb_agg(jsonb_build_array(oid,tgname,tgfoid,tgenabled,pg_get_triggerdef(oid)) ORDER BY tgname)
+    'triggers',(SELECT jsonb_agg(jsonb_build_array(tgname,tgfoid,tgenabled,pg_get_triggerdef(oid)) ORDER BY tgname)
       FROM pg_trigger WHERE tgrelid='commerce."CommerceConversationGrant"'::regclass AND NOT tgisinternal),
     'checks',(SELECT jsonb_agg(jsonb_build_array(oid,conname,pg_get_constraintdef(oid)) ORDER BY conname)
       FROM pg_constraint WHERE conrelid='commerce."CommerceConversationGrant"'::regclass))`);
@@ -410,11 +428,9 @@ export async function runGrantCases(fixture, mode) {
     ['unknown kind', [{ ...builtIns[0], kind: 'UNKNOWN' }]],
     ['tagged published branch', [{ ...published, kind: 'PUBLISHED' }]],
     ['unknown built-in name', [{ ...builtIns[0], toolName: 'unknown' }]],
-    ['wrong built-in version', [{ ...builtIns[0], definitionVersion: '2.0.0' }]],
-    ['uppercase hash', [{ ...builtIns[0], contractHash: 'A'.repeat(64) }]],
-    ['short hash', [{ ...builtIns[0], contractHash: 'a' }]],
-    ['nonstring hash', [{ ...builtIns[0], contractHash: 1 }]],
-    ['missing key', [Object.fromEntries(Object.entries(builtIns[0]).filter(([key]) => key !== 'contractHash'))]],
+    ['legacy built-in version', [{ ...builtIns[0], definitionVersion: '1.0.0' }]],
+    ['contractHash extra built-in key', [{ ...builtIns[0], contractHash: hash }]],
+    ['arbitrary extra built-in key', [{ ...builtIns[0], extra: true }]],
     ['extra built-in key', [{ ...builtIns[0], toolId: 'fake' }]],
     ['extra published key', [{ ...published, contractHash: hash }]],
     ['duplicate built-in name', [builtIns[0], builtIns[0]]],
