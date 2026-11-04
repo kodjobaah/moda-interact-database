@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -8,11 +8,12 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
   seedUpgrade, capturePreserved, assertConversion, captureGuards,
-  runTaxonomyCases, runGrantCases, conflictSql,
+  captureLegacyGrant, assertLegacyGrantConverted,
+  runTaxonomyCases, runGrantCases,
 } from './fixtures/reference-taxonomy-fixtures.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const target = '20261104120000_reference_taxonomy_and_core_product_discovery';
+const target = '20261104162500_arch058_remove_builtin_contract_hash';
 const args = process.argv.slice(2);
 assert.ok(args.length === 2 && args[0] === '--mode' && ['fresh', 'upgrade'].includes(args[1]),
   'Usage: --mode fresh|upgrade');
@@ -22,12 +23,11 @@ const password = randomUUID();
 const staging = mkdtempSync(path.join(tmpdir(), 'moda-reference-taxonomy-'));
 const migrationRoot = path.join(root, 'prisma/migrations');
 const migrations = readdirSync(migrationRoot).filter(name => /^\d{14}_/.test(name)).sort();
-assert.equal(migrations.at(-1), target, 'Reserved taxonomy migration must follow the accepted chain');
+assert.equal(migrations.at(-1), target, 'Built-in grant correction must follow the accepted migration chain');
 const predecessors = migrations.slice(0, -1);
 let started = false;
 let hostPort;
 let currentDatabase = 'reference_taxonomy';
-let blocker;
 
 function docker(args, options = {}) {
   return execFileSync('docker', args, {
@@ -90,6 +90,16 @@ function deploy(database, expectFailure) {
     assert.ok(serverDiagnostic.includes(expectFailure), output.slice(-4096) + '\n' + serverDiagnostic);
     console.log(`PASS migration rejection ${expectFailure}; Prisma exit=${result.status}\n${output.slice(-2048)}\n${serverDiagnostic}`);
   } else {
+    if (result.status !== 0) {
+      const logs = spawnSync('docker', ['logs', '--since', beganAt, container], {
+        encoding: 'utf8', timeout: 15_000, maxBuffer: 8 * 1024 * 1024,
+      });
+      if (logs.error) throw logs.error;
+      const serverDiagnostic = (logs.stdout + logs.stderr).split('\n')
+        .filter(line => line.includes('db=' + database + ' '))
+        .join('\n').replaceAll(password, '[REDACTED]').slice(-4096);
+      assert.equal(result.status, 0, output.slice(-4096) + '\n' + serverDiagnostic);
+    }
     assert.equal(result.status, 0, output.slice(-4096));
   }
   return output;
@@ -110,37 +120,6 @@ function cloneDatabase(name, template = 'reference_taxonomy') {
   assert.equal(result.status, 0, result.stderr);
   currentDatabase = name;
 }
-async function lockInventory() {
-  blocker = spawn('docker', [
-    'exec', '-i', container, 'psql', '-X', '-q', '-v', 'ON_ERROR_STOP=1',
-    '-U', 'postgres', '-d', currentDatabase,
-  ], { stdio: ['pipe', 'pipe', 'pipe'] });
-  blocker.stderr.on('data', () => {});
-  blocker.stdout.on('data', () => {});
-  blocker.stdin.end(`SET application_name='reference-taxonomy-blocker';
-    BEGIN;
-    INSERT INTO commerce."CommerceTool" (id,name,"displayName")
-      VALUES ('reference-concurrent-tool','reference_concurrent_tool','Concurrent writer');
-    INSERT INTO commerce."CommerceCapability" (id,key,"displayName","featureId","toolId")
-      SELECT 'reference-concurrent-capability','reference_concurrent_capability','Concurrent writer',
-        id,'reference-concurrent-tool' FROM billing."Feature" WHERE key='product_search';
-    SELECT pg_sleep(45); ROLLBACK;`);
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    if (sql(`SELECT count(*) FROM pg_locks lock JOIN pg_stat_activity activity USING(pid)
-      WHERE activity.application_name='reference-taxonomy-blocker' AND lock.granted
-      AND lock.relation='commerce."CommerceCapability"'::regclass
-      AND lock.mode='RowExclusiveLock';`) === '1') return;
-    await delay(100);
-  }
-  throw new Error('Inventory writer failed to acquire its barrier lock');
-}
-function releaseInventory() {
-  sql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity
-    WHERE application_name='reference-taxonomy-blocker' AND datname=current_database();`);
-  blocker?.kill();
-  blocker = undefined;
-}
-
 try {
   // An inherited DATABASE_URL is never used. Only this invocation's random
   // loopback port and database names are supplied to Prisma.
@@ -174,39 +153,55 @@ try {
     currentDatabase = 'reference_taxonomy';
     seedUpgrade(fixture);
   }
+  const legacyGrant = mode === 'upgrade' ? captureLegacyGrant(fixture) : null;
   const preserved = capturePreserved(fixture);
+  const completeBefore = mode === 'upgrade' ? capturePreserved(fixture, true) : null;
   const guards = captureGuards(fixture);
   cpSync(path.join(migrationRoot, target), path.join(staging, 'prisma/migrations', target), { recursive: true });
 
   if (mode === 'upgrade') {
-    for (const kind of ['unknown', 'unowned', 'wrong-tool', 'wildcard-audit', 'missing-feature', 'primary-collision', 'lock-timeout']) {
-      cloneDatabase(`conflict_${kind.replaceAll('-', '_')}`, ['primary-collision', 'lock-timeout'].includes(kind) ? 'reference_taxonomy' : 'predecessor_template');
-      const mutation = conflictSql(kind);
-      if (mutation) sql(mutation);
-      const before = capturePreserved(fixture, true);
-      const feature = json(`(SELECT to_jsonb(row) FROM billing."Feature" row WHERE key='product_search')`);
-      if (kind === 'lock-timeout') await lockInventory();
-      try {
-        deploy(currentDatabase, kind === 'missing-feature' ? 'PRODUCT_DISCOVERY_FEATURE_MISSING'
-          : kind === 'lock-timeout' ? 'canceling statement due to lock timeout'
-            : kind === 'primary-collision' ? 'BillingPlanFeature_pkey' : 'PRODUCT_DISCOVERY_MEMBERSHIP_CONFLICT');
-      } finally {
-        if (blocker) releaseInventory();
-      }
-      assert.equal(sql(`SELECT to_regclass('commerce."ReferenceTaxonomyGeneration"') IS NULL;`), 't');
-      assert.deepEqual(capturePreserved(fixture, true), before);
-      assert.deepEqual(json(`(SELECT to_jsonb(row) FROM billing."Feature" row WHERE key='product_search')`), feature);
-      assert.deepEqual(captureGuards(fixture), guards);
-      assert.deepEqual(migrationHistory(), history);
-      console.log(`PASS ${kind} rollback preserves schema, functions, feature, and existing rows`);
-      currentDatabase = 'reference_taxonomy';
-    }
+    cloneDatabase('injected_failure');
+    const migrationSql = readFileSync(path.join(migrationRoot, target, 'migration.sql'), 'utf8');
+    const injectedSql = migrationSql.replace('COMMIT;', "DO $$ BEGIN RAISE EXCEPTION 'ARCH058_INJECTED_FAILURE'; END $$;\nCOMMIT;");
+    assert.notEqual(injectedSql, migrationSql, 'Failure injection point must exist before COMMIT');
+    const failure = execute(injectedSql);
+    assert.notEqual(failure.status, 0, 'Injected migration failure unexpectedly succeeded');
+    assert.ok(failure.stderr.includes('ARCH058_INJECTED_FAILURE'), failure.stderr.slice(0, 4096));
+    const injectedJson = expression => {
+      const result = execute(`SELECT coalesce((${expression})::jsonb, 'null'::jsonb)::text;`, 'injected_failure');
+      assert.equal(result.status, 0, result.stderr?.slice(0, 4096));
+      return JSON.parse(result.stdout.trim());
+    };
+    assert.deepEqual(capturePreserved({ sql, json: injectedJson }, true), completeBefore);
+    assert.deepEqual(injectedJson(`(SELECT to_jsonb(row) FROM commerce."CommerceConversationGrant" row
+      WHERE id='reference-legacy-grant')`), legacyGrant);
+    assert.deepEqual(injectedJson(`jsonb_build_object(
+      'functions',(SELECT jsonb_agg(jsonb_build_array(oid,proname,proowner,proacl) ORDER BY proname)
+        FROM pg_proc WHERE oid IN ('commerce.arch020_grant_tools(jsonb)'::regprocedure,
+          'commerce.arch021_conversation_grant_guard()'::regprocedure)),
+      'triggers',(SELECT jsonb_agg(jsonb_build_array(tgname,tgfoid,tgenabled,pg_get_triggerdef(oid)) ORDER BY tgname)
+        FROM pg_trigger WHERE tgrelid='commerce."CommerceConversationGrant"'::regclass AND NOT tgisinternal),
+      'checks',(SELECT jsonb_agg(jsonb_build_array(oid,conname,pg_get_constraintdef(oid)) ORDER BY conname)
+        FROM pg_constraint WHERE conrelid='commerce."CommerceConversationGrant"'::regclass))`), guards);
+    assert.equal(injectedJson(`to_jsonb((SELECT count(*) FROM "_prisma_migrations" WHERE migration_name='${target}'))`), 0);
+    currentDatabase = 'reference_taxonomy';
+    console.log('PASS injected failure rolls back helper replacement, row rewrite and trigger drop');
   }
 
   deploy(currentDatabase);
-  assert.deepEqual(capturePreserved(fixture), preserved);
+  const preservedAfter = capturePreserved(fixture);
+  const expectedPreserved = structuredClone(preserved);
+  if (mode === 'upgrade') {
+    const grantIndex = expectedPreserved['commerce."CommerceConversationGrant"'].findIndex(row => row.id === 'reference-legacy-grant');
+    const grant = expectedPreserved['commerce."CommerceConversationGrant"'][grantIndex];
+    grant.grantedTools = grant.grantedTools.map(tool => tool.kind === 'BUILT_IN'
+      ? { kind: tool.kind, toolName: tool.toolName, definitionVersion: '2.0.0' }
+      : tool);
+  }
+  assert.deepEqual(preservedAfter, expectedPreserved);
   assert.deepEqual(captureGuards(fixture), guards, 'Function identity, owners/ACLs and CHECK/trigger bindings must survive');
-  assertConversion(fixture, mode);
+  if (mode === 'upgrade') assertLegacyGrantConverted(fixture, legacyGrant);
+  if (mode === 'fresh') assertConversion(fixture, mode);
   runTaxonomyCases(fixture);
   await runGrantCases(fixture, mode);
   const after = capturePreserved(fixture, true);
@@ -223,7 +218,6 @@ try {
   console.error(String(error.stack ?? error).replaceAll(password, '[REDACTED]').slice(0, 8192));
   process.exitCode = 1;
 } finally {
-  blocker?.kill();
   if (started) {
     try { docker(['rm', '--force', '--volumes', container]); }
     catch (error) { console.error(String(error).replaceAll(password, '[REDACTED]').slice(0, 2048)); process.exitCode = 1; }
