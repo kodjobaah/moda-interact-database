@@ -4504,3 +4504,50 @@ enum CommerceAuditAction {
 
   @@schema("commerce")
 }
+
+model ReferenceTaxonomyGeneration {
+  id                    String   @id(map: "ReferenceTaxonomyGeneration_pkey") @default(cuid()) @db.Text
+  environment           CommerceEnvironment
+  source                String   @db.VarChar(64)
+  taxonomyVersion       String   @db.VarChar(64)
+  languageTag           String   @db.VarChar(35)
+  sourceUrl             String   @db.Text
+  sourceSha256          String   @db.VarChar(64)
+  embeddingProvider     String   @db.VarChar(64)
+  embeddingModel        String   @db.VarChar(255)
+  embeddingDimensions   Int
+  embeddingIndexVersion String   @db.VarChar(64)
+  embeddingTextVersion  String   @db.VarChar(64)
+  importFingerprint     String   @db.VarChar(64)
+  categoryCount         Int
+  isActive              Boolean  @default(false)
+  completedAt           DateTime @db.Timestamptz(3)
+  createdAt             DateTime @default(now()) @db.Timestamptz(3)
+  activatedAt           DateTime? @db.Timestamptz(3)
+
+  categories ReferenceTaxonomyCategory[]
+
+  @@unique([id, embeddingDimensions], map: "ReferenceTaxonomyGeneration_id_dimensions_key")
+  @@unique([environment, source, languageTag, importFingerprint], map: "ReferenceTaxonomyGeneration_import_identity_key")
+  @@schema("commerce")
+}
+
+model ReferenceTaxonomyCategory {
+  generationId        String                @db.Text
+  categoryId          String                @db.Text
+  name                String                @db.Text
+  fullName            String                @db.Text
+  parentId            String?               @db.Text
+  level               Int
+  ancestorIds         String[]              @default([]) @db.Text
+  embedding           Unsupported("vector")
+  embeddingDimensions Int
+
+  generation ReferenceTaxonomyGeneration @relation(fields: [generationId, embeddingDimensions], references: [id, embeddingDimensions], onDelete: Cascade, onUpdate: Restrict, map: "ReferenceTaxonomyCategory_generation_dimensions_fkey")
+  parent     ReferenceTaxonomyCategory?    @relation("ReferenceTaxonomyCategoryTree", fields: [generationId, parentId], references: [generationId, categoryId], onDelete: NoAction, onUpdate: Restrict, map: "ReferenceTaxonomyCategory_parent_fkey")
+  children   ReferenceTaxonomyCategory[]   @relation("ReferenceTaxonomyCategoryTree")
+
+  @@id([generationId, categoryId], map: "ReferenceTaxonomyCategory_pkey")
+  @@index([generationId, parentId], map: "ReferenceTaxonomyCategory_generation_parent_idx")
+  @@schema("commerce")
+}
