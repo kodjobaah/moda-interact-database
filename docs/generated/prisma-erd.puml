@@ -2487,4 +2487,26 @@ MerchantKnowledgeDataFormat |o--|| MerchantKnowledgeInputKind
 MerchantKnowledgeUploadedAsset |o--|| MerchantKnowledgeUploadedAssetStatus
 MerchantKnowledgeSourceRevision |o--|| MerchantKnowledgeRevisionReason
 MerchantKnowledgeSourceRevision |o--|| MerchantKnowledgeRevisionStatus
+
+entity "CommercePurposeCapability" as CommercePurposeCapability {
+--
+  # purposeFeatureId : [FK] Feature
+  # capabilityId : [FK] CommerceCapability
+  * position : Int
+}
+
+entity "CommerceReleasePurposeCapability" as CommerceReleasePurposeCapability {
+--
+  # releaseId : [FK] CommerceReleaseFeature
+  # purposeFeatureId : [FK] CommerceReleaseFeature
+  # capabilityId : [FK] CommerceReleaseCapability
+  * position : Int
+}
+
+CommercePurposeCapability }o--|| Feature
+CommercePurposeCapability }o--|| CommerceCapability
+CommerceReleasePurposeCapability }o--|| CommerceReleaseFeature
+CommerceReleasePurposeCapability }o--|| CommerceReleaseFeature
+CommerceReleasePurposeCapability }o--|| CommerceReleaseCapability
+CommerceReleasePurposeCapability }o--|| CommerceReleaseCapability
 @enduml
