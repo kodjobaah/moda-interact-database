@@ -893,6 +893,7 @@ model Feature {
 
   @@index([active, displayName])
   @@schema("billing")
+  commercePurposeCapabilities CommercePurposeCapability[]
 }
 
 enum SubscriptionProjectionStatus {
@@ -3389,6 +3390,7 @@ model CommerceCapability {
   @@index([featureId])
   @@index([toolId])
   @@schema("commerce")
+  purposeMemberships CommercePurposeCapability[]
 }
 
 model CommerceFeatureConfiguration {
@@ -3440,6 +3442,7 @@ model CommerceReleaseCapability {
   @@index([toolRevisionId, toolId])
   @@index([featureId, releaseId])
   @@schema("commerce")
+  purposeMemberships CommerceReleasePurposeCapability[]
 }
 
 model CommerceReleaseFeature {
@@ -3453,6 +3456,36 @@ model CommerceReleaseFeature {
 
   @@id([releaseId, featureId])
   @@index([featureId, releaseId])
+  @@schema("commerce")
+  purposeMembers CommerceReleasePurposeCapability[]
+}
+
+// ARCH-064: purpose selection references canonical capabilities; ownership stays unchanged.
+model CommercePurposeCapability {
+  purposeFeatureId String             @db.Text
+  capabilityId     String             @db.Text
+  position         Int
+  purposeFeature   Feature            @relation(fields: [purposeFeatureId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  capability       CommerceCapability @relation(fields: [capabilityId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([purposeFeatureId, capabilityId])
+  @@unique([purposeFeatureId, position])
+  @@index([capabilityId])
+  @@schema("commerce")
+}
+
+// Revision identity comes exclusively from the member of this same immutable release.
+model CommerceReleasePurposeCapability {
+  releaseId        String                    @db.Text
+  purposeFeatureId String                    @db.Text
+  capabilityId     String                    @db.Text
+  position         Int
+  purposeFeature   CommerceReleaseFeature    @relation(fields: [releaseId, purposeFeatureId], references: [releaseId, featureId], onDelete: Restrict, onUpdate: Restrict)
+  capability       CommerceReleaseCapability @relation(fields: [releaseId, capabilityId], references: [releaseId, capabilityId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([releaseId, purposeFeatureId, capabilityId])
+  @@unique([releaseId, purposeFeatureId, position], map: "CommerceReleasePurposeCapability_position_key")
+  @@index([releaseId, capabilityId])
   @@schema("commerce")
 }
 

@@ -132,7 +132,8 @@
     "test:arch055-database-contracts:postgres:upgrade": "node scripts/test-arch055-database-contracts-postgres.mjs --mode upgrade",
     "test:reference-taxonomy-schema": "node scripts/validate-reference-taxonomy-schema.mjs",
     "test:reference-taxonomy:postgres:fresh": "node scripts/test-reference-taxonomy-postgres.mjs --mode fresh",
-    "test:reference-taxonomy:postgres:upgrade": "node scripts/test-reference-taxonomy-postgres.mjs --mode upgrade"
+    "test:reference-taxonomy:postgres:upgrade": "node scripts/test-reference-taxonomy-postgres.mjs --mode upgrade",
+    "test:arch064-purpose-membership:postgres": "node scripts/test-arch064-purpose-membership-postgres.mjs"
   },
   "keywords": [],
   "author": "",
