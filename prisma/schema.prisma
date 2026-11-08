@@ -500,6 +500,7 @@ enum ConversationOutcome {
 }
 
 model Conversation {
+  commerceProductContext CommerceConversationProductContext?
   commerceGrant CommerceConversationGrant?
 
   id String @id @default(cuid())
@@ -2074,6 +2075,7 @@ enum WhatsAppConsentEvidenceDecision {
 }
 
 model Shop {
+  commerceProductContexts CommerceConversationProductContext[]
   commerceConversationGrants      CommerceConversationGrant[]
   externalCredentials             CommerceExternalCredential[]
   externalConnectionAudits        CommerceExternalConnectionAudit[]
@@ -4583,4 +4585,22 @@ model ReferenceTaxonomyCategory {
   @@id([generationId, categoryId], map: "ReferenceTaxonomyCategory_pkey")
   @@index([generationId, parentId], map: "ReferenceTaxonomyCategory_generation_parent_idx")
   @@schema("commerce")
+}
+
+// ARCH-066: disposable reference cache; Shared validates JSON and Background fences canonical ownership.
+model CommerceConversationProductContext {
+  conversationId       String       @id
+  conversation         Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  shopId               String
+  shop                 Shop         @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  schemaVersion        Int          @default(1)
+  revision             Int          @default(1)
+  sourceInboundVersion Int
+  references           Json         @db.JsonB
+  expiresAt            DateTime     @db.Timestamptz(3)
+  createdAt            DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime     @updatedAt @db.Timestamptz(3)
+
+  @@index([shopId, expiresAt], map: "CommerceConversationProductContext_shopId_expiresAt_idx")
+  @@schema("whatsapp")
 }

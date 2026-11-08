@@ -2509,4 +2509,19 @@ CommerceReleasePurposeCapability }o--|| CommerceReleaseFeature
 CommerceReleasePurposeCapability }o--|| CommerceReleaseFeature
 CommerceReleasePurposeCapability }o--|| CommerceReleaseCapability
 CommerceReleasePurposeCapability }o--|| CommerceReleaseCapability
+entity "CommerceConversationProductContext" as CommerceConversationProductContext {
++ conversationId [PK] : String
+--
+  # shopId : [FK] Shop
+  * schemaVersion : Int
+  * revision : Int
+  * sourceInboundVersion : Int
+  * references : Json
+  * expiresAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+CommerceConversationProductContext }o--|| Conversation
+CommerceConversationProductContext }o--|| Shop
 @enduml
