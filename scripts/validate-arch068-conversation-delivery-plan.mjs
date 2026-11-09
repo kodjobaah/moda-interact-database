@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const schema = readFileSync(new URL('../prisma/schema.prisma', import.meta.url), 'utf8');
+const message = schema.match(/model ConversationMessage \{([\s\S]*?)\n\}/)[1];
+assert.match(message, /^ {2}outboundPresentation\s+Json\?\s+@db\.JsonB\s*$/m);
+assert.match(message, /contentType\s+MessageContentType\s+@default\(TEXT\)/);
+assert.match(message, /providerMessageId\s+String\?\s+@unique/);
+const sql = readFileSync(new URL('../prisma/migrations/20261109210000_arch068_conversation_delivery_plan/migration.sql', import.meta.url), 'utf8');
+assert.equal(sql.trim(), 'ALTER TABLE "whatsapp"."ConversationMessage"\nADD COLUMN "outboundPresentation" JSONB;');
+console.log('PASS ARCH-068 nullable JSONB, unchanged text/receipt fields, exact additive DDL (no defaults/backfill/index)');
