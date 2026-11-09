@@ -772,6 +772,7 @@ entity "ConversationMessage" as ConversationMessage {
   readAt : DateTime
   providerFailureCode : String
   failedAt : DateTime
+  outboundPresentation : Json
 }
 
 entity "WhatsAppRecipientReachability" as WhatsAppRecipientReachability {

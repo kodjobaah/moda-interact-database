@@ -714,6 +714,9 @@ model ConversationMessage {
   transcriptionFailureCode String?
   transcriptionCompletedAt DateTime?
 
+  // Frozen aspect-2 delivery plan; null for legacy/other message paths.
+  outboundPresentation Json? @db.JsonB
+
   createdAt DateTime @default(now())
 
   recoveryOutreachAttempt RecoveryOutreachAttempt?

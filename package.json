@@ -134,7 +134,9 @@
     "test:reference-taxonomy:postgres:fresh": "node scripts/test-reference-taxonomy-postgres.mjs --mode fresh",
     "test:reference-taxonomy:postgres:upgrade": "node scripts/test-reference-taxonomy-postgres.mjs --mode upgrade",
     "test:arch064-purpose-membership:postgres": "node scripts/test-arch064-purpose-membership-postgres.mjs",
-    "test:arch066-product-context:postgres": "node scripts/test-arch066-product-context-postgres.mjs"
+    "test:arch066-product-context:postgres": "node scripts/test-arch066-product-context-postgres.mjs",
+    "test:arch068-conversation-delivery-plan": "node scripts/validate-arch068-conversation-delivery-plan.mjs",
+    "test:arch068-conversation-delivery-plan:postgres": "node scripts/test-arch068-conversation-delivery-plan-postgres.mjs"
   },
   "keywords": [],
   "author": "",
