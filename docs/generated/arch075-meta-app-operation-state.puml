@@ -1,0 +1,22 @@
+@startuml
+hide methods
+entity "whatsapp.MetaTemplateAppOperationState" as state {
+  * environment : commerce.CommerceEnvironment <<PK>>
+  * appId : varchar(32), numeric 1..32 <<PK>>
+  --
+  cooldownUntil : timestamptz(3)?
+  consecutiveThrottleCount : int [0..31]
+  lastThrottleAt : timestamptz(3)?
+  leaseOwnerToken : varchar(128)?
+  leaseGeneration : bigint, nonnegative monotonic
+  leaseAcquiredAt : timestamptz(3)?
+  leaseUntil : timestamptz(3)?
+  updatedAt : timestamptz(3)
+}
+note right of state
+  One row per configured app/environment.
+  App quota spans shops and WABAs.
+  Coherent nullable owner/time tuple.
+  No credentials or provider payload.
+end note
+@enduml

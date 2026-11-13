@@ -2590,4 +2590,18 @@ ConversationDeliveryStatusReceipt }o--o| ConversationDeliveryPart
 ConversationDeliveryPart |o--|| ConversationDeliveryPartRole
 ConversationDeliveryPart |o--|| ConversationDeliveryPartState
 ConversationDeliveryStatusReceipt |o--|| ConversationDeliveryStatus
+entity "MetaTemplateAppOperationState" as MetaTemplateAppOperationState {
++ environment [PK] : CommerceEnvironment
++ appId [PK] : String
+--
+  cooldownUntil : DateTime
+  * consecutiveThrottleCount : Int
+  lastThrottleAt : DateTime
+  leaseOwnerToken : String
+  * leaseGeneration : BigInt
+  leaseAcquiredAt : DateTime
+  leaseUntil : DateTime
+  * updatedAt : DateTime
+}
+MetaTemplateAppOperationState |o--|| CommerceEnvironment
 @enduml
