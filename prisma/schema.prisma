@@ -2714,6 +2714,25 @@ model WhatsAppTemplateTranslationBatchItem {
   @@schema("whatsapp")
 }
 
+/// App quota is shared across WABAs and tenants; Background owns fenced timing policy.
+model MetaTemplateAppOperationState {
+  environment CommerceEnvironment
+  appId       String              @db.VarChar(32)
+
+  cooldownUntil            DateTime? @db.Timestamptz(3)
+  consecutiveThrottleCount Int       @default(0)
+  lastThrottleAt           DateTime? @db.Timestamptz(3)
+
+  leaseOwnerToken String?   @db.VarChar(128)
+  leaseGeneration BigInt    @default(0)
+  leaseAcquiredAt DateTime? @db.Timestamptz(3)
+  leaseUntil      DateTime? @db.Timestamptz(3)
+  updatedAt       DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@id([environment, appId])
+  @@schema("whatsapp")
+}
+
 model WhatsAppTemplateMetaRegistration {
   id                        String    @id @default(cuid()) @db.Text
   localeId                  String    @db.Text
