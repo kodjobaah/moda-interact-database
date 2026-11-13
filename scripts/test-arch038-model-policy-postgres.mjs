@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -8,8 +8,8 @@ import { setTimeout as delay } from 'node:timers/promises';
 const modeIndex = process.argv.indexOf('--mode');
 const mode = modeIndex < 0 ? undefined : process.argv[modeIndex + 1];
 assert.ok(['fresh', 'upgrade'].includes(mode), 'Use --mode fresh or --mode upgrade');
-const target = '20261013183000_arch038_unified_model_policies';
-const container = `moda-arch038-db001-${randomUUID()}`;
+const target = '20261111090000_arch038_initial_outreach_tool_call_budget';
+const container = `moda-arch038-db003-${randomUUID()}`;
 const db = 'arch038_policy_fixture';
 const postgresImage = 'pgvector/pgvector:pg17';
 const migrations = new URL('../prisma/migrations/', import.meta.url);
@@ -58,10 +58,14 @@ async function main() {
   }
   if (!ready) throw new Error('PostgreSQL did not become ready on TCP');
   const names = readdirSync(migrations).filter(n => /^\d{14}_.+/.test(n)).sort();
-  assert.equal(names.at(-1), target, 'Target must be last migration in uploaded baseline');
+  assert.ok(names.includes(target), 'Target belongs to the complete ordered migration chain');
+  assert.ok(names.at(-1) > target, 'Upgrade must retain newer canonical migrations');
   let previousShopCount = 0, previousPlanCount = 0, previousSubscriptionCount = 0, previousBillingPlanCount = 0;
   for (const name of names) {
-    if (mode === 'upgrade' && name === target) {
+    if (mode === 'upgrade' && name === target) continue;
+    apply(name);
+  }
+  if (mode === 'upgrade') {
       // Existing merchant/billing fixtures must survive the upgrade.
       sql(`INSERT INTO "commerce"."Shop" ("id", "domain", "updatedAt") VALUES ('arch038-shop', 'arch038-shop.example', now());`);
       sql(`BEGIN;
@@ -88,8 +92,7 @@ async function main() {
       previousBillingPlanCount = Number(scalar('SELECT count(*) FROM "billing"."BillingPlan";'));
       assert.ok(previousShopCount > 0 && previousPlanCount > 0 && previousSubscriptionCount > 0 && previousBillingPlanCount > 0,
         'Upgrade fixtures must populate all protected Shop and billing tables before the target migration');
-    }
-    apply(name);
+
   }
   if (mode === 'fresh') {
     sql(`INSERT INTO "commerce"."Shop" ("id", "domain", "updatedAt") VALUES ('arch038-shop', 'arch038-shop.example', now());`);
@@ -108,6 +111,44 @@ async function main() {
     }
   }
   sql(`INSERT INTO "public"."PlatformAdmin" ("id", "email", "updatedAt") VALUES ('arch038-admin', 'arch038-admin@example.test', now());`);
+  if (mode === 'upgrade') {
+    // Exercise a genuinely pending earlier-named migration after ALL newer sources.
+    // An injected backfill failure must roll back the function, data and trigger state.
+    sql(`UPDATE ${policy} SET "budget"='{"deadlineMs":71000,"outputTokens":913}', "editVersion"=2, "updatedByAdminId"='arch038-admin' WHERE "environment"='DEVELOPMENT' AND "context"='LIVE' AND "scope"='PLATFORM';
+      UPDATE ${policy} SET "budget"='{"deadlineMs":42000,"outputTokens":512}', "editVersion"=2, "updatedByAdminId"='arch038-admin' WHERE "environment"='DEVELOPMENT' AND "context"='PREVIEW' AND "scope"='PLATFORM';`);
+    sql(insert('arch038-legacy-plan','LIVE','PRICE_PLAN','arch038-existing-merchant-plan',null,{outputTokens:777}).replace("'DEVELOPMENT'","'STAGING'"));
+    sql(insert('arch038-legacy-shop','LIVE','SHOP',null,'arch038-shop',{deadlineMs:32000}).replace("'DEVELOPMENT'","'STAGING'"));
+    const protectedData = scalar(`SELECT jsonb_build_object('shops',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM commerce."Shop" t),'plans',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM billing."MerchantPricingPlan" t),'billing',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM billing."BillingPlan" t),'subscriptions',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM billing."Subscription" t),'overrides',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM ${policy} t WHERE scope<>'PLATFORM'))::text;`);
+    const before = scalar(`SELECT jsonb_agg(to_jsonb(p) ORDER BY id)::text FROM ${policy} p;`);
+    const functionBefore = sql(`SELECT pg_get_functiondef('commerce.arch038_valid_model_budget(jsonb,integer,commerce."CommerceModelPolicyScope")'::regprocedure);`, true);
+    sql(`CREATE FUNCTION commerce.arch038_fixture_backfill_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'fixture backfill failure' USING ERRCODE='23514'; END $$;
+      CREATE TRIGGER arch038_fixture_backfill_failure BEFORE UPDATE ON ${policy} FOR EACH ROW EXECUTE FUNCTION commerce.arch038_fixture_backfill_failure();`);
+    rejected(readFileSync(new URL(`${target}/migration.sql`, migrations), 'utf8'), 'migration backfill failure');
+    assert.equal(scalar(`SELECT jsonb_agg(to_jsonb(p) ORDER BY id)::text FROM ${policy} p;`), before);
+    assert.equal(sql(`SELECT pg_get_functiondef('commerce.arch038_valid_model_budget(jsonb,integer,commerce."CommerceModelPolicyScope")'::regprocedure);`, true), functionBefore);
+    assert.equal(scalar(`SELECT tgenabled FROM pg_trigger WHERE tgrelid='commerce."CommerceModelPolicy"'::regclass AND tgname='arch038_model_policy_guard';`), 'O');
+    sql(`DROP TRIGGER arch038_fixture_backfill_failure ON ${policy}; DROP FUNCTION commerce.arch038_fixture_backfill_failure();`);
+    rejected(`UPDATE ${policy} SET "budget"='{"deadlineMs":1,"outputTokens":1}' WHERE "scope"='PLATFORM';`, 'guard remains active after failed migration');
+    apply(target);
+    const afterPolicies = JSON.parse(scalar(`SELECT jsonb_agg(to_jsonb(p) ORDER BY id)::text FROM ${policy} p;`));
+    const expectedPolicies = JSON.parse(before).map(row => row.context === 'LIVE' && row.scope === 'PLATFORM' && !Object.hasOwn(row.budget, 'initialOutreachToolCalls')
+      ? {...row, budget:{...row.budget, initialOutreachToolCalls:16}, editVersion:row.editVersion+1, updatedAt:afterPolicies.find(value=>value.id===row.id).updatedAt}
+      : row);
+    assert.deepEqual(afterPolicies, expectedPolicies, 'Backfill changes only missing LIVE Platform key, version and timestamp');
+    assert.equal(scalar(`SELECT "budget"::text FROM ${policy} WHERE "environment"='DEVELOPMENT' AND "context"='LIVE' AND "scope"='PLATFORM';`), '{"deadlineMs": 71000, "outputTokens": 913, "initialOutreachToolCalls": 16}');
+    assert.equal(scalar(`SELECT "editVersion"::text FROM ${policy} WHERE "environment"='DEVELOPMENT' AND "context"='LIVE' AND "scope"='PLATFORM';`), '3');
+    assert.equal(scalar(`SELECT "budget"::text FROM ${policy} WHERE "environment"='DEVELOPMENT' AND "context"='PREVIEW' AND "scope"='PLATFORM';`), '{"deadlineMs": 42000, "outputTokens": 512}');
+    assert.equal(scalar(`SELECT "editVersion"::text FROM ${policy} WHERE "environment"='DEVELOPMENT' AND "context"='PREVIEW' AND "scope"='PLATFORM';`), '2');
+    assert.equal(scalar(`SELECT jsonb_build_object('shops',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM commerce."Shop" t),'plans',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM billing."MerchantPricingPlan" t),'billing',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM billing."BillingPlan" t),'subscriptions',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM billing."Subscription" t),'overrides',(SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM ${policy} t WHERE scope<>'PLATFORM'))::text;`), protectedData);
+    sql(`DELETE FROM ${policy} WHERE id IN ('arch038-legacy-plan','arch038-legacy-shop');`);
+  }
+  assert.equal(scalar(`SELECT count(*) FROM information_schema.tables WHERE table_schema='whatsapp' AND table_name IN ('ConversationDeliveryPart','MetaTemplateAppOperationState');`), '2');
+  // A rerun is a missing-only backfill: explicitly configured values/versions stay exact.
+  sql(`UPDATE ${policy} SET "budget"="budget" || '{"initialOutreachToolCalls":7}', "editVersion"="editVersion"+1, "updatedByAdminId"='arch038-admin' WHERE "environment"='TEST' AND "context"='LIVE' AND "scope"='PLATFORM';`);
+  const stable = scalar(`SELECT jsonb_agg(to_jsonb(p) ORDER BY id)::text FROM ${policy} p;`);
+  apply(target);
+  assert.equal(scalar(`SELECT jsonb_agg(to_jsonb(p) ORDER BY id)::text FROM ${policy} p;`), stable);
+  assert.equal(scalar(`SELECT tgenabled FROM pg_trigger WHERE tgrelid='commerce."CommerceModelPolicy"'::regclass AND tgname='arch038_model_policy_guard';`), 'O');
   // The existing billing catalogue enforces contiguous positions and 20 translations
   // through deferred constraint triggers. Build a valid plan fixture in one txn.
   sql(`BEGIN;
@@ -127,7 +168,25 @@ async function main() {
     COMMIT;`);
   assert.equal(Number(scalar(`SELECT count(*) FROM ${policy} WHERE "scope"='PLATFORM';`)), 10);
   assert.equal(Number(scalar(`SELECT count(*) FROM ${policy} WHERE "scope"='PLATFORM' AND "context"='PREVIEW';`)), 5);
-  assert.equal(scalar(`SELECT "budget"::text FROM ${policy} WHERE "environment"='DEVELOPMENT' AND "context"='LIVE' AND "scope"='PLATFORM';`), '{"deadlineMs": 60000, "outputTokens": 800}');
+  assert.equal(scalar(`SELECT count(*) FROM ${policy} WHERE scope='PLATFORM' AND context='LIVE' AND budget ? 'initialOutreachToolCalls';`), '5');
+  assert.equal(scalar(`SELECT count(*) FROM ${policy} WHERE scope='PLATFORM' AND context='PREVIEW' AND budget ? 'initialOutreachToolCalls';`), '0');
+  assert.equal(scalar(`SELECT "budget"::text FROM ${policy} WHERE "environment"='DEVELOPMENT' AND "context"='LIVE' AND "scope"='PLATFORM';`), mode === 'fresh' ? '{"deadlineMs": 60000, "outputTokens": 800, "initialOutreachToolCalls": 16}' : '{"deadlineMs": 71000, "outputTokens": 913, "initialOutreachToolCalls": 16}');
+  for (const scope of ['PLATFORM', 'PRICE_PLAN', 'SHOP']) {
+    for (const value of [1,64]) {
+      const budget = scope === 'PLATFORM' ? {deadlineMs:1,outputTokens:1,initialOutreachToolCalls:value} : {initialOutreachToolCalls:value};
+      assert.equal(scalar(`SELECT commerce.arch038_valid_model_budget('${JSON.stringify(budget)}',1,'${scope}');`), 't');
+    }
+    for (const value of [0,65,-1,1.5,'16',null,9007199254740992]) {
+      const budget = scope === 'PLATFORM' ? {deadlineMs:1,outputTokens:1,initialOutreachToolCalls:value} : {initialOutreachToolCalls:value};
+      assert.equal(scalar(`SELECT commerce.arch038_valid_model_budget('${JSON.stringify(budget)}',1,'${scope}');`), 'f');
+    }
+  }
+  assert.equal(scalar(`SELECT commerce.arch038_valid_model_budget('{"deadlineMs":1,"outputTokens":1}',1,'PLATFORM');`), 't', 'Legacy two-field Platform writers remain compatible');
+  for (const value of [1,64]) {
+    sql(insert('arch038-boundary','PREVIEW','SHOP',null,'arch038-shop',{initialOutreachToolCalls:value}));
+    assert.equal(scalar(`SELECT "budget"->>'initialOutreachToolCalls' FROM ${policy} WHERE id='arch038-boundary';`), String(value));
+    sql(`DELETE FROM ${policy} WHERE id='arch038-boundary';`);
+  }
   rejected(`DELETE FROM ${policy} WHERE "scope"='PLATFORM';`, 'mandatory Platform delete');
   rejected(insert('arch038-invalid', 'PREVIEW', 'PRICE_PLAN', 'missing-plan', null, { deadlineMs: 1000 }), 'Preview plan invalid');
   rejected(insert('arch038-invalid', 'LIVE', 'SHOP', null, null, { deadlineMs: 1000 }), 'owner missing');
@@ -136,6 +195,7 @@ async function main() {
   rejected(insert('arch038-invalid', 'LIVE', 'SHOP', null, 'arch038-shop', { deadlineMs: -1 }), 'negative budget');
   rejected(insert('arch038-invalid', 'LIVE', 'SHOP', null, 'arch038-shop', { deadlineMs: 1.5 }), 'fractional budget');
   rejected(insert('arch038-invalid', 'LIVE', 'SHOP', null, 'arch038-shop', { remoteCalls: 10 }), 'unrecognised field');
+  rejected(insert('arch038-invalid', 'LIVE', 'SHOP', null, 'arch038-shop', { initialOutreachToolCalls: 65 }), 'initial outreach call limit above maximum');
   rejected(insert('arch038-invalid', 'LIVE', 'SHOP', null, 'arch038-shop', { deadlineMs: 9007199254740992 }), 'unsafe integer');
   rejected(insert('arch038-invalid', 'LIVE', 'SHOP', null, 'unknown-shop', { deadlineMs: 500 }), 'Shop FK');
   rejected(insert('arch038-invalid', 'LIVE', 'PRICE_PLAN', 'unknown-plan', null, { outputTokens: 500 }), 'Plan FK');
@@ -155,11 +215,11 @@ async function main() {
     JOIN ${policy} s ON s."environment"=p."environment" AND s."context"='LIVE' AND s."scope"='SHOP'
     WHERE p."environment"='DEVELOPMENT' AND p."context"='LIVE' AND p."scope"='PLATFORM'
       AND a."id"='arch038-live-plan' AND s."id"='arch038-live-shop';`),
-    '{"deadlineMs": 90000, "outputTokens": 2000}');
+    '{"deadlineMs": 90000, "outputTokens": 2000, "initialOutreachToolCalls": 16}');
   assert.equal(scalar(`SELECT (p."budget" || s."budget")::text FROM ${policy} p JOIN ${policy} s
     ON p."environment"=s."environment" AND p."context"=s."context"
     WHERE p."scope"='PLATFORM' AND s."scope"='SHOP' AND s."id"='arch038-live-shop';`),
-  '{"deadlineMs": 60000, "outputTokens": 2000}');
+  mode === 'fresh' ? '{"deadlineMs": 60000, "outputTokens": 2000, "initialOutreachToolCalls": 16}' : '{"deadlineMs": 71000, "outputTokens": 2000, "initialOutreachToolCalls": 16}');
   assert.equal(scalar(`SELECT "budget"::text FROM ${policy} WHERE "id"='arch038-preview-shop';`), '{"deadlineMs": 90000}');
   // CAS + audit are transactionally paired. A stale version cannot commit a newer budget.
   sql(`BEGIN;
@@ -187,11 +247,28 @@ async function main() {
       'arch038-live-shop', 'DEVELOPMENT', 'Rollback invalid audit', '{}');
     COMMIT;`, 'atomic policy/audit rollback');
   assert.equal(scalar(`SELECT "editVersion"::text FROM ${policy} WHERE "id"='arch038-live-shop';`), '2');
+  // Two real simultaneous sessions race the same CAS version; only the winning
+  // mutation may append an audit row. No shared/global lock is added.
+  const race = value => new Promise((resolve, reject) => {
+    const statement = `WITH changed AS (
+      UPDATE ${policy} SET "budget"='{"initialOutreachToolCalls":${value}}', "editVersion"=3, "updatedByAdminId"='arch038-admin'
+      WHERE id='arch038-live-shop' AND "editVersion"=2 RETURNING id
+    ), audited AS (
+      INSERT INTO commerce."CommerceAuditEvent" (id,"actorAdminId",action,"modelPolicyId",environment,reason,metadata)
+      SELECT 'arch038-race-${value}','arch038-admin','SET_LIVE_SHOP_BUDGET_OVERRIDE',id,'DEVELOPMENT','Concurrent tool budget update',
+      '{"context":"LIVE","scope":"SHOP","previousBudget":{"outputTokens":1500},"nextBudget":{"initialOutreachToolCalls":${value}},"previousEditVersion":2,"nextEditVersion":3}'::jsonb FROM changed RETURNING id
+    ) SELECT count(*) FROM audited;`;
+    const child = execFile('docker',['exec','-i',container,'psql','-X','-q','-A','-t','-v','ON_ERROR_STOP=1','-U','postgres','-d',db],{encoding:'utf8'},(error,stdout)=>error?reject(error):resolve(stdout.trim()));
+    child.stdin.end(statement);
+  });
+  assert.deepEqual((await Promise.all([race(1),race(64)])).sort(), ['0','1']);
+  assert.equal(scalar(`SELECT "editVersion" FROM ${policy} WHERE id='arch038-live-shop';`), '3');
+  assert.equal(scalar(`SELECT count(*) FROM commerce."CommerceAuditEvent" WHERE "modelPolicyId"='arch038-live-shop';`), '2');
   // Removing an override leaves its immutable audit record intact.
   sql(`DELETE FROM ${policy} WHERE "id"='arch038-live-shop';`);
-  assert.equal(scalar(`SELECT count(*) FROM "commerce"."CommerceAuditEvent" WHERE "modelPolicyId"='arch038-live-shop';`), '1');
+  assert.equal(scalar(`SELECT count(*) FROM "commerce"."CommerceAuditEvent" WHERE "modelPolicyId"='arch038-live-shop';`), '2');
   assert.equal(scalar(`SELECT count(*) FROM ${policy} WHERE "id"='arch038-live-shop';`), '0');
-  console.log(`PASS ARCH-038 database policy PostgreSQL ${mode}`);
+  console.log(`PASS ARCH-038 database policy PostgreSQL ${mode}: ${names.length} complete-chain migrations; bounded tool calls, missing-only backfill, rollback, concurrent CAS and immutable audit verified`);
 }
 try { await main(); } finally {
   if (running) { docker(['rm', '-f', '-v', container]); console.log(`CLEANUP ${container}`); }

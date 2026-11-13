@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -41,3 +42,12 @@ assert.doesNotMatch(migration, /REFERENCES "public"\."Shop"/);
 assert.doesNotMatch(migration, /ALTER TABLE "billing"\."BillingPlan"/);
 assert.doesNotMatch(migration, /ALTER TABLE "commerce"\."CommerceModelAvailability"/);
 console.log('PASS ARCH-038 unified model policy schema/migration static checks');
+
+const outreach = read('prisma/migrations/20261111090000_arch038_initial_outreach_tool_call_budget/migration.sql');
+assert.match(outreach, /^BEGIN;/);
+assert.match(outreach, /COMMIT;\s*$/);
+assert.equal((outreach.match(/CREATE OR REPLACE FUNCTION/g) ?? []).length, 1);
+for (const text of ["'initialOutreachToolCalls'", 'numeric_text::numeric > 64', '9007199254740991', "key_count NOT IN (2, 3)", "AND NOT (\"budget\" ? 'initialOutreachToolCalls')", "AND \"context\" = 'LIVE'", "WHERE \"scope\" = 'PLATFORM'"]) assert.ok(outreach.includes(text), text);
+assert.ok(outreach.indexOf('DISABLE TRIGGER') < outreach.indexOf('UPDATE "commerce"."CommerceModelPolicy"'));
+assert.ok(outreach.indexOf('ENABLE TRIGGER') > outreach.indexOf('UPDATE "commerce"."CommerceModelPolicy"'));
+console.log(`PASS ARCH-038 initial-outreach migration SHA-256 ${createHash('sha256').update(outreach).digest('hex')}`);
