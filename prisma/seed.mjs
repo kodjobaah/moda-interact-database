@@ -14,7 +14,6 @@ const plans = [
         { feature: "checkout_recovery", enabled: true },
         { feature: "product_search", enabled: true },
         { feature: "ai_conversations", enabled: true },
-        { feature: "order_support", enabled: false },
       ],
     },
   },
@@ -29,7 +28,6 @@ const plans = [
         { feature: "checkout_recovery", enabled: true },
         { feature: "product_search", enabled: true },
         { feature: "ai_conversations", enabled: true },
-        { feature: "order_support", enabled: true },
       ],
     },
   },
@@ -44,7 +42,6 @@ const plans = [
         { feature: "checkout_recovery", enabled: true },
         { feature: "product_search", enabled: true },
         { feature: "ai_conversations", enabled: true },
-        { feature: "order_support", enabled: true },
       ],
     },
   },
@@ -120,7 +117,6 @@ async function main() {
     { key: "checkout_recovery", displayName: "Checkout Recovery", activationMode: "ALWAYS_ENABLED", systemRequired: true, active: true },
     { key: "ai_conversations", displayName: "AI Conversations", activationMode: "ALWAYS_ENABLED", systemRequired: true, active: true },
     { key: "product_search", displayName: "Product Search", activationMode: "ALWAYS_ENABLED", systemRequired: true, active: true },
-    { key: "order_support", displayName: "Order Support", activationMode: "MERCHANT_OPT_IN", systemRequired: false, active: true },
   ];
   for (const feature of features) await prisma.feature.upsert({ where: { key: feature.key }, create: feature, update: feature });
   console.log("Seeding billing plans...");

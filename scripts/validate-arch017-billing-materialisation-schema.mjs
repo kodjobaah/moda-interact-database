@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 
 const root = process.cwd();
@@ -48,7 +49,8 @@ requirePattern(featureModel, /active\s+Boolean\s+@default\(true\)/, "Feature act
 requirePattern(featureModel, /activationMode\s+FeatureActivationMode/, "Feature activation mode");
 requirePattern(featureModel, /systemRequired\s+Boolean\s+@default\(false\)/, "Feature system required");
 requireText(merchantPlanModel, "shopifyPlanHandle String @unique", "MerchantPricingPlan unique handle");
-for (const field of ["shopifyRecoveryUsageEventHandle", "materializedAt", "features     MerchantPricingPlanFeature[]"]) requireText(merchantPlanModel, field, "MerchantPricingPlan field");
+for (const field of ["shopifyRecoveryUsageEventHandle", "materializedAt"]) requireText(merchantPlanModel, field, "MerchantPricingPlan field");
+requirePattern(merchantPlanModel, /features\s+MerchantPricingPlanFeature\[\]/, "MerchantPricingPlan feature relation");
 for (const forbidden of ["MerchantPricingPlan", "billingPlanId"]) forbidText(billingPlanModel, forbidden, "BillingPlan physical independence");
 requireText(billingPlanFeatureModel, "featureId String", "BillingPlanFeature FK");
 requireText(billingPlanFeatureModel, "feature   Feature @relation(fields: [featureId], references: [id], onDelete: Restrict)", "BillingPlanFeature relation");
@@ -67,7 +69,10 @@ requirePattern(model("PlatformBillingPolicy"), /terminalMessageReservedSlots\s+I
 requireText(model("ShopBillingPolicyOverride"), "terminalMessageReservedSlots Int?", "Shop override field");
 requireText(migration, 'DROP TYPE "billing"."BillingPlanFeatureIdentifier"', "enum removal");
 for (const forbidden of ["BillingPlan.createdAt", "BillingPlan.shopifyUsageEventHandle", "MerchantPricingUsageEvent", "INSERT INTO \"billing\".\"ShopFeaturePreference\"", "Subscription", "BillingPlanFeature" + " bpf" + " JOIN"]) forbidText(migration, forbidden, "migration inference");
-for (const key of ["checkout_recovery", "product_search", "ai_conversations", "order_support"]) requireText(seed, key, "seed feature key");
+for (const key of ["checkout_recovery", "product_search", "ai_conversations"]) requireText(seed, key, "seed feature key");
+forbidText(seed, "order_support", "retired feature must not be recreated by current seed");
+const retirement = readFileSync(resolve(root, "prisma/migrations/20261106023000_remove_order_support/migration.sql"));
+if (createHash("sha256").update(retirement).digest("hex") !== "6afd411b773669387f6289243537ea999df07a1f8c553163862a1f21de06cde2") throw new Error("retirement migration: deployed checksum must remain exact");
 for (const value of ["active: true", "defaultOutboundSoftLimit: 1000", "defaultOutboundHardLimit: 2000", "terminalMessageReservedSlots: 1", "absoluteOutboundHardLimit: 2000"]) requireText(seed, value, "seed canonical default");
 requireOrdered(migration, "CREATE TABLE \"billing\".\"Feature\"", "UPDATE \"billing\".\"BillingPlanFeature\"", "feature creation before enum mapping");
 requireOrdered(migration, "ALTER TABLE \"billing\".\"PlatformBillingPolicy\"\n  ADD COLUMN", "ALTER TABLE \"billing\".\"BillingPlan\"\n  DROP COLUMN", "policy defaults before BillingPlan removal");

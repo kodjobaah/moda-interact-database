@@ -142,7 +142,10 @@
     "test:arch075-human-root:postgres": "node scripts/test-arch075-human-root-postgres.mjs",
     "test:arch075-deploy-history:postgres": "node scripts/test-arch075-deploy-history-postgres.mjs",
     "test:arch075-meta-app-operation-state": "node scripts/validate-arch075-meta-app-operation-state.mjs",
-    "test:arch075-meta-app-operation-state:postgres": "node scripts/test-arch075-meta-app-operation-state-postgres.mjs"
+    "test:arch075-meta-app-operation-state:postgres": "node scripts/test-arch075-meta-app-operation-state-postgres.mjs",
+    "test:arch017-order-support-retirement:postgres:fresh": "node scripts/test-arch017-order-support-retirement-postgres.mjs --mode fresh",
+    "test:arch017-order-support-retirement:postgres:upgrade": "node scripts/test-arch017-order-support-retirement-postgres.mjs --mode upgrade",
+    "test:arch017-order-support-retirement:postgres:rollback": "node scripts/test-arch017-order-support-retirement-postgres.mjs --mode rollback"
   },
   "keywords": [],
   "author": "",
