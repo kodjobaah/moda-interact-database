@@ -722,6 +722,7 @@ model ConversationMessage {
   recoveryOutreachAttempt RecoveryOutreachAttempt?
   merchantSendCommand     MerchantConversationSendCommand?
   moderationAssessments   ConversationModerationAssessment[]
+  deliveryParts           ConversationDeliveryPart[]
 
   sentAt              DateTime?
   deliveredAt         DateTime?
@@ -732,6 +733,92 @@ model ConversationMessage {
   @@index([conversationId, createdAt])
   @@index([conversationId, createdAt, id])
   @@index([inReplyToProviderId])
+  @@schema("whatsapp")
+}
+
+// One logical ConversationMessage may have at most three physical sends.
+// Billing, authored content and history remain anchored to the existing root.
+enum ConversationDeliveryPartRole {
+  HEADER
+  PRODUCT
+  ANSWER
+
+  @@schema("whatsapp")
+}
+
+enum ConversationDeliveryPartState {
+  PREPARED
+  ADMITTED
+  ACKNOWLEDGED
+  DELIVERED
+  READ
+  FAILED
+  UNKNOWN
+  CANCELLED
+
+  @@schema("whatsapp")
+}
+
+enum ConversationDeliveryStatus {
+  SENT
+  DELIVERED
+  READ
+  FAILED
+
+  @@schema("whatsapp")
+}
+
+model ConversationDeliveryPart {
+  id String @id @default(cuid())
+
+  messageId String
+  message ConversationMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  ordinal Int @db.SmallInt
+  role ConversationDeliveryPartRole
+  payload Json @db.JsonB
+  payloadDigest String @db.VarChar(64)
+  sourceIdentity Json @db.JsonB
+  deadlineAt DateTime @db.Timestamptz(3)
+  state ConversationDeliveryPartState @default(PREPARED)
+
+  providerAccountId String @db.VarChar(128)
+  providerPhoneNumberId String @db.VarChar(128)
+  providerDispatchKey String? @unique @db.VarChar(128)
+  providerDispatchAdmittedAt DateTime? @db.Timestamptz(3)
+  providerMessageId String? @unique @db.VarChar(512)
+  acknowledgedAt DateTime? @db.Timestamptz(3)
+  deliveredAt DateTime? @db.Timestamptz(3)
+  readAt DateTime? @db.Timestamptz(3)
+  failedAt DateTime? @db.Timestamptz(3)
+  unknownAt DateTime? @db.Timestamptz(3)
+  cancelledAt DateTime? @db.Timestamptz(3)
+  failureCode String? @db.VarChar(64)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  statusReceipts ConversationDeliveryStatusReceipt[]
+
+  @@unique([messageId, ordinal])
+  @@index([state, deadlineAt])
+  @@schema("whatsapp")
+}
+
+// Normalized status facts only: never store raw webhook or customer payloads.
+// Unmatched receipts are retained for at most seven days by the owning worker.
+model ConversationDeliveryStatusReceipt {
+  id String @id @default(cuid())
+  providerAccountId String @db.VarChar(128)
+  providerPhoneNumberId String @db.VarChar(128)
+  providerMessageId String @db.VarChar(512)
+  status ConversationDeliveryStatus
+  providerTimestamp DateTime @db.Timestamptz(3)
+  receivedAt DateTime @default(now()) @db.Timestamptz(3)
+  failureCode String? @db.VarChar(64)
+  partId String?
+  part ConversationDeliveryPart? @relation(fields: [partId], references: [id], onDelete: Cascade)
+
+  @@unique([providerAccountId, providerPhoneNumberId, providerMessageId, status, providerTimestamp], map: "ConversationDeliveryStatusReceipt_sender_status_key")
+  @@index([partId])
   @@schema("whatsapp")
 }
 

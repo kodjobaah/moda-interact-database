@@ -1,0 +1,72 @@
+@startuml arch075-delivery-parts
+skinparam linetype ortho
+entity "ConversationMessage (existing logical root)" as ConversationMessage {
+  * id : [PK] String
+  --
+  content/status/provider fields unchanged
+}
+enum "ConversationDeliveryPartRole" as ConversationDeliveryPartRole {
+  HEADER
+  PRODUCT
+  ANSWER
+}
+enum "ConversationDeliveryPartState" as ConversationDeliveryPartState {
+  PREPARED
+  ADMITTED
+  ACKNOWLEDGED
+  DELIVERED
+  READ
+  FAILED
+  UNKNOWN
+  CANCELLED
+}
+enum "ConversationDeliveryStatus" as ConversationDeliveryStatus {
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+entity "ConversationDeliveryPart" as ConversationDeliveryPart {
++ id [PK] : String
+--
+  # messageId : [FK] ConversationMessage
+  * ordinal : Int
+  * role : ConversationDeliveryPartRole
+  * payload : Json
+  * payloadDigest : String
+  * sourceIdentity : Json
+  * deadlineAt : DateTime
+  * state : ConversationDeliveryPartState
+  * providerAccountId : String
+  * providerPhoneNumberId : String
+  providerDispatchKey : String
+  providerDispatchAdmittedAt : DateTime
+  providerMessageId : String
+  acknowledgedAt : DateTime
+  deliveredAt : DateTime
+  readAt : DateTime
+  failedAt : DateTime
+  unknownAt : DateTime
+  cancelledAt : DateTime
+  failureCode : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+entity "ConversationDeliveryStatusReceipt" as ConversationDeliveryStatusReceipt {
++ id [PK] : String
+--
+  * providerAccountId : String
+  * providerPhoneNumberId : String
+  * providerMessageId : String
+  * status : ConversationDeliveryStatus
+  * providerTimestamp : DateTime
+  * receivedAt : DateTime
+  failureCode : String
+  # partId : [FK] ConversationDeliveryPart
+}
+ConversationDeliveryPart }o--|| ConversationMessage
+ConversationDeliveryStatusReceipt }o--o| ConversationDeliveryPart
+ConversationDeliveryPart |o--|| ConversationDeliveryPartRole
+ConversationDeliveryPart |o--|| ConversationDeliveryPartState
+ConversationDeliveryStatusReceipt |o--|| ConversationDeliveryStatus
+@enduml

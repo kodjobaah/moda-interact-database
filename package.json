@@ -136,7 +136,11 @@
     "test:arch064-purpose-membership:postgres": "node scripts/test-arch064-purpose-membership-postgres.mjs",
     "test:arch066-product-context:postgres": "node scripts/test-arch066-product-context-postgres.mjs",
     "test:arch068-conversation-delivery-plan": "node scripts/validate-arch068-conversation-delivery-plan.mjs",
-    "test:arch068-conversation-delivery-plan:postgres": "node scripts/test-arch068-conversation-delivery-plan-postgres.mjs"
+    "test:arch068-conversation-delivery-plan:postgres": "node scripts/test-arch068-conversation-delivery-plan-postgres.mjs",
+    "test:arch075-delivery-parts": "node scripts/validate-arch075-delivery-parts.mjs",
+    "test:arch075-delivery-parts:postgres": "node scripts/test-arch075-delivery-parts-postgres.mjs",
+    "test:arch075-human-root:postgres": "node scripts/test-arch075-human-root-postgres.mjs",
+    "test:arch075-deploy-history:postgres": "node scripts/test-arch075-deploy-history-postgres.mjs"
   },
   "keywords": [],
   "author": "",

@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const schema=readFileSync(new URL('../prisma/schema.prisma',import.meta.url),'utf8');
+const sql=readFileSync(new URL('../prisma/migrations/20261113004310_arch075_ordered_delivery_parts/migration.sql',import.meta.url),'utf8');
+for(const model of ['ConversationDeliveryPart','ConversationDeliveryStatusReceipt'])assert.match(schema,new RegExp(`model ${model} \\{`));
+assert.match(schema,/deliveryParts\s+ConversationDeliveryPart\[\]/);
+assert.match(sql,/CHECK \("ordinal" BETWEEN 0 AND 2\)/);
+assert.match(sql,/UNIQUE INDEX "ConversationDeliveryPart_messageId_ordinal_key"/);
+assert.match(sql,/CREATE TRIGGER "ConversationDeliveryPart_immutable"/);
+assert.match(sql,/CREATE TRIGGER "ConversationDeliveryStatusReceipt_immutable"/);
+assert.match(sql,/WHERE "partId" IS NULL/);
+assert.doesNotMatch(sql,/DROP (?:TABLE|INDEX|TYPE)|RENAME|ALTER TABLE "(?:commerce|billing|shopify)"/);
+assert.doesNotMatch(sql,/ALTER TABLE "whatsapp"\."ConversationMessage"/);
+assert.match(sql,/ON DELETE CASCADE/);
+console.log('PASS ARCH-075 additive bounded physical-part schema, sender-scoped receipts, immutable evidence and legacy root compatibility');
