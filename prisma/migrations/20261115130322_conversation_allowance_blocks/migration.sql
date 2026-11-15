@@ -90,8 +90,12 @@ BEGIN
     END IF;
   END IF;
   -- Serialize ordinal allocation per owner, including distinct concurrent blocks.
-  SELECT c.type,c."checkoutRecoveryId",c."shopId",r."shopId" INTO owner_type,owner_recovery,direct_shop,owner_shop FROM "whatsapp"."Conversation" c LEFT JOIN "commerce"."CheckoutRecovery" r ON r.id=c."checkoutRecoveryId" WHERE c.id=NEW."conversationId" FOR UPDATE OF c;
+  SELECT c.type,c."checkoutRecoveryId",c."shopId" INTO owner_type,owner_recovery,direct_shop FROM "whatsapp"."Conversation" c WHERE c.id=NEW."conversationId" FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'ALLOWANCE_CONVERSATION_MISSING' USING ERRCODE='23503'; END IF;
+  -- Exact C→Recovery lock order matches sender assignment admission. SHARE
+  -- conflicts with a concurrent NO KEY UPDATE of recovery.shopId. Without it,
+  -- both a child INSERT and the reciprocal parent guard can miss each other.
+  SELECT r."shopId" INTO owner_shop FROM "commerce"."CheckoutRecovery" r WHERE r.id=owner_recovery FOR SHARE;
   IF owner_type <> 'RECOVERY' OR owner_recovery IS NULL OR owner_shop IS DISTINCT FROM NEW."shopId" OR (direct_shop IS NOT NULL AND direct_shop IS DISTINCT FROM NEW."shopId") THEN
     RAISE EXCEPTION 'ALLOWANCE_OWNER_MISMATCH' USING ERRCODE='23514';
   END IF;

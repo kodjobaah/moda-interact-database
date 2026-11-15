@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
+import { session, waitBlocked } from './arch040-postgres-lock-sessions.mjs';
 
 const require = createRequire(import.meta.url);
 const prisma = require.resolve('prisma/build/index.js');
@@ -129,6 +130,42 @@ async function checks(db) {
   sql(db,`INSERT INTO whatsapp."ConversationMessage"(id,"conversationId",direction,"senderType",content) VALUES('old-writer','standalone','OUTBOUND','HUMAN','Still works')`);
   check(sql(db,`SELECT "allowanceBlockId" IS NULL FROM whatsapp."ConversationMessage" WHERE id='old-writer'`),'t');
 }
+async function parentOwnerRaces(db) {
+  sql(db, `CREATE TABLE public.allowance_test_result(name text PRIMARY KEY,result text NOT NULL);
+INSERT INTO commerce."Shop"(id,domain,"updatedAt") VALUES('s-race2','race-other.fixture.example',now());
+INSERT INTO commerce."CheckoutRecovery"(id,"shopId","checkoutToken","lastExternalActivityAt","updatedAt") VALUES('race-r1','s1','race-t1',now(),now()),('race-r2','s1','race-t2',now(),now());
+INSERT INTO whatsapp."Conversation"(id,"checkoutRecoveryId",type,"updatedAt") VALUES('race-c1','race-r1','RECOVERY',now()),('race-c2','race-r2','RECOVERY',now());`);
+  const child = session(() => sqlArgs(db), 'allowance-child');
+  const parent = session(() => sqlArgs(db), 'allowance-parent');
+  try {
+    // Child first: the parent's non-key owner UPDATE must really wait until the
+    // child commits, then its reciprocal deferred guard must see/reject it.
+    await child.send(`BEGIN; SET application_name='allowance-child'; ${block('race-b1',0,{conversationId:'race-c1'})};`);
+    await parent.send("BEGIN; SET application_name='allowance-parent';");
+    const changingParent = parent.send(`DO $race$ DECLARE result text:='allowed'; BEGIN BEGIN
+UPDATE commerce."CheckoutRecovery" SET "shopId"='s-race2' WHERE id='race-r1'; SET CONSTRAINTS ALL IMMEDIATE;
+EXCEPTION WHEN check_violation THEN result:=SQLSTATE; END;
+INSERT INTO public.allowance_test_result VALUES('parent-after-child',result); END $race$;`);
+    await waitBlocked(q=>sql(db,q),'allowance-parent');
+    await child.send('COMMIT;'); await changingParent; await parent.send('COMMIT;');
+    check(sql(db,"SELECT result FROM public.allowance_test_result WHERE name='parent-after-child'"),'23514');
+    check(sql(db,`SELECT r."shopId"=b."shopId" FROM commerce."CheckoutRecovery" r JOIN whatsapp."Conversation" c ON c."checkoutRecoveryId"=r.id JOIN ${blocks} b ON b."conversationId"=c.id WHERE c.id='race-c1'`),'t');
+    // Parent first: the child's recovery read waits for the owner mutation and
+    // validates the committed owner rather than admitting a stale-shop block.
+    await parent.send(`BEGIN; UPDATE commerce."CheckoutRecovery" SET "shopId"='s-race2' WHERE id='race-r2';`);
+    await child.send('BEGIN;');
+    const insertingChild = child.send(`DO $race$ DECLARE result text:='allowed'; BEGIN BEGIN
+${block('race-b2',0,{conversationId:'race-c2'})};
+EXCEPTION WHEN check_violation THEN result:=SQLSTATE; END;
+INSERT INTO public.allowance_test_result VALUES('child-after-parent',result); END $race$;`);
+    await waitBlocked(q=>sql(db,q),'allowance-child');
+    await parent.send('COMMIT;'); await insertingChild; await child.send('COMMIT;');
+    check(sql(db,"SELECT result FROM public.allowance_test_result WHERE name='child-after-parent'"),'23514');
+    check(sql(db,`SELECT count(*) FROM ${blocks} WHERE id='race-b2'`),'0');
+  } finally { await child.close(); await parent.close(); }
+  console.log(`PASS ${db}: both real parent-owner/child-insert lock orderings reject stale ownership`);
+}
+
 try {
   docker(['run','-d','--name',name,'--label','moda.task=ARCH-076-DATABASE-002','-p','127.0.0.1::5432','-e','POSTGRES_PASSWORD=fixture-only','-e','POSTGRES_DB=fixture','pgvector/pgvector:pg17']);
   let ready=false;for(let i=0;i<40;i++){try{sql('fixture','SELECT 1');ready=true;break;}catch{await delay(500);}}assert.ok(ready);
@@ -141,7 +178,7 @@ try {
   const before=JSON.parse(snapshot('upgrade'));
   cpSync(new URL(target,migrations),join(fixture,'migrations',target),{recursive:true});deploy('fresh');seed('fresh');deploy('upgrade');
   const after=JSON.parse(snapshot('upgrade'));for(const message of after.messages)delete message.allowanceBlockId;check(after,before);
-  for(const db of ['fresh','upgrade']){assert.ok(deploy(db).includes('No pending migrations'));await checks(db);console.log(`PASS ${db}: full Prisma history, ownership/immutability/repair/concurrency/cascade and old writers`);}
+  for(const db of ['fresh','upgrade']){assert.ok(deploy(db).includes('No pending migrations'));await checks(db);await parentOwnerRaces(db);console.log(`PASS ${db}: full Prisma history, ownership/immutability/repair/concurrency/cascade and old writers`);}
   console.log(`PASS ARCH-076-DATABASE-002 ${cases} assertions; no hosted database or provider calls`);
 } finally {
   docker(['rm','-f','--volumes',name]);rmSync(temporary,{recursive:true,force:true});console.log('Removed invocation-owned PostgreSQL and migration fixtures');
