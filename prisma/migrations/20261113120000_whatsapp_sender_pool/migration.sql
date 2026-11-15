@@ -313,7 +313,7 @@ CREATE CONSTRAINT TRIGGER arch076_recovery_assignment_owner AFTER UPDATE OF "sho
 -- Classification evidence and later resolution are different immutable facts.
 -- Validate at commit so child/original admission can be written in either order.
 CREATE FUNCTION whatsapp.arch076_resolution_witness_guard() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE original whatsapp."RecoveryBasketRoutingTurn"%ROWTYPE; resolver whatsapp."RecoveryBasketRoutingTurn"%ROWTYPE;
+DECLARE original whatsapp."RecoveryBasketRoutingTurn"%ROWTYPE; resolver whatsapp."RecoveryBasketRoutingTurn"%ROWTYPE; confirmed_prompt whatsapp."RecoveryBasketRoutingTurn"%ROWTYPE;
 BEGIN
   SELECT * INTO original FROM whatsapp."RecoveryBasketRoutingTurn" WHERE "inboundProviderMessageId"=NEW."inboundProviderMessageId";
   IF NOT FOUND OR original."resolutionInboundProviderMessageId" IS NULL THEN RETURN NEW; END IF;
@@ -325,15 +325,25 @@ BEGIN
      resolver."selectedConversationId" IS DISTINCT FROM original."selectedConversationId" THEN RAISE EXCEPTION 'ROUTING_RESOLVER_OWNER_MISMATCH'; END IF;
   IF COALESCE(resolver."routingDecision"->>'role','') NOT IN ('NEW_QUESTION','SELECT_ONLY','SELECT_AND_QUESTION') THEN RAISE EXCEPTION 'ROUTING_RESOLVER_ROLE_MISMATCH'; END IF;
   IF resolver."routingDecision"->>'currentInboundProviderMessageId' IS DISTINCT FROM resolver."inboundProviderMessageId" THEN RAISE EXCEPTION 'ROUTING_RESOLVER_INBOUND_MISMATCH'; END IF;
-  IF resolver."inboundProviderMessageId"<>original."inboundProviderMessageId" AND (
-     resolver."parentProviderMessageId" IS DISTINCT FROM original."inboundProviderMessageId" OR
-     COALESCE(resolver."routingDecision"->>'role','') NOT IN ('SELECT_ONLY','SELECT_AND_QUESTION') OR
-     resolver."routingDecision"->>'originalTurnId' IS DISTINCT FROM original."inboundProviderMessageId" OR
-     resolver."routingDecision"->>'currentInboundProviderMessageId' IS DISTINCT FROM resolver."inboundProviderMessageId" OR
-     resolver."routingDecision"->>'promptTurnId' IS DISTINCT FROM original."inboundProviderMessageId" OR
-     original."promptSentAt" IS NULL OR original."promptProviderMessageId" IS NULL OR
-     resolver."routingDecision"->>'confirmedPromptProviderMessageId' IS DISTINCT FROM original."promptProviderMessageId"
-  ) THEN RAISE EXCEPTION 'ROUTING_RESOLVER_ORIGINAL_OR_PROMPT_MISMATCH'; END IF;
+  IF resolver."inboundProviderMessageId"<>original."inboundProviderMessageId" THEN
+    IF resolver."parentProviderMessageId" IS DISTINCT FROM original."inboundProviderMessageId" OR
+       COALESCE(resolver."routingDecision"->>'role','') NOT IN ('SELECT_ONLY','SELECT_AND_QUESTION') OR
+       resolver."routingDecision"->>'originalTurnId' IS DISTINCT FROM original."inboundProviderMessageId"
+    THEN RAISE EXCEPTION 'ROUTING_RESOLVER_ORIGINAL_OR_PROMPT_MISMATCH'; END IF;
+    -- Explicit star relation: original and actual confirmed prompt may differ.
+    -- Never search reverse children or infer the most recent prompt.
+    SELECT * INTO confirmed_prompt FROM whatsapp."RecoveryBasketRoutingTurn"
+      WHERE "inboundProviderMessageId"=(resolver."routingDecision"->>'promptTurnId');
+    IF NOT FOUND THEN RAISE EXCEPTION 'ROUTING_RESOLVER_ORIGINAL_OR_PROMPT_MISMATCH'; END IF;
+    IF confirmed_prompt."threadId"<>original."threadId" OR
+       (confirmed_prompt."inboundProviderMessageId"<>original."inboundProviderMessageId" AND
+        confirmed_prompt."parentProviderMessageId" IS DISTINCT FROM original."inboundProviderMessageId") OR
+       (confirmed_prompt."routeId" IS NOT NULL AND confirmed_prompt."routeId" IS DISTINCT FROM original."routeId") OR
+       (confirmed_prompt."promptScopeRouteId" IS NOT NULL AND confirmed_prompt."promptScopeRouteId" IS DISTINCT FROM original."routeId") OR
+       confirmed_prompt."promptSentAt" IS NULL OR confirmed_prompt."promptProviderMessageId" IS NULL OR
+       resolver."routingDecision"->>'confirmedPromptProviderMessageId' IS DISTINCT FROM confirmed_prompt."promptProviderMessageId"
+    THEN RAISE EXCEPTION 'ROUTING_RESOLVER_ORIGINAL_OR_PROMPT_MISMATCH'; END IF;
+  END IF;
   RETURN NEW;
 END $$;
 CREATE CONSTRAINT TRIGGER arch076_resolution_witness AFTER INSERT OR UPDATE ON whatsapp."RecoveryBasketRoutingTurn" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION whatsapp.arch076_resolution_witness_guard();
