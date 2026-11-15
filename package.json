@@ -147,7 +147,8 @@
     "test:arch017-order-support-retirement:postgres:upgrade": "node scripts/test-arch017-order-support-retirement-postgres.mjs --mode upgrade",
     "test:arch017-order-support-retirement:postgres:rollback": "node scripts/test-arch017-order-support-retirement-postgres.mjs --mode rollback",
     "test:conversation-allowance": "node scripts/validate-conversation-allowance.mjs",
-    "test:conversation-allowance:postgres": "node scripts/test-conversation-allowance-postgres.mjs"
+    "test:conversation-allowance:postgres": "node scripts/test-conversation-allowance-postgres.mjs",
+    "test:arch076-sender-pool:postgres": "node scripts/test-arch076-sender-pool-postgres.mjs"
   },
   "keywords": [],
   "author": "",
