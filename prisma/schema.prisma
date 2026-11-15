@@ -499,7 +499,106 @@ enum ConversationOutcome {
   @@schema("whatsapp")
 }
 
+// Sender inventory and immutable recipient/shop generations (ARCH-076).
+model WhatsAppPoolSender {
+  providerPhoneNumberId String @id @db.VarChar(64)
+  providerAccountId String @db.VarChar(64)
+  priority Int @default(0)
+  allocationEnabled Boolean @default(false)
+  verifiedAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  threads RecoverySenderThread[]
+
+  @@unique([providerPhoneNumberId, providerAccountId])
+  @@schema("whatsapp")
+}
+
+model RecoverySenderThread {
+  id String @id @default(cuid())
+  canonicalRecipient String @db.VarChar(15)
+  providerPhoneNumberId String @db.VarChar(64)
+  sender WhatsAppPoolSender @relation(fields: [providerPhoneNumberId], references: [providerPhoneNumberId], onDelete: Restrict, onUpdate: NoAction)
+  openedAt DateTime @default(now()) @db.Timestamptz(3)
+  closedAt DateTime? @db.Timestamptz(3)
+  routes RecoverySenderRoute[]
+  routingTurns RecoveryBasketRoutingTurn[]
+
+  @@unique([id, canonicalRecipient, providerPhoneNumberId])
+  @@schema("whatsapp")
+}
+
+model RecoverySenderRoute {
+  id String @id @default(cuid())
+  shopId String
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  threadId String
+  canonicalRecipient String @db.VarChar(15)
+  providerPhoneNumberId String @db.VarChar(64)
+  thread RecoverySenderThread @relation(fields: [threadId, canonicalRecipient, providerPhoneNumberId], references: [id, canonicalRecipient, providerPhoneNumberId], onDelete: Cascade, onUpdate: NoAction)
+  openedAt DateTime @default(now()) @db.Timestamptz(3)
+  closedAt DateTime? @db.Timestamptz(3)
+  assignments RecoverySenderAssignment[]
+
+  @@index([threadId, closedAt, shopId])
+  @@schema("whatsapp")
+}
+
+model RecoverySenderAssignment {
+  conversationId String @id
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  routeId String
+  // SQL migration makes this FK DEFERRABLE INITIALLY DEFERRED.
+  route RecoverySenderRoute @relation(fields: [routeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  assignedAt DateTime @default(now()) @db.Timestamptz(3)
+  releasedAt DateTime? @db.Timestamptz(3)
+
+  @@index([routeId, releasedAt])
+  @@schema("whatsapp")
+}
+
+model RecoveryBasketRoutingTurn {
+  inboundProviderMessageId String @id
+  threadId String
+  thread RecoverySenderThread @relation(fields: [threadId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  // Historical scope stamps survive shop deletion; guarded by SQL on binding.
+  routeId String?
+  promptScopeRouteId String?
+  occurredAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  inputJson Json? @db.JsonB
+  candidatesJson Json? @db.JsonB
+  moderationJson Json? @db.JsonB
+  configurationSnapshot Json? @db.JsonB
+  routingDecision Json? @db.JsonB
+  parentProviderMessageId String?
+  parent RecoveryBasketRoutingTurn? @relation("RoutingTurnParent", fields: [parentProviderMessageId], references: [inboundProviderMessageId], onDelete: NoAction, onUpdate: NoAction)
+  children RecoveryBasketRoutingTurn[] @relation("RoutingTurnParent")
+  state String @default("RECEIVED") @db.VarChar(24)
+  resolutionInboundProviderMessageId String?
+  resolutionTurn RecoveryBasketRoutingTurn? @relation("RoutingTurnResolution", fields: [resolutionInboundProviderMessageId], references: [inboundProviderMessageId], onDelete: NoAction, onUpdate: NoAction, map: "RecoveryBasketRoutingTurn_resolution_fkey")
+  resolvedOriginals RecoveryBasketRoutingTurn[] @relation("RoutingTurnResolution")
+  selectedConversationId String?
+  selectedConversation Conversation? @relation(fields: [selectedConversationId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  promptText String?
+  promptAdmittedAt DateTime? @db.Timestamptz(3)
+  promptSentAt DateTime? @db.Timestamptz(3)
+  promptProviderMessageId String? @unique
+  expiresAt DateTime @db.Timestamptz(3)
+  resolvedAt DateTime? @db.Timestamptz(3)
+  workToken String?
+  workLeaseUntil DateTime? @db.Timestamptz(3)
+  nextRepairAt DateTime? @db.Timestamptz(3)
+  repairAttempt Int @default(0)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([threadId, state, occurredAt])
+  @@schema("whatsapp")
+}
+
 model Conversation {
+  senderAssignment RecoverySenderAssignment?
+  selectedRoutingTurns RecoveryBasketRoutingTurn[]
   commerceProductContext CommerceConversationProductContext?
   commerceGrant CommerceConversationGrant?
 
@@ -694,6 +793,10 @@ model ConversationMessage {
   providerDispatchKey             String?   @unique @db.VarChar(128)
   providerDispatchAdmittedAt      DateTime? @db.Timestamptz(3)
   providerDispatchControlRevision Int?
+
+  // Exact root dispatch sender; null for legacy writers.
+  dispatchProviderAccountId String? @db.VarChar(64)
+  dispatchProviderPhoneNumberId String? @db.VarChar(64)
 
   // Meta context.id when this message is a reply
   inReplyToProviderId String?
@@ -2165,6 +2268,7 @@ enum WhatsAppConsentEvidenceDecision {
 }
 
 model Shop {
+  recoverySenderRoutes RecoverySenderRoute[]
   commerceProductContexts CommerceConversationProductContext[]
   commerceConversationGrants      CommerceConversationGrant[]
   externalCredentials             CommerceExternalCredential[]

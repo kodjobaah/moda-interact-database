@@ -1,0 +1,78 @@
+@startuml
+skinparam linetype ortho
+hide methods
+entity "WhatsAppPoolSender" as Sender {
+  * providerPhoneNumberId : varchar[64] <<PK>>
+  * providerAccountId : varchar[64] <<immutable>>
+  * priority : int
+  * allocationEnabled : boolean
+  * verifiedAt : timestamptz
+  * createdAt / updatedAt : timestamptz
+}
+entity "RecoverySenderThread" as Thread {
+  * id : text <<PK>>
+  * canonicalRecipient : varchar[15] <<immutable>>
+  * providerPhoneNumberId : varchar[64] <<FK>>
+  * openedAt : timestamptz <<immutable>>
+  closedAt : timestamptz <<monotonic>>
+}
+entity "RecoverySenderRoute" as Route {
+  * id : text <<PK>>
+  * shopId : text <<FK immutable>>
+  * threadId : text <<FK immutable>>
+  * canonicalRecipient : varchar[15]
+  * providerPhoneNumberId : varchar[64]
+  * openedAt : timestamptz <<immutable>>
+  closedAt : timestamptz <<monotonic>>
+}
+entity "RecoverySenderAssignment" as Assignment {
+  * conversationId : text <<PK FK immutable>>
+  * routeId : text <<FK immutable>>
+  * assignedAt : timestamptz <<immutable>>
+  releasedAt : timestamptz <<monotonic>>
+}
+entity "RecoveryBasketRoutingTurn" as Turn {
+  * inboundProviderMessageId : text <<PK>>
+  * threadId : text <<FK immutable>>
+  routeId / promptScopeRouteId : text <<historical scope>>
+  parentProviderMessageId : text <<FK>>
+  selectedConversationId : text <<FK>>
+  resolutionInboundProviderMessageId : text <<FK immutable>>
+  inputJson / candidatesJson / moderationJson : jsonb
+  configurationSnapshot / routingDecision : jsonb
+  state : varchar[24]
+  promptText / promptProviderMessageId : text
+  occurredAt / createdAt / expiresAt : timestamptz
+  promptAdmittedAt / promptSentAt / resolvedAt : timestamptz
+  workToken : text
+  workLeaseUntil / nextRepairAt : timestamptz
+  repairAttempt : int
+  updatedAt : timestamptz
+}
+entity "Shop (existing)" as Shop
+entity "Conversation (existing)" as Conversation
+entity "ConversationMessage (existing)" as Message {
+  dispatchProviderAccountId : varchar[64] <<nullable>>
+  dispatchProviderPhoneNumberId : varchar[64] <<nullable>>
+}
+Sender ||--o{ Thread : RESTRICT
+Thread ||--o{ Route : CASCADE / exact tuple
+Shop ||--o{ Route : CASCADE
+Route ||--o{ Assignment : deferred NO ACTION
+Conversation ||--o| Assignment : CASCADE
+Thread ||--o{ Turn : CASCADE
+Turn |o--o{ Turn
+Conversation |o--o{ Turn : selected SET NULL
+Conversation ||--o{ Message
+note right of Turn
+route and prompt scope are scalar stamps.
+Guard checks exact thread when bound.
+Owner deletion scrubs pending input,
+without changing historical scope.
+Parent/resolution links: deferred NO ACTION.
+end note
+note bottom of Assignment
+At most one lifetime assignment per recovery Conversation.
+No allowance or credit dependencies.
+end note
+@enduml
