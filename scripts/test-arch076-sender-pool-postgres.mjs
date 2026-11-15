@@ -239,16 +239,20 @@ try {
   console.log(`PASS ARCH-076-DATABASE-001 ${cases} assertions; no hosted DB/provider calls`);
 } catch (error) {
   primaryFailure = error;
-  throw error;
 } finally {
   try {
     if (containerCreated) docker(['rm','-f','--volumes',name]);
     console.log(`Removed invocation-owned PostgreSQL ${name}`);
   } catch (cleanupError) {
     console.error(`Cleanup failed for invocation-owned PostgreSQL ${name}:`, cleanupError.message);
-    if (!primaryFailure) throw cleanupError;
-  } finally {
+    primaryFailure ??= cleanupError;
+  }
+  try {
     rmSync(temporary,{recursive:true,force:true});
     console.log('Removed temporary migration files');
+  } catch (cleanupError) {
+    console.error('Temporary migration cleanup failed:', cleanupError.message);
+    primaryFailure ??= cleanupError;
   }
 }
+if (primaryFailure) throw primaryFailure;
