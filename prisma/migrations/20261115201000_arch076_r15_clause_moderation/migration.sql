@@ -219,7 +219,8 @@ BEGIN
       p->>'transcriptSha256' IS DISTINCT FROM encode(sha256(convert_to(source_row."moderationJson"#>>'{audioTranscript,text}','UTF8')),'hex') OR
       COALESCE(p->>'sourceSha256','') !~ '^[0-9a-f]{64}$' OR
       p->>'sourceSha256' IS DISTINCT FROM whatsapp.arch076_r15_audio_source_sha256(source_row."inputJson") OR
-      COALESCE(source_row."moderationJson"#>>'{audioTranscript,text}','')='' OR
+      jsonb_typeof(source_row."moderationJson"#>'{audioTranscript,text}') IS DISTINCT FROM 'string' OR
+      length(btrim(COALESCE(source_row."moderationJson"#>>'{audioTranscript,text}',''),E' \t\n\r\f\v'||chr(160)||chr(5760)||chr(8192)||chr(8193)||chr(8194)||chr(8195)||chr(8196)||chr(8197)||chr(8198)||chr(8199)||chr(8200)||chr(8201)||chr(8202)||chr(8232)||chr(8233)||chr(8239)||chr(8287)||chr(12288)||chr(65279)))=0 OR
       COALESCE(p->>'transcriptSha256','') !~ '^[0-9a-f]{64}$' OR COALESCE(p->>'mediaIdSha256','') !~ '^[0-9a-f]{64}$' OR
       COALESCE(p->>'provider','')='' OR COALESCE(p->>'model','')='' OR
       jsonb_typeof(p->'durationMs') IS DISTINCT FROM 'number' OR COALESCE(p->>'durationMs','') !~ '^[0-9]{1,9}$' OR
