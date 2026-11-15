@@ -145,7 +145,8 @@
     "test:arch075-meta-app-operation-state:postgres": "node scripts/test-arch075-meta-app-operation-state-postgres.mjs",
     "test:arch017-order-support-retirement:postgres:fresh": "node scripts/test-arch017-order-support-retirement-postgres.mjs --mode fresh",
     "test:arch017-order-support-retirement:postgres:upgrade": "node scripts/test-arch017-order-support-retirement-postgres.mjs --mode upgrade",
-    "test:arch017-order-support-retirement:postgres:rollback": "node scripts/test-arch017-order-support-retirement-postgres.mjs --mode rollback"
+    "test:arch017-order-support-retirement:postgres:rollback": "node scripts/test-arch017-order-support-retirement-postgres.mjs --mode rollback",
+    "test:arch076-sender-pool:postgres": "node scripts/test-arch076-sender-pool-postgres.mjs"
   },
   "keywords": [],
   "author": "",

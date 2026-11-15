@@ -773,6 +773,8 @@ entity "ConversationMessage" as ConversationMessage {
   providerFailureCode : String
   failedAt : DateTime
   outboundPresentation : Json
+  dispatchProviderAccountId : String?
+  dispatchProviderPhoneNumberId : String?
 }
 
 entity "WhatsAppRecipientReachability" as WhatsAppRecipientReachability {
@@ -2604,4 +2606,79 @@ entity "MetaTemplateAppOperationState" as MetaTemplateAppOperationState {
   * updatedAt : DateTime
 }
 MetaTemplateAppOperationState |o--|| CommerceEnvironment
+
+
+entity "WhatsAppPoolSender" as WhatsAppPoolSender {
++ providerPhoneNumberId [PK] : String
+--
+  * providerAccountId : String
+  * priority : Int
+  * allocationEnabled : Boolean
+  * verifiedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+entity "RecoverySenderThread" as RecoverySenderThread {
++ id [PK] : String
+--
+  * canonicalRecipient : String
+  # providerPhoneNumberId : [FK] WhatsAppPoolSender
+  * openedAt : DateTime
+  closedAt : DateTime
+}
+entity "RecoverySenderRoute" as RecoverySenderRoute {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # threadId : [FK] RecoverySenderThread
+  # canonicalRecipient : [FK] RecoverySenderThread
+  # providerPhoneNumberId : [FK] RecoverySenderThread
+  * openedAt : DateTime
+  closedAt : DateTime
+}
+entity "RecoverySenderAssignment" as RecoverySenderAssignment {
++ conversationId [PK] : String
+--
+  # routeId : [FK] RecoverySenderRoute
+  * assignedAt : DateTime
+  releasedAt : DateTime
+}
+entity "RecoveryBasketRoutingTurn" as RecoveryBasketRoutingTurn {
++ inboundProviderMessageId [PK] : String
+--
+  # threadId : [FK] RecoverySenderThread
+  routeId : String
+  promptScopeRouteId : String
+  * occurredAt : DateTime
+  * createdAt : DateTime
+  inputJson : Json
+  candidatesJson : Json
+  moderationJson : Json
+  configurationSnapshot : Json
+  routingDecision : Json
+  # parentProviderMessageId : [FK] RecoveryBasketRoutingTurn
+  * state : String
+  # resolutionInboundProviderMessageId : [FK] RecoveryBasketRoutingTurn
+  # selectedConversationId : [FK] Conversation
+  promptText : String
+  promptAdmittedAt : DateTime
+  promptSentAt : DateTime
+  promptProviderMessageId : String
+  * expiresAt : DateTime
+  resolvedAt : DateTime
+  workToken : String
+  workLeaseUntil : DateTime
+  nextRepairAt : DateTime
+  * repairAttempt : Int
+  * updatedAt : DateTime
+}
+
+RecoverySenderThread }o--|| WhatsAppPoolSender
+RecoverySenderRoute }o--|| Shop
+RecoverySenderRoute }o--|| RecoverySenderThread
+RecoverySenderAssignment }o--|| Conversation
+RecoverySenderAssignment }o--|| RecoverySenderRoute
+RecoveryBasketRoutingTurn }o--|| RecoverySenderThread
+RecoveryBasketRoutingTurn }o--o| RecoveryBasketRoutingTurn
+RecoveryBasketRoutingTurn }o--o| Conversation
 @enduml
