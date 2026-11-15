@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "test:arch076-r15-clause:postgres": "node scripts/test-arch076-r15-clause-postgres.mjs",
     "lint": "eslint . --max-warnings=0",
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "validate": "prisma validate --schema prisma/schema.prisma",
