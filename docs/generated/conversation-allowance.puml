@@ -1,0 +1,58 @@
+@startuml conversation-allowance
+skinparam linetype ortho
+entity "commerce.Shop" as Shop {
++ id [PK] : String
+}
+entity "commerce.CheckoutRecovery" as CheckoutRecovery {
++ id [PK] : String
+# shopId : Shop
+}
+entity "whatsapp.Conversation" as Conversation {
++ id [PK] : String
+# checkoutRecoveryId [unique] : CheckoutRecovery
+}
+entity "billing.UsageReservation" as UsageReservation {
++ id [PK] : String
+# shopId : Shop
+* sourceKey [unique] : String
+* status : UsageReservationStatus
+}
+entity "whatsapp.ConversationMessage" as ConversationMessage {
++ id [PK] : String
+# conversationId : Conversation
+# allowanceBlockId [nullable] : ConversationAllowanceBlock
+}
+entity "ConversationAllowanceBlock" as ConversationAllowanceBlock {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # conversationId : [FK] Conversation
+  * ordinal : Int
+  * fundingKind : String
+  * state : String
+  # predecessorId : [FK] ConversationAllowanceBlock
+  # creditReservationId : [FK] UsageReservation
+  * hardMessageLimit : Int
+  * terminalReservedSlots : Int
+  repairAt : DateTime
+  repairLeaseToken : String
+  repairLeaseUntil : DateTime
+  repairDeadlineAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+CheckoutRecovery }o--|| Shop
+Conversation |o--o| CheckoutRecovery
+ConversationAllowanceBlock }o--|| Shop
+ConversationAllowanceBlock }o--|| Conversation
+ConversationAllowanceBlock |o--o| UsageReservation
+ConversationAllowanceBlock }o--o| ConversationAllowanceBlock : predecessor
+ConversationMessage }o--|| Conversation
+ConversationMessage }o--o| ConversationAllowanceBlock
+note bottom of ConversationAllowanceBlock
+  One ACTIVE and one PENDING per Conversation.
+  Credit and provider outcomes remain in existing records.
+  Funding identity and message membership are immutable.
+  Same-owner evidence FKs are deferred for owner cascades.
+end note
+@enduml
