@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const schema = readFileSync(new URL('../prisma/schema.prisma', import.meta.url), 'utf8');
+const sql = readFileSync(new URL('../prisma/migrations/20261115130322_conversation_allowance_blocks/migration.sql', import.meta.url), 'utf8');
+const model = schema.match(/model ConversationAllowanceBlock \{([\s\S]*?)\n\}/)?.[1];
+assert.ok(model);
+for (const field of ['id','shopId','conversationId','ordinal','fundingKind','state','predecessorId','creditReservationId','hardMessageLimit','terminalReservedSlots','repairAt','repairLeaseToken','repairLeaseUntil','repairDeadlineAt','createdAt','updatedAt']) assert.match(model, new RegExp(`\\b${field}\\s`));
+assert.doesNotMatch(model, /openingMessageId|logicalSourceKey|normalMessageLimit|repairAttempt|Json|sender|routeId/);
+assert.match(schema, /allowanceBlockId String\?/);
+assert.match(sql, /ADD COLUMN\s+"allowanceBlockId" TEXT/);
+assert.equal((sql.match(/CREATE TABLE /g) ?? []).length, 1);
+assert.doesNotMatch(sql, /DROP |RENAME |INSERT INTO |UPDATE "(?:billing|commerce|whatsapp)"\./);
+for (const name of ['Allowance_one_active_per_conversation','Allowance_one_pending_per_conversation','Allowance_pending_repair_due','MESSAGE_ALLOWANCE_PIN_IMMUTABLE','ALLOWANCE_IDENTITY_IMMUTABLE','ALLOWANCE_OWNER_MISMATCH','ALLOWANCE_ORDINAL_NOT_MONOTONIC','ALLOWANCE_RESERVATION_IMMUTABLE','ALLOWANCE_HISTORY_DELETE_FORBIDDEN']) assert.ok(sql.includes(name));
+assert.equal((sql.match(/ALTER CONSTRAINT[^;]+DEFERRABLE INITIALLY DEFERRED/g) ?? []).length, 3);
+assert.match(sql, /"Allowance_pending_repair_due"[\s\S]*WHERE state='PENDING' AND "repairAt" IS NOT NULL/);
+console.log('PASS independent allowance model, nullable old-writer pin, additive migration, ownership/identity/retention and deferred evidence integrity');

@@ -500,6 +500,7 @@ enum ConversationOutcome {
 }
 
 model Conversation {
+  allowanceBlocks ConversationAllowanceBlock[]
   commerceProductContext CommerceConversationProductContext?
   commerceGrant CommerceConversationGrant?
 
@@ -684,6 +685,8 @@ enum MessageTranscriptionStatus {
 }
 
 model ConversationMessage {
+  allowanceBlockId String?
+  allowanceBlock ConversationAllowanceBlock? @relation(fields: [allowanceBlockId, conversationId], references: [id, conversationId], onDelete: NoAction, onUpdate: NoAction)
   id String @id @default(cuid())
 
   conversationId String
@@ -1833,7 +1836,40 @@ model RecoveryCreditPurchase {
   @@schema("billing")
 }
 
+// Funding boundaries within one checkout Conversation. Reservation and delivery
+// records remain authoritative for financial and provider outcomes.
+model ConversationAllowanceBlock {
+  id                      String @id @default(cuid())
+  shopId                  String
+  conversationId          String
+  ordinal                 Int
+  fundingKind             String @db.VarChar(16)
+  state                   String @db.VarChar(16)
+  predecessorId           String?
+  creditReservationId     String? @unique
+  hardMessageLimit        Int
+  terminalReservedSlots   Int
+  repairAt                DateTime? @db.Timestamptz(3)
+  repairLeaseToken        String?
+  repairLeaseUntil        DateTime? @db.Timestamptz(3)
+  repairDeadlineAt        DateTime? @db.Timestamptz(3)
+  createdAt               DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  shop                    Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  conversation            Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  reservation             UsageReservation? @relation(fields: [creditReservationId, shopId], references: [id, shopId], onDelete: NoAction, onUpdate: NoAction)
+  predecessor             ConversationAllowanceBlock? @relation("AllowanceSuccessors", fields: [predecessorId, conversationId], references: [id, conversationId], onDelete: NoAction, onUpdate: NoAction)
+  successors              ConversationAllowanceBlock[] @relation("AllowanceSuccessors")
+  messages                ConversationMessage[]
+
+  @@unique([conversationId, ordinal])
+  @@unique([id, conversationId])
+  @@schema("billing")
+}
+
 model UsageReservation {
+  conversationAllowanceBlocks ConversationAllowanceBlock[]
   id String @id @default(cuid())
 
   shopId    String
@@ -2165,6 +2201,7 @@ enum WhatsAppConsentEvidenceDecision {
 }
 
 model Shop {
+  conversationAllowanceBlocks ConversationAllowanceBlock[]
   commerceProductContexts CommerceConversationProductContext[]
   commerceConversationGrants      CommerceConversationGrant[]
   externalCredentials             CommerceExternalCredential[]
