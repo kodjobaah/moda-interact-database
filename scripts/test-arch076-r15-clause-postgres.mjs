@@ -57,6 +57,14 @@ function checks(db) {
   cases+=slices.length-1;
   const rawAudio={content:{type:'audio',mediaId:'fixture-media'}};
   const sourceHash=sql(db,`SELECT whatsapp.arch076_r15_audio_source_sha256(${q(JSON.stringify(rawAudio))}::jsonb)`);
+  for(const role of ['NEW_QUESTION','CLARIFY','SELECT_ONLY']) {
+    const id=`direct-audio-${role}`;
+    const proof={schemaVersion:1,verified:true,sourceSha256:sourceHash,providerMessageId:id,mediaIdSha256:sha('fixture-media'),mediaSha256:null,transcriptSha256:sha('Friday?'),provider:'fixture-speech',model:'fixture-transcription',durationMs:1000,operationRows:[{id:'speech-operation',version:1}]};
+    const decision={schemaVersion:1,role,currentInboundProviderMessageId:id,originalTurnId:null,originalInboundProviderMessageId:null,associatedMessages:{originalMessageId:`${id}-message`,currentMessageId:`${id}-message`},audioCurrent:proof,audioOriginal:proof};
+    const statement=`INSERT INTO whatsapp."RecoveryBasketRoutingTurn"("inboundProviderMessageId","threadId","occurredAt","expiresAt","routingDecision","inputJson","moderationJson") VALUES (${q(id)},'thread-a',now(),now()+interval '1 hour',${q(JSON.stringify(decision))}::jsonb,${q(JSON.stringify(rawAudio))}::jsonb,${q(JSON.stringify({audioTranscript:{text:'Friday?',provenance:proof}}))}::jsonb)`;
+    if(role==='SELECT_ONLY') reject(db,statement,'R15_AUDIO_ATTESTATION_INVALID');
+    else {sql(db,statement);check(sql(db,`SELECT "parentProviderMessageId" IS NULL FROM whatsapp."RecoveryBasketRoutingTurn" WHERE "inboundProviderMessageId"=${q(id)}`),'t');}
+  }
   let n=0;
   function scenario({text='2. Friday?', stage=false, mutate=()=>{}, full=true, original=true, kind='TEXT', sender='CUSTOMER', subject='CUSTOMER_MESSAGE', fullDecision='ALLOW', audioVerified=true, audioMutate=()=>{}, originalAudio=false, forgeBoth=false, missingTranscript=false, bothMutate=()=>{}, transcriptionState='COMPLETED', actualMediaId='fixture-media', transcriptValue=text}={}) {
     const key=`case${n++}`, root=`${key}-root`, current=`${key}-current`, prompt=stage?`${key}-prompt`:root;

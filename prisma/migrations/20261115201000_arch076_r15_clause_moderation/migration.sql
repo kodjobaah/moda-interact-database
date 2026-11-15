@@ -204,7 +204,13 @@ BEGIN
   FOREACH slot IN ARRAY ARRAY['audioCurrent','audioOriginal'] LOOP
     p:=NEW."routingDecision"->slot;
     IF p IS NULL OR p='null'::jsonb THEN CONTINUE; END IF;
-    IF slot='audioCurrent' OR NEW."routingDecision"->>'originalInboundProviderMessageId'=NEW."inboundProviderMessageId" THEN source_row:=NEW;
+    IF slot='audioCurrent' OR NEW."routingDecision"->>'originalInboundProviderMessageId'=NEW."inboundProviderMessageId" OR
+      (NEW."parentProviderMessageId" IS NULL AND NEW."routingDecision"->>'role' IN ('NEW_QUESTION','CLARIFY') AND
+       NEW."routingDecision"->>'originalTurnId' IS NULL AND NEW."routingDecision"->>'originalInboundProviderMessageId' IS NULL AND
+       NEW."routingDecision"->>'currentInboundProviderMessageId'=NEW."inboundProviderMessageId" AND
+       jsonb_typeof(NEW."routingDecision"#>'{associatedMessages,currentMessageId}')='string' AND
+       COALESCE(NEW."routingDecision"#>>'{associatedMessages,currentMessageId}','')<>'' AND
+       NEW."routingDecision"#>>'{associatedMessages,originalMessageId}'=NEW."routingDecision"#>>'{associatedMessages,currentMessageId}') THEN source_row:=NEW;
     ELSE
       SELECT * INTO source_row FROM whatsapp."RecoveryBasketRoutingTurn"
         WHERE "inboundProviderMessageId"=NEW."parentProviderMessageId" FOR SHARE;
