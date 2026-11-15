@@ -204,7 +204,7 @@ BEGIN
   FOREACH slot IN ARRAY ARRAY['audioCurrent','audioOriginal'] LOOP
     p:=NEW."routingDecision"->slot;
     IF p IS NULL OR p='null'::jsonb THEN CONTINUE; END IF;
-    IF slot='audioCurrent' OR NEW."routingDecision"->>'originalInboundProviderMessageId'=NEW."inboundProviderMessageId" OR
+    IF slot='audioCurrent' OR
       (NEW."parentProviderMessageId" IS NULL AND NEW."routingDecision"->>'role' IN ('NEW_QUESTION','CLARIFY') AND
        NEW."routingDecision"->>'originalTurnId' IS NULL AND NEW."routingDecision"->>'originalInboundProviderMessageId' IS NULL AND
        NEW."routingDecision"->>'currentInboundProviderMessageId'=NEW."inboundProviderMessageId" AND
