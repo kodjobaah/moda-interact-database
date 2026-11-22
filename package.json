@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test:arch076-r15-clause:postgres": "node scripts/test-arch076-r15-clause-postgres.mjs",
+    "test:arch078-unmapped-shopify-usage-event-handles:postgres:fresh": "node scripts/test-arch078-unmapped-shopify-usage-event-handles-postgres.mjs --mode fresh",
+    "test:arch078-unmapped-shopify-usage-event-handles:postgres:upgrade": "node scripts/test-arch078-unmapped-shopify-usage-event-handles-postgres.mjs --mode upgrade",
     "lint": "eslint . --max-warnings=0",
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "validate": "prisma validate --schema prisma/schema.prisma",

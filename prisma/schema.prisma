@@ -1745,8 +1745,9 @@ model Subscription {
   planId String?
   plan   BillingPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
 
-  observedShopifyPlanHandle String?
-  status                    SubscriptionProjectionStatus
+  observedShopifyPlanHandle        String?
+  unmappedShopifyUsageEventHandles String[] @default([])
+  status                           SubscriptionProjectionStatus
 
   billingPeriodId String?
   billingPeriod   BillingPeriod?  @relation("CurrentSubscriptionBillingPeriod", fields: [billingPeriodId], references: [id], onDelete: SetNull)

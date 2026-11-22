@@ -20,6 +20,22 @@ enum "ShopRecoveryPolicyOverrideAuditAction" as ShopRecoveryPolicyOverrideAuditA
   UPSERT
   CLEAR
 }
+enum "WhatsAppRecoveryConsentDecision" as WhatsAppRecoveryConsentDecision {
+  UNKNOWN
+  GRANTED
+  REVOKED
+}
+enum "WhatsAppRecoveryConsentSource" as WhatsAppRecoveryConsentSource {
+  SHOPIFY_NATIVE
+  WOO_MODA_CHECKBOX
+}
+enum "WhatsAppRecoveryNoContactReason" as WhatsAppRecoveryNoContactReason {
+  CUSTOMER_STOP
+  MERCHANT_OPT_OUT
+}
+enum "WhatsAppConsentPurpose" as WhatsAppConsentPurpose {
+  WHATSAPP_CHECKOUT_RECOVERY
+}
 enum "CheckoutRecoveryStatus" as CheckoutRecoveryStatus {
   DETECTED
   MESSAGE_SENT
@@ -35,6 +51,12 @@ enum "RecoveryAdmissionBlockReason" as RecoveryAdmissionBlockReason {
 enum "RecoveryOutreachTrigger" as RecoveryOutreachTrigger {
   INITIAL
   NO_RESPONSE_FOLLOW_UP
+  POST_WINDOW_FOLLOW_UP
+}
+enum "RecoveryOutreachInitiator" as RecoveryOutreachInitiator {
+  HUMAN
+  AGENT
+  AUTOMATION
 }
 enum "RecoveryOutreachStatus" as RecoveryOutreachStatus {
   PENDING
@@ -44,6 +66,10 @@ enum "RecoveryOutreachStatus" as RecoveryOutreachStatus {
   CAPACITY_BLOCKED
   CANCELLED
   FAILED
+}
+enum "ConversationControlMode" as ConversationControlMode {
+  AI
+  HUMAN
 }
 enum "ConversationType" as ConversationType {
   RECOVERY
@@ -64,6 +90,19 @@ enum "ConversationOutcome" as ConversationOutcome {
   NO_RESPONSE
   DECLINED
   EXPIRED
+}
+enum "MerchantConversationSendKind" as MerchantConversationSendKind {
+  HUMAN_TEXT
+  RECOVERY_FOLLOW_UP_TEMPLATE
+}
+enum "MerchantConversationSendState" as MerchantConversationSendState {
+  ACCEPTED
+  CLAIMED
+  DISPATCH_ADMITTED
+  SENT
+  FAILED
+  CANCELLED
+  UNKNOWN
 }
 enum "MessageDirection" as MessageDirection {
   INBOUND
@@ -93,6 +132,45 @@ enum "MessageTranscriptionStatus" as MessageTranscriptionStatus {
   COMPLETED
   REJECTED
   FAILED
+}
+enum "ConversationDeliveryPartRole" as ConversationDeliveryPartRole {
+  HEADER
+  PRODUCT
+  ANSWER
+}
+enum "ConversationDeliveryPartState" as ConversationDeliveryPartState {
+  PREPARED
+  ADMITTED
+  ACKNOWLEDGED
+  DELIVERED
+  READ
+  FAILED
+  UNKNOWN
+  CANCELLED
+}
+enum "ConversationDeliveryStatus" as ConversationDeliveryStatus {
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+enum "ConversationModerationSubject" as ConversationModerationSubject {
+  CUSTOMER_MESSAGE
+  HUMAN_COMMAND
+  AGENT_MESSAGE
+  AUTOMATION_MESSAGE
+}
+enum "ConversationModerationDecision" as ConversationModerationDecision {
+  PENDING
+  CHECKING
+  ALLOW
+  BLOCK
+  REVIEW_REQUIRED
+  RETRYABLE_ERROR
+}
+enum "HumanMessagingRestrictionStatus" as HumanMessagingRestrictionStatus {
+  ACTIVE
+  SUSPENDED
 }
 enum "BillingPlanKind" as BillingPlanKind {
   FREE
@@ -197,6 +275,11 @@ enum "MerchantPricingPlanKind" as MerchantPricingPlanKind {
   FREE
   PAID_METERED
 }
+enum "MerchantPricingPlanPublicationStatus" as MerchantPricingPlanPublicationStatus {
+  TRANSLATING
+  TRANSLATION_FAILED
+  READY
+}
 enum "MerchantPricingAllowancePeriod" as MerchantPricingAllowancePeriod {
   LIFETIME
   EVERY_30_DAYS
@@ -221,6 +304,38 @@ enum "BillingOperationState" as BillingOperationState {
   CONFIRMED
   OUTCOME_UNKNOWN
   FAILED
+}
+enum "MerchantPricingTranslationRunStatus" as MerchantPricingTranslationRunStatus {
+  PENDING
+  PROCESSING
+  READY_TO_APPLY
+  APPLIED
+  FAILED
+  STALE
+}
+enum "MerchantPricingTranslationEntityKind" as MerchantPricingTranslationEntityKind {
+  PLAN
+  HIGHLIGHT
+}
+enum "MerchantPricingTranslationField" as MerchantPricingTranslationField {
+  TITLE
+  DESCRIPTION
+}
+enum "MerchantPricingTranslationItemStatus" as MerchantPricingTranslationItemStatus {
+  PENDING
+  AVAILABLE
+  FAILED
+}
+enum "MerchantPricingTranslationBatchStatus" as MerchantPricingTranslationBatchStatus {
+  READY
+  SUBMITTING
+  SUBMISSION_UNKNOWN
+  SUBMITTED
+  PROVIDER_COMPLETED
+  COMPLETED
+  FAILED
+  EXPIRED
+  CANCELLED
 }
 enum "UsageReservationCompensationReason" as UsageReservationCompensationReason {
   WHATSAPP_RECIPIENT_UNDELIVERABLE
@@ -259,6 +374,20 @@ enum "ShopPlatform" as ShopPlatform {
 enum "WooCommerceInstallationStatus" as WooCommerceInstallationStatus {
   ACTIVE
   REVOKED
+}
+enum "WhatsAppConsentEvidenceDecision" as WhatsAppConsentEvidenceDecision {
+  GRANT
+  REVOKE
+}
+enum "WooCommerceRestReadGrantStatus" as WooCommerceRestReadGrantStatus {
+  ACTIVE
+  INVALID
+  REVOKED
+}
+enum "WooCommerceRestReadAttemptStatus" as WooCommerceRestReadAttemptStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
 }
 enum "CommerceExternalConnectionScope" as CommerceExternalConnectionScope {
   PLATFORM
@@ -348,6 +477,7 @@ enum "BackgroundRuntimeLeaseName" as BackgroundRuntimeLeaseName {
   MERCHANT_KNOWLEDGE_PENDING_RECONCILIATION
   MERCHANT_KNOWLEDGE_UPLOAD_CLEANUP
   MERCHANT_KNOWLEDGE_ENTITLEMENT_RECONCILIATION
+  WOO_COUPON_SYNC_DISPATCH
 }
 enum "MerchantKnowledgeInputKind" as MerchantKnowledgeInputKind {
   REMOTE_URL
@@ -377,6 +507,15 @@ enum "MerchantKnowledgeUploadedAssetStatus" as MerchantKnowledgeUploadedAssetSta
 enum "CommerceToolRevisionStatus" as CommerceToolRevisionStatus {
   DRAFT
   PUBLISHED
+}
+enum "CommerceModelPolicyContext" as CommerceModelPolicyContext {
+  LIVE
+  PREVIEW
+}
+enum "CommerceModelPolicyScope" as CommerceModelPolicyScope {
+  PLATFORM
+  PRICE_PLAN
+  SHOP
 }
 enum "CommerceModelAvailabilityScope" as CommerceModelAvailabilityScope {
   PLATFORM
@@ -494,6 +633,11 @@ enum "CommerceAuditAction" as CommerceAuditAction {
   UPDATE_MERCHANT_STUDIO_ACCESS
   DISABLE_MERCHANT_STUDIO_ACCESS
   BIND_MERCHANT_STUDIO_IDENTITY
+  SET_LIVE_PLATFORM_BUDGET
+  SET_LIVE_PLAN_BUDGET_OVERRIDE
+  SET_LIVE_SHOP_BUDGET_OVERRIDE
+  SET_PREVIEW_PLATFORM_BUDGET
+  SET_PREVIEW_SHOP_BUDGET_OVERRIDE
   CREATE_MODEL_AVAILABILITY
   UPDATE_MODEL_AVAILABILITY
   ENABLE_MODEL_AVAILABILITY
@@ -513,6 +657,22 @@ enum "CommerceAuditAction" as CommerceAuditAction {
   ENABLE_TRANSLATION_MODEL_CONFIGURATION
   DISABLE_TRANSLATION_MODEL_CONFIGURATION
   REQUEST_PROMPT_TEMPLATE_CATEGORY_TRANSLATION
+  CREATE_WHATSAPP_TEMPLATE_VARIANT
+  UPDATE_WHATSAPP_TEMPLATE_VARIANT
+  ENABLE_WHATSAPP_TEMPLATE_VARIANT
+  DISABLE_WHATSAPP_TEMPLATE_VARIANT
+  BULK_ASSIGN_WHATSAPP_TEMPLATE_VARIANT
+  BULK_UPDATE_WHATSAPP_TEMPLATE_VARIANT
+  CREATE_WHATSAPP_TEMPLATE_DEFINITION
+  CLONE_WHATSAPP_TEMPLATE_DEFINITION
+  REQUEST_WHATSAPP_TEMPLATE_TRANSLATION
+  REVIEW_WHATSAPP_TEMPLATE_LOCALE
+  REQUEST_WHATSAPP_TEMPLATE_META_SUBMISSION
+  PUBLISH_WHATSAPP_TEMPLATE_DEFINITION
+  ASSIGN_WHATSAPP_TEMPLATE_DEFINITION
+  RETIRE_WHATSAPP_TEMPLATE_DEFINITION
+  ACTIVATE_WHATSAPP_CONVERSATION_WRAPPER
+  DEACTIVATE_WHATSAPP_CONVERSATION_WRAPPER
 }
 entity "Session" as Session {
 + id [PK] : String
@@ -542,10 +702,12 @@ entity "ShopSettings" as ShopSettings {
   * onboardingCompleted : Boolean
   plan : String
   * recoveryDelayMinutes : Int
+  * aiResponseDelayMinutes : Int
   * recoveryOfferMode : RecoveryOfferMode
   # fixedShopifyDiscountId : [FK] ShopifyDiscount
   * followUpEnabled : Boolean
   followUpDelayMinutes : Int
+  * notifyOnInitialRecoveryOutreach : Boolean
   defaultLanguageTag : String
   defaultTimeZone : String
   defaultCountryCode : String
@@ -634,6 +796,7 @@ entity "ShopBrand" as ShopBrand {
   squareLogoUrl : String
   squareLogoAltText : String
   coverImageUrl : String
+  * whatsAppMedia : Json
   * fetchedAt : DateTime
   * lastRefreshedAt : DateTime
 }
@@ -656,6 +819,20 @@ entity "CustomerPhone" as CustomerPhone {
 --
   # customerId : [FK] Customer
   * phone : String
+  whatsappCanonicalPhone : String
+  whatsappPhoneVerifiedAt : DateTime
+  * whatsappConsentPurpose : WhatsAppConsentPurpose
+  * whatsappConsentDecision : WhatsAppRecoveryConsentDecision
+  whatsappConsentSource : WhatsAppRecoveryConsentSource
+  whatsappConsentProviderObservedAt : DateTime
+  whatsappConsentVerifiedAt : DateTime
+  * whatsappConsentRevision : BigInt
+  * whatsappConsentDecisionSequence : BigInt
+  * whatsappNoContact : Boolean
+  whatsappNoContactReason : WhatsAppRecoveryNoContactReason
+  whatsappNoContactAt : DateTime
+  * whatsappNoContactRevision : BigInt
+  whatsappNoContactClearedAt : DateTime
   * startedAt : DateTime
   endedAt : DateTime
   * createdAt : DateTime
@@ -687,6 +864,7 @@ entity "CheckoutRecovery" as CheckoutRecovery {
   totalPrice : Decimal
   checkoutUrl : String
   lineItems : Json
+  wooRestoreSnapshot : Json
   * detectedAt : DateTime
   * lastExternalActivityAt : DateTime
   messageSentAt : DateTime
@@ -707,6 +885,9 @@ entity "RecoveryOutreachAttempt" as RecoveryOutreachAttempt {
   * sequence : Int
   * trigger : RecoveryOutreachTrigger
   * status : RecoveryOutreachStatus
+  initiatedBy : RecoveryOutreachInitiator
+  initiationKey : String
+  claimedAt : DateTime
   * configuredOfferMode : RecoveryOfferMode
   # fixedShopifyDiscountId : [FK] ShopifyDiscount
   offerSnapshot : Json
@@ -720,6 +901,75 @@ entity "RecoveryOutreachAttempt" as RecoveryOutreachAttempt {
   * updatedAt : DateTime
 }
 
+entity "WhatsAppPoolSender" as WhatsAppPoolSender {
++ providerPhoneNumberId [PK] : String
+--
+  * providerAccountId : String
+  * priority : Int
+  * allocationEnabled : Boolean
+  * verifiedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "RecoverySenderThread" as RecoverySenderThread {
++ id [PK] : String
+--
+  * canonicalRecipient : String
+  # providerPhoneNumberId : [FK] WhatsAppPoolSender
+  * openedAt : DateTime
+  closedAt : DateTime
+}
+
+entity "RecoverySenderRoute" as RecoverySenderRoute {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # threadId : [FK] RecoverySenderThread
+  # canonicalRecipient : [FK] RecoverySenderThread
+  # providerPhoneNumberId : [FK] RecoverySenderThread
+  * openedAt : DateTime
+  closedAt : DateTime
+}
+
+entity "RecoverySenderAssignment" as RecoverySenderAssignment {
++ conversationId [PK] : String
+--
+  # routeId : [FK] RecoverySenderRoute
+  * assignedAt : DateTime
+  releasedAt : DateTime
+}
+
+entity "RecoveryBasketRoutingTurn" as RecoveryBasketRoutingTurn {
++ inboundProviderMessageId [PK] : String
+--
+  # threadId : [FK] RecoverySenderThread
+  routeId : String
+  promptScopeRouteId : String
+  * occurredAt : DateTime
+  * createdAt : DateTime
+  inputJson : Json
+  candidatesJson : Json
+  moderationJson : Json
+  configurationSnapshot : Json
+  routingDecision : Json
+  # parentProviderMessageId : [FK] RecoveryBasketRoutingTurn
+  * state : String
+  # resolutionInboundProviderMessageId : [FK] RecoveryBasketRoutingTurn
+  # selectedConversationId : [FK] Conversation
+  promptText : String
+  promptAdmittedAt : DateTime
+  promptSentAt : DateTime
+  promptProviderMessageId : String
+  * expiresAt : DateTime
+  resolvedAt : DateTime
+  workToken : String
+  workLeaseUntil : DateTime
+  nextRepairAt : DateTime
+  * repairAttempt : Int
+  * updatedAt : DateTime
+}
+
 entity "Conversation" as Conversation {
 + id [PK] : String
 --
@@ -729,6 +979,9 @@ entity "Conversation" as Conversation {
   standaloneScopeKey : String
   * type : ConversationType
   * outcome : ConversationOutcome
+  * controlMode : ConversationControlMode
+  * controlRevision : Int
+  controlChangedAt : DateTime
   languageTag : String
   languageSource : LanguageSource
   countryCode : String
@@ -737,6 +990,9 @@ entity "Conversation" as Conversation {
   * inboundVersion : Int
   * lastProcessedVersion : Int
   pendingTurnStartedAt : DateTime
+  pendingAiNotBeforeAt : DateTime
+  pendingAiControlRevision : Int
+  pendingAiDelayMinutes : Int
   processingInboundVersion : Int
   processingStartedAt : DateTime
   summary : String
@@ -746,12 +1002,64 @@ entity "Conversation" as Conversation {
   * updatedAt : DateTime
 }
 
+entity "ConversationControlEvent" as ConversationControlEvent {
++ id [PK] : String
+--
+  # conversationId : [FK] Conversation
+  * fromMode : ConversationControlMode
+  * toMode : ConversationControlMode
+  * fromRevision : Int
+  * toRevision : Int
+  * occurredAt : DateTime
+}
+
+entity "MerchantConversationSendCommand" as MerchantConversationSendCommand {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # conversationId : [FK] Conversation
+  * idempotencyKey : String
+  followUpClaimKey : String
+  * payloadSha256 : String
+  * expectedControlRevision : Int
+  * kind : MerchantConversationSendKind
+  * recipientSnapshot : String
+  textBody : String
+  preparedTextBody : String
+  preparedWrapperEvidence : Json
+  preparedAt : DateTime
+  templateName : String
+  templateLanguageCode : String
+  templateParameters : Json
+  # recoveryOutreachAttemptId : [FK] RecoveryOutreachAttempt
+  # outboundMessageId : [FK] ConversationMessage
+  * state : MerchantConversationSendState
+  providerDispatchKey : String
+  providerDispatchAdmittedAt : DateTime
+  providerDispatchControlRevision : Int
+  providerDispatchRestrictionRevision : Int
+  * dispatchAttemptCount : Int
+  nextAttemptAt : DateTime
+  leaseToken : String
+  leaseExpiresAt : DateTime
+  * acceptedAt : DateTime
+  completedAt : DateTime
+  failureCode : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 entity "ConversationMessage" as ConversationMessage {
 + id [PK] : String
 --
   # allowanceBlockId : [FK] ConversationAllowanceBlock
-  # conversationId : [FK] Conversation
+  # conversationId : [FK] ConversationAllowanceBlock
   providerMessageId : String
+  providerDispatchKey : String
+  providerDispatchAdmittedAt : DateTime
+  providerDispatchControlRevision : Int
+  dispatchProviderAccountId : String
+  dispatchProviderPhoneNumberId : String
   inReplyToProviderId : String
   * direction : MessageDirection
   * senderType : MessageSenderType
@@ -767,15 +1075,84 @@ entity "ConversationMessage" as ConversationMessage {
   transcriptionModel : String
   transcriptionFailureCode : String
   transcriptionCompletedAt : DateTime
+  outboundPresentation : Json
   * createdAt : DateTime
   sentAt : DateTime
   deliveredAt : DateTime
   readAt : DateTime
   providerFailureCode : String
   failedAt : DateTime
-  outboundPresentation : Json
-  dispatchProviderAccountId : String?
-  dispatchProviderPhoneNumberId : String?
+}
+
+entity "ConversationDeliveryPart" as ConversationDeliveryPart {
++ id [PK] : String
+--
+  # messageId : [FK] ConversationMessage
+  * ordinal : Int
+  * role : ConversationDeliveryPartRole
+  * payload : Json
+  * payloadDigest : String
+  * sourceIdentity : Json
+  * deadlineAt : DateTime
+  * state : ConversationDeliveryPartState
+  * providerAccountId : String
+  * providerPhoneNumberId : String
+  providerDispatchKey : String
+  providerDispatchAdmittedAt : DateTime
+  providerMessageId : String
+  acknowledgedAt : DateTime
+  deliveredAt : DateTime
+  readAt : DateTime
+  failedAt : DateTime
+  unknownAt : DateTime
+  cancelledAt : DateTime
+  failureCode : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "ConversationDeliveryStatusReceipt" as ConversationDeliveryStatusReceipt {
++ id [PK] : String
+--
+  * providerAccountId : String
+  * providerPhoneNumberId : String
+  * providerMessageId : String
+  * status : ConversationDeliveryStatus
+  * providerTimestamp : DateTime
+  * receivedAt : DateTime
+  failureCode : String
+  # partId : [FK] ConversationDeliveryPart
+}
+
+entity "ConversationModerationAssessment" as ConversationModerationAssessment {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # conversationId : [FK] Conversation
+  * subject : ConversationModerationSubject
+  # conversationMessageId : [FK] ConversationMessage
+  # merchantSendCommandId : [FK] MerchantConversationSendCommand
+  * contentSha256 : String
+  * inputKind : String
+  * requestedModel : String
+  returnedModel : String
+  * policyVersion : String
+  * decision : ConversationModerationDecision
+  flagged : Boolean
+  categories : Json
+  categoryScores : Json
+  reasonCode : String
+  providerRequestId : String
+  * attemptCount : Int
+  nextAttemptAt : DateTime
+  leaseToken : String
+  leaseExpiresAt : DateTime
+  assessedAt : DateTime
+  reviewedAt : DateTime
+  # reviewedByPlatformAdminId : [FK] PlatformAdmin
+  reviewDisposition : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
 }
 
 entity "WhatsAppRecipientReachability" as WhatsAppRecipientReachability {
@@ -790,6 +1167,31 @@ entity "WhatsAppRecipientReachability" as WhatsAppRecipientReachability {
   * version : Int
   * createdAt : DateTime
   * updatedAt : DateTime
+}
+
+entity "ShopHumanMessagingRestriction" as ShopHumanMessagingRestriction {
++ shopId [PK] : String
+--
+  * status : HumanMessagingRestrictionStatus
+  * revision : Int
+  * reasonCode : String
+  reasonNote : String
+  suspendedAt : DateTime
+  restoredAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "ShopHumanMessagingRestrictionEvent" as ShopHumanMessagingRestrictionEvent {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  * fromStatus : HumanMessagingRestrictionStatus
+  * toStatus : HumanMessagingRestrictionStatus
+  * revision : Int
+  * reasonCode : String
+  reasonNote : String
+  # platformAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
 }
 
 entity "Feature" as Feature {
@@ -812,6 +1214,8 @@ entity "MerchantPricingPlan" as MerchantPricingPlan {
   * displayName : String
   * planKind : MerchantPricingPlanKind
   * isActive : Boolean
+  * publicationStatus : MerchantPricingPlanPublicationStatus
+  # currentTranslationRunId : [FK] MerchantPricingTranslationRun
   * cataloguePosition : Int
   * featured : Boolean
   * includedRecoveryCredits : Int
@@ -861,6 +1265,86 @@ entity "MerchantPricingPlanHighlightTranslation" as MerchantPricingPlanHighlight
   * merchantDescription : String
   * createdAt : DateTime
   * updatedAt : DateTime
+}
+
+entity "MerchantPricingTranslationRun" as MerchantPricingTranslationRun {
++ id [PK] : String
+--
+  * shopifyPlanHandle : String
+  * environment : CommerceEnvironment
+  # translationModelConfigurationId : [FK] CommerceTranslationModelConfiguration
+  * provider : String
+  * providerModelId : String
+  * modelConfigurationVersion : Int
+  * sourceSchemaVersion : Int
+  * sourceHash : String
+  * sourceSnapshot : Json
+  * status : MerchantPricingTranslationRunStatus
+  # requestedByAdminId : [FK] PlatformAdmin
+  * requestedAt : DateTime
+  startedAt : DateTime
+  readyToApplyAt : DateTime
+  appliedAt : DateTime
+  completedAt : DateTime
+  appliedMerchantPricingPlanId : String
+  failureCode : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantPricingTranslationItem" as MerchantPricingTranslationItem {
++ id [PK] : String
+--
+  # runId : [FK] MerchantPricingTranslationRun
+  * sourceEntityKind : MerchantPricingTranslationEntityKind
+  sourceContentKey : String
+  * sourceField : MerchantPricingTranslationField
+  * sourceLanguageTag : String
+  * targetLanguageTag : String
+  * sourceText : String
+  translatedText : String
+  * status : MerchantPricingTranslationItemStatus
+  failureCode : String
+  * retryCount : Int
+  nextAttemptAt : DateTime
+  # currentBatchId : [FK] MerchantPricingTranslationBatch
+  completedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantPricingTranslationBatch" as MerchantPricingTranslationBatch {
++ id [PK] : String
+--
+  # runId : [FK] MerchantPricingTranslationRun
+  * provider : String
+  * model : String
+  * status : MerchantPricingTranslationBatchStatus
+  providerBatchId : String
+  inputFileId : String
+  outputFileId : String
+  errorFileId : String
+  submissionStartedAt : DateTime
+  lastSubmitAttemptAt : DateTime
+  * submitAttemptCount : Int
+  nextSubmitAt : DateTime
+  submittedAt : DateTime
+  lastPolledAt : DateTime
+  nextPollAt : DateTime
+  * pollSequence : Int
+  completedAt : DateTime
+  failureCode : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "MerchantPricingTranslationBatchItem" as MerchantPricingTranslationBatchItem {
++ id [PK] : String
+--
+  # batchId : [FK] MerchantPricingTranslationBatch
+  # translationItemId : [FK] MerchantPricingTranslationItem
+  * providerCustomId : String
+  * createdAt : DateTime
 }
 
 entity "MerchantPricingUsageEvent" as MerchantPricingUsageEvent {
@@ -987,6 +1471,7 @@ entity "Subscription" as Subscription {
   # shopId : [FK] Shop
   # planId : [FK] BillingPlan
   observedShopifyPlanHandle : String
+  * unmappedShopifyUsageEventHandles : String
   * status : SubscriptionProjectionStatus
   # billingPeriodId : [FK] BillingPeriod
   currentPeriodStart : DateTime
@@ -1097,6 +1582,26 @@ entity "RecoveryCreditPurchase" as RecoveryCreditPurchase {
   * updatedAt : DateTime
 }
 
+entity "ConversationAllowanceBlock" as ConversationAllowanceBlock {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # conversationId : [FK] Conversation
+  * ordinal : Int
+  * fundingKind : String
+  * state : String
+  # predecessorId : [FK] ConversationAllowanceBlock
+  # creditReservationId : [FK] UsageReservation
+  * hardMessageLimit : Int
+  * terminalReservedSlots : Int
+  repairAt : DateTime
+  repairLeaseToken : String
+  repairLeaseUntil : DateTime
+  repairDeadlineAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 entity "UsageReservation" as UsageReservation {
 + id [PK] : String
 --
@@ -1132,6 +1637,7 @@ entity "PlatformBillingPolicy" as PlatformBillingPolicy {
   * defaultOutboundHardLimit : Int
   * terminalMessageReservedSlots : Int
   * whatsappRecipientSuppressionDays : Int
+  mcpExecutionPolicy : Json
   * version : Int
   * createdAt : DateTime
   * updatedAt : DateTime
@@ -1288,6 +1794,68 @@ entity "WooCommerceInstallation" as WooCommerceInstallation {
   * updatedAt : DateTime
 }
 
+entity "WhatsAppConsentEvidence" as WhatsAppConsentEvidence {
++ id [PK] : String
+--
+  # shopId : [FK] Shop
+  # installationId : [FK] WooCommerceInstallation
+  * eventId : String
+  * payloadDigest : Bytes
+  # customerId : [FK] Customer
+  # customerPhoneId : [FK] CustomerPhone
+  * canonicalPhone : String
+  * purpose : WhatsAppConsentPurpose
+  * decision : WhatsAppConsentEvidenceDecision
+  * decisionSequence : BigInt
+  * phoneConsentRevision : BigInt
+  * decisionAt : DateTime
+  disclosureText : String
+  disclosureVersion : String
+  disclosureLocale : String
+  * recordedAt : DateTime
+}
+
+entity "WooCommerceRestReadAttempt" as WooCommerceRestReadAttempt {
++ id [PK] : String
+--
+  # installationId : [FK] WooCommerceInstallation
+  # shopId : [FK] WooCommerceInstallation
+  * tokenDigest : Bytes
+  * attemptSequence : BigInt
+  * credentialVersionSnapshot : Int
+  * status : WooCommerceRestReadAttemptStatus
+  * expiresAt : DateTime
+  consumedAt : DateTime
+  consumptionTransactionId : BigInt
+  failureCode : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "WooCommerceRestReadGrant" as WooCommerceRestReadGrant {
++ id [PK] : String
+--
+  # installationId : [FK] WooCommerceInstallation
+  # shopId : [FK] WooCommerceInstallation
+  # authorizationAttemptId : [FK] WooCommerceRestReadAttempt
+  * authorizationAttemptSequence : BigInt
+  * credentialVersionSnapshot : Int
+  * rotationVersion : Int
+  * status : WooCommerceRestReadGrantStatus
+  * credentialCiphertext : Bytes
+  * credentialNonce : Bytes
+  * credentialAuthTag : Bytes
+  * encryptionKeyId : String
+  * providerKeyId : String
+  * authorizedScope : String
+  * verifiedAt : DateTime
+  * grantedAt : DateTime
+  revokedAt : DateTime
+  invalidatedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 entity "WooCommerceBillingWebhookReceipt" as WooCommerceBillingWebhookReceipt {
 + id [PK] : String
 --
@@ -1367,9 +1935,227 @@ entity "WhatsAppTemplateVariant" as WhatsAppTemplateVariant {
   * providerLanguageCode : String
   * providerTemplateName : String
   providerTemplateId : String
+  # metaRegistrationId : [FK] WhatsAppTemplateMetaRegistration
   * status : WhatsAppTemplateStatus
   * enabled : Boolean
   * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "WhatsAppTemplateDefinition" as WhatsAppTemplateDefinition {
++ id [PK] : String
+--
+  * kind : String
+  purpose : String
+  offerType : String
+  audience : String
+  providerTemplateName : String
+  category : String
+  * sourceLanguageTag : String
+  * astSchemaVersion : Int
+  * sourceHash : String
+  * status : String
+  publishedAt : DateTime
+  retiredAt : DateTime
+  # createdByAdminId : [FK] PlatformAdmin
+  # clonedFromDefinitionId : [FK] WhatsAppTemplateDefinition
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "WhatsAppTemplateLocale" as WhatsAppTemplateLocale {
++ id [PK] : String
+--
+  # definitionId : [FK] WhatsAppTemplateDefinition
+  * languageTag : String
+  providerLanguageCode : String
+  localeAst : Json
+  contentHash : String
+  * status : String
+  # reviewedByAdminId : [FK] PlatformAdmin
+  reviewedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "WhatsAppTemplateTranslationRun" as WhatsAppTemplateTranslationRun {
++ id [PK] : String
+--
+  # definitionId : [FK] WhatsAppTemplateDefinition
+  # translationModelConfigurationId : [FK] CommerceTranslationModelConfiguration
+  * provider : String
+  * providerModelId : String
+  * modelConfigurationVersion : Int
+  * sourceSchemaVersion : Int
+  * sourceHash : String
+  * sourceSnapshot : Json
+  * status : String
+  # requestedByAdminId : [FK] PlatformAdmin
+  * requestedAt : DateTime
+  startedAt : DateTime
+  completedAt : DateTime
+  failureCode : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "WhatsAppTemplateTranslationItem" as WhatsAppTemplateTranslationItem {
++ id [PK] : String
+--
+  # runId : [FK] WhatsAppTemplateTranslationRun
+  * targetLanguageTag : String
+  translatedAst : Json
+  outputContentHash : String
+  # resultLocaleId : [FK] WhatsAppTemplateLocale
+  * status : String
+  failureCode : String
+  * retryCount : Int
+  nextAttemptAt : DateTime
+  # currentBatchId : [FK] WhatsAppTemplateTranslationBatch
+  completedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "WhatsAppTemplateTranslationBatch" as WhatsAppTemplateTranslationBatch {
++ id [PK] : String
+--
+  # runId : [FK] WhatsAppTemplateTranslationRun
+  * provider : String
+  * model : String
+  * status : String
+  providerBatchId : String
+  inputFileId : String
+  outputFileId : String
+  errorFileId : String
+  submissionStartedAt : DateTime
+  lastSubmitAttemptAt : DateTime
+  * submitAttemptCount : Int
+  nextSubmitAt : DateTime
+  submittedAt : DateTime
+  lastPolledAt : DateTime
+  nextPollAt : DateTime
+  * pollSequence : Int
+  completedAt : DateTime
+  failureCode : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "WhatsAppTemplateTranslationBatchItem" as WhatsAppTemplateTranslationBatchItem {
++ id [PK] : String
+--
+  # batchId : [FK] WhatsAppTemplateTranslationBatch
+  # translationItemId : [FK] WhatsAppTemplateTranslationItem
+  * providerCustomId : String
+  * createdAt : DateTime
+}
+
+entity "MetaTemplateAppOperationState\nApp quota is shared across WABAs and tenants; Background owns fenced timing policy." as MetaTemplateAppOperationState {
+--
+  * environment : CommerceEnvironment
+  * appId : String
+  cooldownUntil : DateTime
+  * consecutiveThrottleCount : Int
+  lastThrottleAt : DateTime
+  leaseOwnerToken : String
+  * leaseGeneration : BigInt
+  leaseAcquiredAt : DateTime
+  leaseUntil : DateTime
+  * updatedAt : DateTime
+}
+
+entity "WhatsAppTemplateMetaRegistration" as WhatsAppTemplateMetaRegistration {
++ id [PK] : String
+--
+  # localeId : [FK] WhatsAppTemplateLocale
+  * wabaId : String
+  * providerTemplateName : String
+  * providerLanguageCode : String
+  * category : String
+  * componentsSnapshot : Json
+  * parameterBindingsSnapshot : Json
+  * submittedContentHash : String
+  providerTemplateId : String
+  * submissionState : String
+  providerStatus : String
+  failureCode : String
+  lastSubmittedAt : DateTime
+  nextRetryAt : DateTime
+  lastReconciledAt : DateTime
+  lastObservedContentHash : String
+  lastObservedCategory : String
+  driftDetectedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "WhatsAppTemplateMetaEvent" as WhatsAppTemplateMetaEvent {
++ id [PK] : String
+--
+  * eventIdentity : String
+  # registrationId : [FK] WhatsAppTemplateMetaRegistration
+  * source : String
+  * eventType : String
+  outcome : String
+  attemptNumber : Int
+  * wabaId : String
+  providerTemplateId : String
+  providerTemplateName : String
+  providerLanguageCode : String
+  requestDigest : String
+  providerRequestId : String
+  httpStatus : Int
+  providerStatus : String
+  failureCode : String
+  reasonCode : String
+  evidence : Json
+  * receivedAt : DateTime
+  processedAt : DateTime
+}
+
+entity "WhatsAppTemplatePublicationOperation" as WhatsAppTemplatePublicationOperation {
++ id [PK] : String
+--
+  # definitionId : [FK] WhatsAppTemplateDefinition
+  # requestedByAdminId : [FK] PlatformAdmin
+  * operationKey : String
+  * scopeSnapshot : Json
+  * status : String
+  totalTargets : Int
+  * succeededTargets : Int
+  * failedTargets : Int
+  nextPageCursor : String
+  failureCode : String
+  * requestedAt : DateTime
+  completedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "WhatsAppTemplatePublicationTarget" as WhatsAppTemplatePublicationTarget {
++ id [PK] : String
+--
+  # operationId : [FK] WhatsAppTemplatePublicationOperation
+  # shopId : [FK] Shop
+  * languageTag : String
+  # metaRegistrationId : [FK] WhatsAppTemplateMetaRegistration
+  # previousVariantId : [FK] WhatsAppTemplateVariant
+  # newVariantId : [FK] WhatsAppTemplateVariant
+  * status : String
+  failureCode : String
+  * retryCount : Int
+  processedAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "WhatsAppConversationWrapperActiveSlot" as WhatsAppConversationWrapperActiveSlot {
++ audience [PK] : String
+--
+  # definitionId : [FK] WhatsAppTemplateDefinition
+  * editVersion : Int
+  # updatedByAdminId : [FK] PlatformAdmin
   * updatedAt : DateTime
 }
 
@@ -1396,6 +2182,32 @@ entity "RagSearchResults" as RagSearchResults {
   * astraDoc : String
 }
 
+entity "PlatformConfiguration" as PlatformConfiguration {
++ id [PK] : String
+--
+  * environment : String
+  * key : String
+  * value : Json
+  * version : Int
+  updatedBy : String
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
+entity "PlatformConfigurationAudit" as PlatformConfigurationAudit {
++ id [PK] : String
+--
+  * environment : String
+  * key : String
+  * expectedVersion : Int
+  * resultingVersion : Int
+  beforeValue : Json
+  * afterValue : Json
+  * actorId : String
+  reason : String
+  * createdAt : DateTime
+}
+
 entity "PlatformAdmin" as PlatformAdmin {
 + id [PK] : String
 --
@@ -1408,6 +2220,42 @@ entity "PlatformAdmin" as PlatformAdmin {
   lastLoginAt : DateTime
   * createdAt : DateTime
   * updatedAt : DateTime
+}
+
+entity "OperationalIncident" as OperationalIncident {
++ id [PK] : String
+--
+  * incidentKey : String
+  * sourceService : String
+  * environment : String
+  * category : String
+  * reasonCode : String
+  * resourceKey : String
+  # shopId : [FK] Shop
+  * severity : String
+  * status : String
+  * occurrenceCount : Int
+  * firstOccurredAt : DateTime
+  * lastOccurredAt : DateTime
+  * lastCorrelationId : String
+  lastErrorMessage : String
+  # ownerPlatformAdminId : [FK] PlatformAdmin
+  assignedAt : DateTime
+  resolvedAt : DateTime
+  # resolvedByPlatformAdminId : [FK] PlatformAdmin
+  resolutionNote : String
+  * revision : Int
+}
+
+entity "OperationalIncidentEvent" as OperationalIncidentEvent {
++ id [PK] : String
+--
+  # incidentId : [FK] OperationalIncident
+  * eventType : String
+  # actorPlatformAdminId : [FK] PlatformAdmin
+  correlationId : String
+  errorMessage : String
+  * occurredAt : DateTime
 }
 
 entity "MerchantSupportThread" as MerchantSupportThread {
@@ -1439,6 +2287,7 @@ entity "MerchantSupportMessage" as MerchantSupportMessage {
   systemCode : String
   systemVersion : String
   sourceKey : String
+  # checkoutRecoveryId : [FK] CheckoutRecovery
   availableAt : DateTime
   readAt : DateTime
   respondsThroughMerchantVersion : Int
@@ -1686,6 +2535,21 @@ entity "CommerceReleaseFeature" as CommerceReleaseFeature {
   * createdAt : DateTime
 }
 
+entity "CommercePurposeCapability" as CommercePurposeCapability {
+--
+  # purposeFeatureId : [FK] Feature
+  # capabilityId : [FK] CommerceCapability
+  * position : Int
+}
+
+entity "CommerceReleasePurposeCapability" as CommerceReleasePurposeCapability {
+--
+  # releaseId : [FK] CommerceReleaseFeature
+  # purposeFeatureId : [FK] CommerceReleaseFeature
+  # capabilityId : [FK] CommerceReleaseCapability
+  * position : Int
+}
+
 entity "CommerceReleasePointer" as CommerceReleasePointer {
 + environment [PK] : CommerceEnvironment
 --
@@ -1710,6 +2574,7 @@ entity "CommerceAuditEvent" as CommerceAuditEvent {
   # toolRevisionId : [FK] CommerceToolRevision
   # shopId : [FK] Shop
   # modelCatalogueEntryId : [FK] CommerceModelCatalogueEntry
+  modelPolicyId : String
   # modelAvailabilityId : [FK] CommerceModelAvailability
   # translationModelConfigurationId : [FK] CommerceTranslationModelConfiguration
   # promptTemplateCategoryId : [FK] CommercePromptTemplateCategory
@@ -1816,6 +2681,23 @@ entity "CommerceModelCatalogueEntry" as CommerceModelCatalogueEntry {
   * updatedAt : DateTime
 }
 
+entity "CommerceModelPolicy" as CommerceModelPolicy {
++ id [PK] : String
+--
+  * environment : CommerceEnvironment
+  * context : CommerceModelPolicyContext
+  * scope : CommerceModelPolicyScope
+  # merchantPricingPlanId : [FK] MerchantPricingPlan
+  # shopId : [FK] Shop
+  * budget : Json
+  * budgetSchemaVersion : Int
+  * editVersion : Int
+  # createdByAdminId : [FK] PlatformAdmin
+  # updatedByAdminId : [FK] PlatformAdmin
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 entity "CommerceModelAvailability" as CommerceModelAvailability {
 + id [PK] : String
 --
@@ -1885,6 +2767,7 @@ entity "CommerceTranslationModelConfiguration" as CommerceTranslationModelConfig
   * providerModelId : String
   * displayName : String
   * enabled : Boolean
+  * automaticDefault : Boolean
   * editVersion : Int
   # createdByAdminId : [FK] PlatformAdmin
   # updatedByAdminId : [FK] PlatformAdmin
@@ -2121,6 +3004,7 @@ entity "MerchantKnowledgeUploadedAsset" as MerchantKnowledgeUploadedAsset {
 --
   # shopId : [FK] Shop
   # dataFormatId : [FK] MerchantKnowledgeDataFormat
+  intentPurposeKey : String
   * status : MerchantKnowledgeUploadedAssetStatus
   * objectKey : String
   * originalFileName : String
@@ -2188,6 +3072,53 @@ entity "MerchantKnowledgeChunk" as MerchantKnowledgeChunk {
   * createdAt : DateTime
 }
 
+entity "ReferenceTaxonomyGeneration" as ReferenceTaxonomyGeneration {
++ id [PK] : String
+--
+  * environment : CommerceEnvironment
+  * source : String
+  * taxonomyVersion : String
+  * languageTag : String
+  * sourceUrl : String
+  * sourceSha256 : String
+  * embeddingProvider : String
+  * embeddingModel : String
+  * embeddingDimensions : Int
+  * embeddingIndexVersion : String
+  * embeddingTextVersion : String
+  * importFingerprint : String
+  * categoryCount : Int
+  * isActive : Boolean
+  * completedAt : DateTime
+  * createdAt : DateTime
+  activatedAt : DateTime
+}
+
+entity "ReferenceTaxonomyCategory" as ReferenceTaxonomyCategory {
+--
+  # generationId : [FK] ReferenceTaxonomyGeneration
+  * categoryId : String
+  * name : String
+  * fullName : String
+  # parentId : [FK] ReferenceTaxonomyCategory
+  * level : Int
+  * ancestorIds : String
+  # embeddingDimensions : [FK] ReferenceTaxonomyGeneration
+}
+
+entity "CommerceConversationProductContext" as CommerceConversationProductContext {
++ conversationId [PK] : String
+--
+  # shopId : [FK] Shop
+  * schemaVersion : Int
+  * revision : Int
+  * sourceInboundVersion : Int
+  * references : Json
+  * expiresAt : DateTime
+  * createdAt : DateTime
+  * updatedAt : DateTime
+}
+
 ' Relations
 ShopSettings |o--|| Shop
 ShopSettings }o--o| ShopifyDiscount
@@ -2208,15 +3139,51 @@ CheckoutRecovery }o--o| Customer
 RecoveryOutreachAttempt }o--|| CheckoutRecovery
 RecoveryOutreachAttempt }o--o| ShopifyDiscount
 RecoveryOutreachAttempt |o--o| ConversationMessage
+RecoverySenderThread }o--|| WhatsAppPoolSender
+RecoverySenderRoute }o--|| Shop
+RecoverySenderRoute }o--|| RecoverySenderThread
+RecoverySenderRoute }o--|| RecoverySenderThread
+RecoverySenderRoute }o--|| RecoverySenderThread
+RecoverySenderAssignment }o--|| Conversation
+RecoverySenderAssignment }o--|| RecoverySenderRoute
+RecoveryBasketRoutingTurn }o--|| RecoverySenderThread
+RecoveryBasketRoutingTurn }o--o| RecoveryBasketRoutingTurn
+RecoveryBasketRoutingTurn }o--o| RecoveryBasketRoutingTurn
+RecoveryBasketRoutingTurn }o--o| Conversation
 Conversation }o--o| Shop
 Conversation }o--o| Customer
 Conversation |o--o| CheckoutRecovery
+ConversationControlEvent }o--|| Conversation
+MerchantConversationSendCommand }o--|| Shop
+MerchantConversationSendCommand }o--|| Conversation
+MerchantConversationSendCommand }o--o| RecoveryOutreachAttempt
+MerchantConversationSendCommand |o--o| ConversationMessage
+ConversationMessage }o--o| ConversationAllowanceBlock
+ConversationMessage }o--o| ConversationAllowanceBlock
 ConversationMessage }o--|| Conversation
+ConversationDeliveryPart }o--|| ConversationMessage
+ConversationDeliveryStatusReceipt }o--o| ConversationDeliveryPart
+ConversationModerationAssessment }o--|| Shop
+ConversationModerationAssessment }o--|| Conversation
+ConversationModerationAssessment }o--o| ConversationMessage
+ConversationModerationAssessment }o--o| MerchantConversationSendCommand
+ConversationModerationAssessment }o--o| PlatformAdmin
 WhatsAppRecipientReachability }o--|| Shop
+ShopHumanMessagingRestriction }o--|| Shop
+ShopHumanMessagingRestrictionEvent }o--|| Shop
+ShopHumanMessagingRestrictionEvent }o--|| PlatformAdmin
 MerchantPricingPlan }o--o| CommerceModelCatalogueEntry
+MerchantPricingPlan |o--o| MerchantPricingTranslationRun
 MerchantPricingPlanTranslation }o--|| MerchantPricingPlan
 MerchantPricingPlanHighlight }o--|| MerchantPricingPlan
 MerchantPricingPlanHighlightTranslation }o--|| MerchantPricingPlanHighlight
+MerchantPricingTranslationRun }o--|| CommerceTranslationModelConfiguration
+MerchantPricingTranslationRun }o--|| PlatformAdmin
+MerchantPricingTranslationItem }o--|| MerchantPricingTranslationRun
+MerchantPricingTranslationItem }o--o| MerchantPricingTranslationBatch
+MerchantPricingTranslationBatch }o--|| MerchantPricingTranslationRun
+MerchantPricingTranslationBatchItem }o--|| MerchantPricingTranslationBatch
+MerchantPricingTranslationBatchItem }o--|| MerchantPricingTranslationItem
 MerchantPricingUsageEvent }o--|| MerchantPricingPlan
 MerchantPricingUsageTier }o--|| MerchantPricingUsageEvent
 BillingOperation }o--|| Shop
@@ -2247,6 +3214,12 @@ RecoveryCreditPurchase }o--|| Shop
 RecoveryCreditPurchase }o--|| BillingPlan
 RecoveryCreditPurchase }o--o| BillingPeriod
 RecoveryCreditPurchase |o--o| UsageEvent
+ConversationAllowanceBlock }o--|| Shop
+ConversationAllowanceBlock }o--|| Conversation
+ConversationAllowanceBlock |o--o| UsageReservation
+ConversationAllowanceBlock |o--o| UsageReservation
+ConversationAllowanceBlock }o--o| ConversationAllowanceBlock
+ConversationAllowanceBlock }o--o| ConversationAllowanceBlock
 UsageReservation }o--|| Shop
 UsageReservation }o--o| ShopEntitlementCounter
 UsageReservation }o--o| BillingPeriodEntitlementCounter
@@ -2274,6 +3247,18 @@ BillingPeriod }o--|| Shop
 BillingPeriod }o--|| Subscription
 BillingPeriod }o--o| BillingPlan
 WooCommerceInstallation |o--|| Shop
+WhatsAppConsentEvidence }o--|| Shop
+WhatsAppConsentEvidence }o--|| WooCommerceInstallation
+WhatsAppConsentEvidence }o--|| WooCommerceInstallation
+WhatsAppConsentEvidence }o--|| Customer
+WhatsAppConsentEvidence }o--|| Customer
+WhatsAppConsentEvidence }o--|| CustomerPhone
+WhatsAppConsentEvidence }o--|| CustomerPhone
+WooCommerceRestReadAttempt }o--|| WooCommerceInstallation
+WooCommerceRestReadAttempt }o--|| WooCommerceInstallation
+WooCommerceRestReadGrant |o--|| WooCommerceInstallation
+WooCommerceRestReadGrant |o--|| WooCommerceInstallation
+WooCommerceRestReadGrant |o--|| WooCommerceRestReadAttempt
 WooCommerceBillingWebhookReceipt }o--o| BillingOperation
 CommerceExternalConnectionRevision }o--|| CommerceExternalConnection
 CommerceExternalConnectionRevision }o--|| PlatformAdmin
@@ -2285,10 +3270,41 @@ CommerceExternalConnectionAudit }o--|| CommerceExternalConnection
 CommerceExternalConnectionAudit }o--o| CommerceExternalConnectionRevision
 CommerceExternalConnectionAudit }o--o| Shop
 WhatsAppTemplateVariant }o--|| Shop
+WhatsAppTemplateVariant }o--o| WhatsAppTemplateMetaRegistration
+WhatsAppTemplateDefinition }o--|| PlatformAdmin
+WhatsAppTemplateDefinition }o--o| WhatsAppTemplateDefinition
+WhatsAppTemplateLocale }o--|| WhatsAppTemplateDefinition
+WhatsAppTemplateLocale }o--o| PlatformAdmin
+WhatsAppTemplateTranslationRun }o--|| WhatsAppTemplateDefinition
+WhatsAppTemplateTranslationRun }o--|| CommerceTranslationModelConfiguration
+WhatsAppTemplateTranslationRun }o--|| PlatformAdmin
+WhatsAppTemplateTranslationItem }o--|| WhatsAppTemplateTranslationRun
+WhatsAppTemplateTranslationItem }o--o| WhatsAppTemplateLocale
+WhatsAppTemplateTranslationItem }o--o| WhatsAppTemplateTranslationBatch
+WhatsAppTemplateTranslationBatch }o--|| WhatsAppTemplateTranslationRun
+WhatsAppTemplateTranslationBatchItem }o--|| WhatsAppTemplateTranslationBatch
+WhatsAppTemplateTranslationBatchItem }o--|| WhatsAppTemplateTranslationItem
+WhatsAppTemplateMetaRegistration }o--|| WhatsAppTemplateLocale
+WhatsAppTemplateMetaEvent }o--o| WhatsAppTemplateMetaRegistration
+WhatsAppTemplatePublicationOperation }o--|| WhatsAppTemplateDefinition
+WhatsAppTemplatePublicationOperation }o--|| PlatformAdmin
+WhatsAppTemplatePublicationTarget }o--|| WhatsAppTemplatePublicationOperation
+WhatsAppTemplatePublicationTarget }o--|| Shop
+WhatsAppTemplatePublicationTarget }o--|| WhatsAppTemplateMetaRegistration
+WhatsAppTemplatePublicationTarget }o--o| WhatsAppTemplateVariant
+WhatsAppTemplatePublicationTarget }o--o| WhatsAppTemplateVariant
+WhatsAppConversationWrapperActiveSlot }o--|| WhatsAppTemplateDefinition
+WhatsAppConversationWrapperActiveSlot }o--|| PlatformAdmin
+OperationalIncident }o--o| Shop
+OperationalIncident }o--o| PlatformAdmin
+OperationalIncident }o--o| PlatformAdmin
+OperationalIncidentEvent }o--|| OperationalIncident
+OperationalIncidentEvent }o--o| PlatformAdmin
 MerchantSupportThread |o--|| Shop
 MerchantSupportThread }o--o| PlatformAdmin
 MerchantSupportMessage }o--|| MerchantSupportThread
 MerchantSupportMessage }o--o| PlatformAdmin
+MerchantSupportMessage }o--o| CheckoutRecovery
 RecoveryCreditRefund }o--|| Shop
 RecoveryCreditRefund }o--|| RecoveryCreditPurchase
 RecoveryCreditRefund }o--o| MerchantSupportMessage
@@ -2315,6 +3331,12 @@ CommerceReleaseCapability }o--|| CommerceToolRevision
 CommerceReleaseCapability }o--|| CommerceToolRevision
 CommerceReleaseFeature }o--|| CommerceRelease
 CommerceReleaseFeature }o--|| Feature
+CommercePurposeCapability }o--|| Feature
+CommercePurposeCapability }o--|| CommerceCapability
+CommerceReleasePurposeCapability }o--|| CommerceReleaseFeature
+CommerceReleasePurposeCapability }o--|| CommerceReleaseFeature
+CommerceReleasePurposeCapability }o--|| CommerceReleaseCapability
+CommerceReleasePurposeCapability }o--|| CommerceReleaseCapability
 CommerceReleasePointer }o--|| CommerceRelease
 CommerceReleasePointer }o--|| PlatformAdmin
 CommerceAuditEvent }o--o| PlatformAdmin
@@ -2349,6 +3371,10 @@ CommerceToolRevision }o--o| PlatformAdmin
 CommerceModelCatalogueEntry }o--|| CommerceModelAvailability
 CommerceModelCatalogueEntry }o--|| PlatformAdmin
 CommerceModelCatalogueEntry }o--|| PlatformAdmin
+CommerceModelPolicy }o--o| MerchantPricingPlan
+CommerceModelPolicy }o--o| Shop
+CommerceModelPolicy }o--o| PlatformAdmin
+CommerceModelPolicy }o--o| PlatformAdmin
 CommerceModelAvailability |o--o| Shop
 CommerceModelAvailability }o--o| PlatformAdmin
 CommerceModelAvailability }o--o| PlatformAdmin
@@ -2395,6 +3421,12 @@ MerchantKnowledgeSource }o--|| MerchantKnowledgePurposeDataFormat
 MerchantKnowledgeSourceRevision }o--|| MerchantKnowledgeSource
 MerchantKnowledgeSourceRevision }o--o| MerchantKnowledgeUploadedAsset
 MerchantKnowledgeChunk }o--|| MerchantKnowledgeSourceRevision
+ReferenceTaxonomyCategory }o--|| ReferenceTaxonomyGeneration
+ReferenceTaxonomyCategory }o--|| ReferenceTaxonomyGeneration
+ReferenceTaxonomyCategory }o--|| ReferenceTaxonomyCategory
+ReferenceTaxonomyCategory }o--|| ReferenceTaxonomyCategory
+CommerceConversationProductContext }o--|| Conversation
+CommerceConversationProductContext }o--|| Shop
 ' ManyToMany Relations
 ' enum relations
 ShopSettings |o--|| RecoveryOfferMode
@@ -2402,25 +3434,50 @@ ShopifyDiscountCatalogue |o--|| ShopifyDiscountCatalogueStatus
 ShopifyDiscount |o--|| ShopifyDiscountMethod
 ShopRecoveryPolicyOverride |o--|| RecoveryOfferMode
 ShopRecoveryPolicyOverrideAuditEvent |o--|| ShopRecoveryPolicyOverrideAuditAction
+CustomerPhone |o--|| WhatsAppConsentPurpose
+CustomerPhone |o--|| WhatsAppRecoveryConsentDecision
+CustomerPhone |o--|| WhatsAppRecoveryConsentSource
+CustomerPhone |o--|| WhatsAppRecoveryNoContactReason
 CheckoutRecoveryStatusHistory |o--|| CheckoutRecoveryStatus
 CheckoutRecoveryStatusHistory |o--|| CheckoutRecoveryStatus
 CheckoutRecovery |o--|| CheckoutRecoveryStatus
 CheckoutRecovery |o--|| RecoveryAdmissionBlockReason
 RecoveryOutreachAttempt |o--|| RecoveryOutreachTrigger
 RecoveryOutreachAttempt |o--|| RecoveryOutreachStatus
+RecoveryOutreachAttempt |o--|| RecoveryOutreachInitiator
 RecoveryOutreachAttempt |o--|| RecoveryOfferMode
 Conversation |o--|| ConversationType
 Conversation |o--|| ConversationOutcome
+Conversation |o--|| ConversationControlMode
 Conversation |o--|| LanguageSource
+ConversationControlEvent |o--|| ConversationControlMode
+ConversationControlEvent |o--|| ConversationControlMode
+MerchantConversationSendCommand |o--|| MerchantConversationSendKind
+MerchantConversationSendCommand |o--|| MerchantConversationSendState
 ConversationMessage |o--|| MessageDirection
 ConversationMessage |o--|| MessageSenderType
 ConversationMessage |o--|| MessageStatus
 ConversationMessage |o--|| MessageContentType
 ConversationMessage |o--|| MessageTranscriptionStatus
+ConversationDeliveryPart |o--|| ConversationDeliveryPartRole
+ConversationDeliveryPart |o--|| ConversationDeliveryPartState
+ConversationDeliveryStatusReceipt |o--|| ConversationDeliveryStatus
+ConversationModerationAssessment |o--|| ConversationModerationSubject
+ConversationModerationAssessment |o--|| ConversationModerationDecision
+ShopHumanMessagingRestriction |o--|| HumanMessagingRestrictionStatus
+ShopHumanMessagingRestrictionEvent |o--|| HumanMessagingRestrictionStatus
+ShopHumanMessagingRestrictionEvent |o--|| HumanMessagingRestrictionStatus
 Feature |o--|| FeatureActivationMode
 MerchantPricingPlan |o--|| MerchantPricingPlanKind
+MerchantPricingPlan |o--|| MerchantPricingPlanPublicationStatus
 MerchantPricingPlan |o--|| MerchantPricingAllowancePeriod
 MerchantPricingPlan |o--|| MerchantPricingBillingPeriod
+MerchantPricingTranslationRun |o--|| CommerceEnvironment
+MerchantPricingTranslationRun |o--|| MerchantPricingTranslationRunStatus
+MerchantPricingTranslationItem |o--|| MerchantPricingTranslationEntityKind
+MerchantPricingTranslationItem |o--|| MerchantPricingTranslationField
+MerchantPricingTranslationItem |o--|| MerchantPricingTranslationItemStatus
+MerchantPricingTranslationBatch |o--|| MerchantPricingTranslationBatchStatus
 MerchantPricingUsageEvent |o--|| MerchantPricingUsagePricingMode
 BillingOperation |o--|| BillingOperationKind
 BillingOperation |o--|| BillingOperationState
@@ -2447,10 +3504,15 @@ BillingPeriod |o--|| BillingPeriodCloseReason
 Shop |o--|| ShopPlatform
 Shop |o--|| ShopStatus
 WooCommerceInstallation |o--|| WooCommerceInstallationStatus
+WhatsAppConsentEvidence |o--|| WhatsAppConsentPurpose
+WhatsAppConsentEvidence |o--|| WhatsAppConsentEvidenceDecision
+WooCommerceRestReadAttempt |o--|| WooCommerceRestReadAttemptStatus
+WooCommerceRestReadGrant |o--|| WooCommerceRestReadGrantStatus
 CommerceExternalConnectionRevision |o--|| CommerceExternalConnectionScope
 CommerceExternalConnectionRevision |o--|| CommerceExternalAuthMode
 CommerceExternalConnectionAudit |o--|| CommerceExternalConnectionAction
 WhatsAppTemplateVariant |o--|| WhatsAppTemplateStatus
+MetaTemplateAppOperationState |o--|| CommerceEnvironment
 PlatformAdmin |o--|| PlatformAdminRole
 MerchantSupportMessage |o--|| MerchantSupportMessageKind
 MerchantSupportMessage |o--|| MerchantSupportMessageState
@@ -2473,6 +3535,9 @@ CommerceAgentConfiguration |o--|| CommerceEnvironment
 CommerceAgentConfiguration |o--|| CommerceAgentPromptScope
 CommerceStudioMerchantAccess |o--|| CommerceStudioMerchantRole
 CommerceToolRevision |o--|| CommerceToolRevisionStatus
+CommerceModelPolicy |o--|| CommerceEnvironment
+CommerceModelPolicy |o--|| CommerceModelPolicyContext
+CommerceModelPolicy |o--|| CommerceModelPolicyScope
 CommerceModelAvailability |o--|| CommerceModelAvailabilityScope
 CommerceOpenRouterCredential |o--|| CommerceEnvironment
 CommerceEmbeddingConfiguration |o--|| CommerceEnvironment
@@ -2491,219 +3556,5 @@ MerchantKnowledgeDataFormat |o--|| MerchantKnowledgeInputKind
 MerchantKnowledgeUploadedAsset |o--|| MerchantKnowledgeUploadedAssetStatus
 MerchantKnowledgeSourceRevision |o--|| MerchantKnowledgeRevisionReason
 MerchantKnowledgeSourceRevision |o--|| MerchantKnowledgeRevisionStatus
-
-entity "CommercePurposeCapability" as CommercePurposeCapability {
---
-  # purposeFeatureId : [FK] Feature
-  # capabilityId : [FK] CommerceCapability
-  * position : Int
-}
-
-entity "CommerceReleasePurposeCapability" as CommerceReleasePurposeCapability {
---
-  # releaseId : [FK] CommerceReleaseFeature
-  # purposeFeatureId : [FK] CommerceReleaseFeature
-  # capabilityId : [FK] CommerceReleaseCapability
-  * position : Int
-}
-
-CommercePurposeCapability }o--|| Feature
-CommercePurposeCapability }o--|| CommerceCapability
-CommerceReleasePurposeCapability }o--|| CommerceReleaseFeature
-CommerceReleasePurposeCapability }o--|| CommerceReleaseFeature
-CommerceReleasePurposeCapability }o--|| CommerceReleaseCapability
-CommerceReleasePurposeCapability }o--|| CommerceReleaseCapability
-entity "CommerceConversationProductContext" as CommerceConversationProductContext {
-+ conversationId [PK] : String
---
-  # shopId : [FK] Shop
-  * schemaVersion : Int
-  * revision : Int
-  * sourceInboundVersion : Int
-  * references : Json
-  * expiresAt : DateTime
-  * createdAt : DateTime
-  * updatedAt : DateTime
-}
-
-CommerceConversationProductContext }o--|| Conversation
-CommerceConversationProductContext }o--|| Shop
-
-enum "ConversationDeliveryPartRole" as ConversationDeliveryPartRole {
-  HEADER
-  PRODUCT
-  ANSWER
-}
-enum "ConversationDeliveryPartState" as ConversationDeliveryPartState {
-  PREPARED
-  ADMITTED
-  ACKNOWLEDGED
-  DELIVERED
-  READ
-  FAILED
-  UNKNOWN
-  CANCELLED
-}
-enum "ConversationDeliveryStatus" as ConversationDeliveryStatus {
-  SENT
-  DELIVERED
-  READ
-  FAILED
-}
-entity "ConversationDeliveryPart" as ConversationDeliveryPart {
-+ id [PK] : String
---
-  # messageId : [FK] ConversationMessage
-  * ordinal : Int
-  * role : ConversationDeliveryPartRole
-  * payload : Json
-  * payloadDigest : String
-  * sourceIdentity : Json
-  * deadlineAt : DateTime
-  * state : ConversationDeliveryPartState
-  * providerAccountId : String
-  * providerPhoneNumberId : String
-  providerDispatchKey : String
-  providerDispatchAdmittedAt : DateTime
-  providerMessageId : String
-  acknowledgedAt : DateTime
-  deliveredAt : DateTime
-  readAt : DateTime
-  failedAt : DateTime
-  unknownAt : DateTime
-  cancelledAt : DateTime
-  failureCode : String
-  * createdAt : DateTime
-  * updatedAt : DateTime
-}
-entity "ConversationDeliveryStatusReceipt" as ConversationDeliveryStatusReceipt {
-+ id [PK] : String
---
-  * providerAccountId : String
-  * providerPhoneNumberId : String
-  * providerMessageId : String
-  * status : ConversationDeliveryStatus
-  * providerTimestamp : DateTime
-  * receivedAt : DateTime
-  failureCode : String
-  # partId : [FK] ConversationDeliveryPart
-}
-ConversationDeliveryPart }o--|| ConversationMessage
-ConversationDeliveryStatusReceipt }o--o| ConversationDeliveryPart
-ConversationDeliveryPart |o--|| ConversationDeliveryPartRole
-ConversationDeliveryPart |o--|| ConversationDeliveryPartState
-ConversationDeliveryStatusReceipt |o--|| ConversationDeliveryStatus
-entity "MetaTemplateAppOperationState" as MetaTemplateAppOperationState {
-+ environment [PK] : CommerceEnvironment
-+ appId [PK] : String
---
-  cooldownUntil : DateTime
-  * consecutiveThrottleCount : Int
-  lastThrottleAt : DateTime
-  leaseOwnerToken : String
-  * leaseGeneration : BigInt
-  leaseAcquiredAt : DateTime
-  leaseUntil : DateTime
-  * updatedAt : DateTime
-}
-MetaTemplateAppOperationState |o--|| CommerceEnvironment
-entity "ConversationAllowanceBlock" as ConversationAllowanceBlock {
-+ id [PK] : String
---
-  # shopId : [FK] Shop
-  # conversationId : [FK] Conversation
-  * ordinal : Int
-  * fundingKind : String
-  * state : String
-  # predecessorId : [FK] ConversationAllowanceBlock
-  # creditReservationId : [FK] UsageReservation
-  * hardMessageLimit : Int
-  * terminalReservedSlots : Int
-  repairAt : DateTime
-  repairLeaseToken : String
-  repairLeaseUntil : DateTime
-  repairDeadlineAt : DateTime
-  * createdAt : DateTime
-  * updatedAt : DateTime
-}
-ConversationMessage }o--o| ConversationAllowanceBlock
-ConversationAllowanceBlock }o--|| Shop
-ConversationAllowanceBlock }o--|| Conversation
-ConversationAllowanceBlock |o--o| UsageReservation
-ConversationAllowanceBlock }o--o| ConversationAllowanceBlock
-
-
-entity "WhatsAppPoolSender" as WhatsAppPoolSender {
-+ providerPhoneNumberId [PK] : String
---
-  * providerAccountId : String
-  * priority : Int
-  * allocationEnabled : Boolean
-  * verifiedAt : DateTime
-  * createdAt : DateTime
-  * updatedAt : DateTime
-}
-entity "RecoverySenderThread" as RecoverySenderThread {
-+ id [PK] : String
---
-  * canonicalRecipient : String
-  # providerPhoneNumberId : [FK] WhatsAppPoolSender
-  * openedAt : DateTime
-  closedAt : DateTime
-}
-entity "RecoverySenderRoute" as RecoverySenderRoute {
-+ id [PK] : String
---
-  # shopId : [FK] Shop
-  # threadId : [FK] RecoverySenderThread
-  # canonicalRecipient : [FK] RecoverySenderThread
-  # providerPhoneNumberId : [FK] RecoverySenderThread
-  * openedAt : DateTime
-  closedAt : DateTime
-}
-entity "RecoverySenderAssignment" as RecoverySenderAssignment {
-+ conversationId [PK] : String
---
-  # routeId : [FK] RecoverySenderRoute
-  * assignedAt : DateTime
-  releasedAt : DateTime
-}
-entity "RecoveryBasketRoutingTurn" as RecoveryBasketRoutingTurn {
-+ inboundProviderMessageId [PK] : String
---
-  # threadId : [FK] RecoverySenderThread
-  routeId : String
-  promptScopeRouteId : String
-  * occurredAt : DateTime
-  * createdAt : DateTime
-  inputJson : Json
-  candidatesJson : Json
-  moderationJson : Json
-  configurationSnapshot : Json
-  routingDecision : Json
-  # parentProviderMessageId : [FK] RecoveryBasketRoutingTurn
-  * state : String
-  # resolutionInboundProviderMessageId : [FK] RecoveryBasketRoutingTurn
-  # selectedConversationId : [FK] Conversation
-  promptText : String
-  promptAdmittedAt : DateTime
-  promptSentAt : DateTime
-  promptProviderMessageId : String
-  * expiresAt : DateTime
-  resolvedAt : DateTime
-  workToken : String
-  workLeaseUntil : DateTime
-  nextRepairAt : DateTime
-  * repairAttempt : Int
-  * updatedAt : DateTime
-}
-
-RecoverySenderThread }o--|| WhatsAppPoolSender
-RecoverySenderRoute }o--|| Shop
-RecoverySenderRoute }o--|| RecoverySenderThread
-RecoverySenderAssignment }o--|| Conversation
-RecoverySenderAssignment }o--|| RecoverySenderRoute
-RecoveryBasketRoutingTurn }o--|| RecoverySenderThread
-RecoveryBasketRoutingTurn }o--o| RecoveryBasketRoutingTurn
-RecoveryBasketRoutingTurn }o--o| Conversation
+ReferenceTaxonomyGeneration |o--|| CommerceEnvironment
 @enduml
