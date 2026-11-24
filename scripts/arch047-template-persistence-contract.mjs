@@ -27,7 +27,8 @@ export const CONTRACT = {
         "locales": "WhatsAppTemplateLocale[]",
         "translationRuns": "WhatsAppTemplateTranslationRun[]",
         "publications": "WhatsAppTemplatePublicationOperation[]",
-        "activeWrappers": "WhatsAppConversationWrapperActiveSlot[]"
+        "activeWrappers": "WhatsAppConversationWrapperActiveSlot[]",
+        "recoveryDefaults": "WhatsAppRecoveryTemplateDefault[]"
       },
       "directives": [
         "@@index([clonedFromDefinitionId])",

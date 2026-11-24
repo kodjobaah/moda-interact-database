@@ -2717,6 +2717,7 @@ model WhatsAppTemplateDefinition {
   translationRuns WhatsAppTemplateTranslationRun[]
   publications    WhatsAppTemplatePublicationOperation[]
   activeWrappers  WhatsAppConversationWrapperActiveSlot[]
+  recoveryDefaults WhatsAppRecoveryTemplateDefault[]
 
   @@index([kind, purpose, createdAt])
   @@index([status, publishedAt])
@@ -2996,6 +2997,25 @@ model WhatsAppTemplatePublicationTarget {
   @@schema("whatsapp")
 }
 
+// Platform-owned recovery template selection; independent of shops and locales.
+model WhatsAppRecoveryTemplateDefault {
+  id               String   @id @default(cuid()) @db.Text
+  wabaId           String   @db.VarChar(191)
+  purpose          String   @db.VarChar(96)
+  definitionId     String   @db.Text
+  updatedByAdminId String   @db.Text
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  definition WhatsAppTemplateDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy  PlatformAdmin              @relation("WhatsAppRecoveryTemplateDefaultUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([wabaId, purpose])
+  @@index([definitionId])
+  @@index([updatedByAdminId])
+  @@schema("whatsapp")
+}
+
 model WhatsAppConversationWrapperActiveSlot {
   audience         String   @id @db.VarChar(24)
   definitionId     String   @db.Text
@@ -3088,6 +3108,7 @@ model PlatformAdmin {
   requestedWhatsAppTemplateTranslationRuns      WhatsAppTemplateTranslationRun[]        @relation("WhatsAppTemplateTranslationRunRequester")
   requestedWhatsAppTemplatePublications         WhatsAppTemplatePublicationOperation[]  @relation("WhatsAppTemplatePublicationRequester")
   updatedWhatsAppConversationWrapperSlots       WhatsAppConversationWrapperActiveSlot[] @relation("WhatsAppConversationWrapperSlotUpdater")
+  updatedWhatsAppRecoveryTemplateDefaults        WhatsAppRecoveryTemplateDefault[]      @relation("WhatsAppRecoveryTemplateDefaultUpdater")
   createdCommerceToolRevisions                  CommerceToolRevision[]                  @relation("CommerceToolRevisionCreator")
   publishedCommerceToolRevisions                CommerceToolRevision[]                  @relation("CommerceToolRevisionPublisher")
   commerceReleases                              CommerceRelease[]

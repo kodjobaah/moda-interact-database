@@ -17,6 +17,8 @@
     "migrate:dev": "prisma migrate dev --schema prisma/schema.prisma",
     "migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
     "prisma:validate": "prisma validate --schema prisma/schema.prisma",
+    "test:whatsapp-recovery-defaults:postgres:fresh": "node scripts/test-whatsapp-recovery-defaults-postgres.mjs --mode fresh",
+    "test:whatsapp-recovery-defaults:postgres:upgrade": "node scripts/test-whatsapp-recovery-defaults-postgres.mjs --mode upgrade",
     "test:first-production-baseline": "node scripts/validate-first-production-baseline.mjs",
     "test:arch014-promotion-campaign-translations": "node scripts/validate-arch014-promotion-campaign-translations.mjs",
     "test:arch015-fractional-provider-usage": "node scripts/validate-arch015-fractional-provider-usage-snapshots.mjs",
