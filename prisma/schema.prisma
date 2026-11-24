@@ -2416,8 +2416,8 @@ model WhatsAppConsentEvidence {
   id                   String                          @id @default(cuid()) @db.Text
   shopId               String                          @db.Text
   shop                 Shop                            @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  installationId       String                          @db.Text
-  installation         WooCommerceInstallation         @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Restrict, onUpdate: Restrict)
+  installationId       String?                         @db.Text
+  installation         WooCommerceInstallation?        @relation(fields: [installationId, shopId], references: [id, shopId], onDelete: Restrict, onUpdate: Restrict)
   eventId              String                          @db.VarChar(128)
   payloadDigest        Bytes
   customerId           String                          @db.Text
