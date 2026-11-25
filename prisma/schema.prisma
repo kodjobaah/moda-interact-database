@@ -3002,6 +3002,7 @@ model WhatsAppRecoveryTemplateDefault {
   id               String   @id @default(cuid()) @db.Text
   wabaId           String   @db.VarChar(191)
   purpose          String   @db.VarChar(96)
+  format           String   @db.VarChar(16)
   definitionId     String   @db.Text
   updatedByAdminId String   @db.Text
   createdAt        DateTime @default(now()) @db.Timestamptz(3)
@@ -3010,7 +3011,7 @@ model WhatsAppRecoveryTemplateDefault {
   definition WhatsAppTemplateDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   updatedBy  PlatformAdmin              @relation("WhatsAppRecoveryTemplateDefaultUpdater", fields: [updatedByAdminId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
-  @@unique([wabaId, purpose])
+  @@unique([wabaId, purpose, format])
   @@index([definitionId])
   @@index([updatedByAdminId])
   @@schema("whatsapp")
