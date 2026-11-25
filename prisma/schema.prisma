@@ -3593,6 +3593,11 @@ model BackgroundRuntimeConfig {
   recoveryResumeBatchSize       Int @default(25)
   checkoutRecoveryLifetimeDays  Int @default(21)
 
+  recoveryDeliveryTemporaryRetryDelayMinutes       Int @default(5)
+  recoveryDeliveryRateLimitRetryDelayMinutes       Int @default(15)
+  recoveryDeliveryMarketingRetryDelayMinutes       Int @default(1440)
+  recoveryDeliveryMaxRetries                       Int @default(3)
+
   translationReconciliationIntervalSeconds Int @default(300)
   translationBatchMaxRequests              Int @default(100)
 
