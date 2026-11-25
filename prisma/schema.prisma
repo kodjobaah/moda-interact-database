@@ -2042,6 +2042,7 @@ model PlatformBillingPolicy {
 
 enum UsageReservationCompensationReason {
   WHATSAPP_RECIPIENT_UNDELIVERABLE
+  WHATSAPP_DELIVERY_FAILED
 
   @@schema("billing")
 }
