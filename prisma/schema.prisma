@@ -456,10 +456,46 @@ model RecoveryOutreachAttempt {
   updatedAt           DateTime  @updatedAt
 
   merchantSendCommands MerchantConversationSendCommand[]
+  deliveryRetryIntent  RecoveryOutreachRetryIntent?
 
   @@unique([checkoutRecoveryId, sequence])
   @@index([checkoutRecoveryId, status, sequence])
   @@index([status, followUpDueAt])
+  @@schema("commerce")
+}
+
+// A durable decision, not a dispatch permit. The current logical sequence
+// constraint remains intact until all readers/writers support physical retries.
+enum RecoveryOutreachRetryPolicy {
+  AFTER_COOLDOWN
+  PROVIDER_POLICY_HOLD
+  REPAIR_REQUIRED
+  REVIEW_REQUIRED
+  DO_NOT_RETRY
+
+  @@schema("commerce")
+}
+
+model RecoveryOutreachRetryIntent {
+  id String @id @default(cuid())
+
+  failedAttemptId String @unique
+  failedAttempt   RecoveryOutreachAttempt @relation(fields: [failedAttemptId], references: [id], onDelete: Cascade)
+  failedMessageId String @unique
+  failedMessage   ConversationMessage @relation(fields: [failedMessageId], references: [id], onDelete: Cascade)
+  fundingReservationId String @unique
+  fundingReservation   UsageReservation @relation(fields: [fundingReservationId], references: [id], onDelete: Cascade)
+
+  providerFailureCode String? @db.VarChar(64)
+  policy RecoveryOutreachRetryPolicy
+  notBeforeAt DateTime? @db.Timestamptz(3)
+  expectedGeneration Int
+  expectedLastExternalActivityAt DateTime
+  cancelledAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([policy, cancelledAt, notBeforeAt])
   @@schema("commerce")
 }
 
@@ -826,6 +862,7 @@ model ConversationMessage {
   createdAt DateTime @default(now())
 
   recoveryOutreachAttempt RecoveryOutreachAttempt?
+  deliveryRetryIntent     RecoveryOutreachRetryIntent?
   merchantSendCommand     MerchantConversationSendCommand?
   moderationAssessments   ConversationModerationAssessment[]
   deliveryParts           ConversationDeliveryPart[]
@@ -1974,6 +2011,7 @@ model ConversationAllowanceBlock {
 
 model UsageReservation {
   conversationAllowanceBlocks ConversationAllowanceBlock[]
+  deliveryRetryIntent RecoveryOutreachRetryIntent?
   id String @id @default(cuid())
 
   shopId    String
