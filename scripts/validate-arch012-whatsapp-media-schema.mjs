@@ -27,8 +27,17 @@ const message = modelBody("ConversationMessage");
 for (const member of ["TEXT", "AUDIO", "UNSUPPORTED"]) {
   assert.match(enumBody("MessageContentType"), new RegExp(`\\b${member}\\b`));
 }
-for (const member of ["NOT_REQUIRED", "PENDING", "COMPLETED", "REJECTED", "FAILED"]) {
-  assert.match(enumBody("MessageTranscriptionStatus"), new RegExp(`\\b${member}\\b`));
+for (const member of [
+  "NOT_REQUIRED",
+  "PENDING",
+  "COMPLETED",
+  "REJECTED",
+  "FAILED",
+]) {
+  assert.match(
+    enumBody("MessageTranscriptionStatus"),
+    new RegExp(`\\b${member}\\b`),
+  );
 }
 
 for (const [name, type, suffix] of [
@@ -37,7 +46,11 @@ for (const [name, type, suffix] of [
   ["providerMediaMimeType", "String?", ""],
   ["providerMediaSha256", "String?", ""],
   ["mediaDurationMs", "Int?", ""],
-  ["transcriptionStatus", "MessageTranscriptionStatus", "@default(NOT_REQUIRED)"],
+  [
+    "transcriptionStatus",
+    "MessageTranscriptionStatus",
+    "@default(NOT_REQUIRED)",
+  ],
   ["transcriptionProvider", "String?", ""],
   ["transcriptionModel", "String?", ""],
   ["transcriptionFailureCode", "String?", ""],
@@ -51,19 +64,50 @@ for (const [name, type, suffix] of [
 
 assert.match(message, /providerMessageId\s+String\?\s+@unique/);
 assert.match(message, /content\s+String/);
-for (const forbidden of ["audioBytes", "rawAudio", "audioBlob", "mediaUrl", "downloadUrl", "providerMediaUrl"]) {
+for (const forbidden of [
+  "audioBytes",
+  "rawAudio",
+  "audioBlob",
+  "mediaUrl",
+  "downloadUrl",
+  "providerMediaUrl",
+]) {
   assert.doesNotMatch(message, new RegExp(`\\b${forbidden}\\b`, "i"));
 }
-for (const field of ["inboundVersion", "lastProcessedVersion", "processingInboundVersion", "processingStartedAt", "lastInboundAt", "lastMessageAt"]) {
+for (const field of [
+  "inboundVersion",
+  "lastProcessedVersion",
+  "processingInboundVersion",
+  "processingStartedAt",
+  "lastInboundAt",
+  "lastMessageAt",
+]) {
   assert.match(conversation, new RegExp(`\\b${field}\\b`));
 }
 
 assert.match(migration, /CREATE TYPE "whatsapp"\."MessageContentType" AS ENUM/);
-assert.match(migration, /CREATE TYPE "whatsapp"\."MessageTranscriptionStatus" AS ENUM/);
-for (const field of ["contentType", "providerMediaId", "providerMediaMimeType", "providerMediaSha256", "mediaDurationMs", "transcriptionStatus", "transcriptionProvider", "transcriptionModel", "transcriptionFailureCode", "transcriptionCompletedAt"]) {
+assert.match(
+  migration,
+  /CREATE TYPE "whatsapp"\."MessageTranscriptionStatus" AS ENUM/,
+);
+for (const field of [
+  "contentType",
+  "providerMediaId",
+  "providerMediaMimeType",
+  "providerMediaSha256",
+  "mediaDurationMs",
+  "transcriptionStatus",
+  "transcriptionProvider",
+  "transcriptionModel",
+  "transcriptionFailureCode",
+  "transcriptionCompletedAt",
+]) {
   assert.match(migration, new RegExp(`ADD COLUMN "${field}"`));
 }
-assert.match(migration, /ck_arch012_conversation_message_media_duration_nonnegative/);
+assert.match(
+  migration,
+  /ck_arch012_conversation_message_media_duration_nonnegative/,
+);
 assert.doesNotMatch(migration, /^\s*(UPDATE|INSERT)\s/im);
 
 console.log("ARCH-012 inbound WhatsApp media/transcription schema validated");

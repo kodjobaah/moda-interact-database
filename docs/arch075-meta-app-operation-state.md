@@ -9,16 +9,16 @@ customer data or provider responses, and has no foreign-key cascade.
 
 ## Consumer contract
 
-| Field | Storage |
-| --- | --- |
-| environment, appId | Composite primary key |
-| cooldownUntil | Nullable timestamptz(3) |
-| consecutiveThrottleCount | Integer, default 0, 0–31 inclusive; writer saturates |
-| lastThrottleAt | Nullable timestamptz(3) |
-| leaseOwnerToken | Nullable varchar(128), nonempty when owned |
-| leaseGeneration | Nonnegative bigint, default 0, monotonic |
+| Field                       | Storage                                              |
+| --------------------------- | ---------------------------------------------------- |
+| environment, appId          | Composite primary key                                |
+| cooldownUntil               | Nullable timestamptz(3)                              |
+| consecutiveThrottleCount    | Integer, default 0, 0–31 inclusive; writer saturates |
+| lastThrottleAt              | Nullable timestamptz(3)                              |
+| leaseOwnerToken             | Nullable varchar(128), nonempty when owned           |
+| leaseGeneration             | Nonnegative bigint, default 0, monotonic             |
 | leaseAcquiredAt, leaseUntil | Nullable timestamptz(3), set with owner as one tuple |
-| updatedAt | timestamptz(3), Prisma updated-at/default now |
+| updatedAt                   | timestamptz(3), Prisma updated-at/default now        |
 
 Background owns the policy: one lease covers one bounded sample operation,
 120 seconds; the first evidenced application throttle waits 15 minutes, doubles

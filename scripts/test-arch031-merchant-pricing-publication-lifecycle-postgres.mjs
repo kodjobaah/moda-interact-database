@@ -5,18 +5,40 @@ import { readFileSync, readdirSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 
 const migrationDirectory = new URL("../prisma/migrations/", import.meta.url);
-const targetMigration = "20261010170000_arch031_merchant_pricing_publication_lifecycle";
+const targetMigration =
+  "20261010170000_arch031_merchant_pricing_publication_lifecycle";
 const modeIndex = process.argv.indexOf("--mode");
 const mode = modeIndex < 0 ? undefined : process.argv[modeIndex + 1];
-assert.ok(["fresh", "upgrade"].includes(mode), "Pass an explicit --mode fresh|upgrade");
+assert.ok(
+  ["fresh", "upgrade"].includes(mode),
+  "Pass an explicit --mode fresh|upgrade",
+);
 
 const databaseName = "arch031_pricing_publication_fixture";
 const containerName = `moda-arch031-database002-${randomUUID()}`;
 let containerStarted = false;
 
 const locales = [
-  "cs", "da", "de", "en", "es", "fi", "fr", "it", "ja", "ko",
-  "nb", "nl", "pl", "pt-BR", "pt-PT", "sv", "th", "tr", "zh-Hans", "zh-Hant",
+  "cs",
+  "da",
+  "de",
+  "en",
+  "es",
+  "fi",
+  "fr",
+  "it",
+  "ja",
+  "ko",
+  "nb",
+  "nl",
+  "pl",
+  "pt-BR",
+  "pt-PT",
+  "sv",
+  "th",
+  "tr",
+  "zh-Hans",
+  "zh-Hant",
 ];
 const nonEnglishLocales = locales.filter((locale) => locale !== "en");
 
@@ -29,16 +51,28 @@ function docker(args, options = {}) {
     });
   } catch (error) {
     const detail = error.stderr?.toString().trim();
-    throw new Error(`Docker command failed${detail ? `: ${detail}` : ""}`, { cause: error });
+    throw new Error(`Docker command failed${detail ? `: ${detail}` : ""}`, {
+      cause: error,
+    });
   }
 }
 
 function psql(sql, { capture = false } = {}) {
   return docker(
     [
-      "exec", "-i", containerName, "psql", "-X", "-q",
+      "exec",
+      "-i",
+      containerName,
+      "psql",
+      "-X",
+      "-q",
       ...(capture ? ["-A", "-t"] : []),
-      "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", databaseName,
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-U",
+      "postgres",
+      "-d",
+      databaseName,
     ],
     { input: sql },
   );
@@ -71,7 +105,19 @@ async function awaitPostgres() {
     try {
       execFileSync(
         "docker",
-        ["exec", containerName, "psql", "-X", "-q", "-U", "postgres", "-d", databaseName, "-c", "SELECT 1"],
+        [
+          "exec",
+          containerName,
+          "psql",
+          "-X",
+          "-q",
+          "-U",
+          "postgres",
+          "-d",
+          databaseName,
+          "-c",
+          "SELECT 1",
+        ],
         { stdio: "ignore" },
       );
       return;
@@ -89,13 +135,21 @@ function migrationNames() {
 }
 
 function applyMigration(name) {
-  psql(readFileSync(new URL(`../prisma/migrations/${name}/migration.sql`, import.meta.url), "utf8"));
+  psql(
+    readFileSync(
+      new URL(`../prisma/migrations/${name}/migration.sql`, import.meta.url),
+      "utf8",
+    ),
+  );
   console.log(`APPLIED ${name}`);
 }
 
 function seedCompletePlanBeforeTarget() {
   const translationValues = locales
-    .map((locale, index) => `('arch031-existing-${index}','arch031-existing-plan','${locale}','Existing ${locale}',CURRENT_TIMESTAMP)`)
+    .map(
+      (locale, index) =>
+        `('arch031-existing-${index}','arch031-existing-plan','${locale}','Existing ${locale}',CURRENT_TIMESTAMP)`,
+    )
     .join(",\n");
   psql(`BEGIN;
 INSERT INTO billing."MerchantPricingPlan" (
@@ -146,7 +200,14 @@ function insertRun({ id, handle, hashChar = "a", status = "PENDING" }) {
   );`;
 }
 
-function draftPlanInsert({ id, handle, runId, position, status = "TRANSLATING", active = false }) {
+function draftPlanInsert({
+  id,
+  handle,
+  runId,
+  position,
+  status = "TRANSLATING",
+  active = false,
+}) {
   return `INSERT INTO billing."MerchantPricingPlan" (
     "id", "shopifyPlanHandle", "displayName", "planKind", "isActive", "cataloguePosition", "includedRecoveryCredits",
     "allowancePeriod", "billingPeriod", "recurringAmountMinor", "currency", "publicationStatus", "currentTranslationRunId", "updatedAt"
@@ -194,7 +255,9 @@ function assertSchemaObjects() {
     activationCheck: true,
     runCheck: true,
   });
-  console.log("PASS Merchant Pricing publication lifecycle schema objects exist");
+  console.log(
+    "PASS Merchant Pricing publication lifecycle schema objects exist",
+  );
 }
 
 function assertUpgradeConvergence() {
@@ -210,7 +273,9 @@ function assertUpgradeConvergence() {
     isActive: true,
     translations: 20,
   });
-  console.log("PASS existing complete plans converge to READY without rewrite or deactivation");
+  console.log(
+    "PASS existing complete plans converge to READY without rewrite or deactivation",
+  );
 }
 
 function assertDraftLifecycle() {
@@ -245,7 +310,9 @@ COMMIT;`);
     planTranslations: 1,
     highlightTranslations: 1,
   });
-  console.log("PASS TRANSLATING plans persist in the catalogue with English-only plan/highlight content");
+  console.log(
+    "PASS TRANSLATING plans persist in the catalogue with English-only plan/highlight content",
+  );
 
   expectRejected(
     "non-ready plan cannot be active",
@@ -256,11 +323,22 @@ COMMIT;`);
 
   expectRejected(
     "non-ready plan requires durable translation run",
-    draftPlanInsert({ id: "arch031-no-run-plan", handle: "arch031-no-run", runId: null, position: basePosition + 1 }),
+    draftPlanInsert({
+      id: "arch031-no-run-plan",
+      handle: "arch031-no-run",
+      runId: null,
+      position: basePosition + 1,
+    }),
     "23514",
   );
 
-  psql(insertRun({ id: "arch031-wrong-run", handle: "different-handle", hashChar: "c" }));
+  psql(
+    insertRun({
+      id: "arch031-wrong-run",
+      handle: "different-handle",
+      hashChar: "c",
+    }),
+  );
   expectRejected(
     "plan current translation run must use the exact Shopify handle",
     `${draftPlanInsert({ id: "arch031-wrong-run-plan", handle: "arch031-wrong", runId: "arch031-wrong-run", position: basePosition + 1 })}
@@ -281,10 +359,16 @@ COMMIT;`);
 
 function assertReadyPromotion() {
   const planValues = nonEnglishLocales
-    .map((locale, index) => `('arch031-final-plan-${index}','arch031-draft-plan','${locale}','Translated ${locale}',CURRENT_TIMESTAMP)`)
+    .map(
+      (locale, index) =>
+        `('arch031-final-plan-${index}','arch031-draft-plan','${locale}','Translated ${locale}',CURRENT_TIMESTAMP)`,
+    )
     .join(",\n");
   const highlightValues = nonEnglishLocales
-    .map((locale, index) => `('arch031-final-highlight-${index}','arch031-draft-highlight','${locale}','Title ${locale}','Description ${locale}',CURRENT_TIMESTAMP)`)
+    .map(
+      (locale, index) =>
+        `('arch031-final-highlight-${index}','arch031-draft-highlight','${locale}','Title ${locale}','Description ${locale}',CURRENT_TIMESTAMP)`,
+    )
     .join(",\n");
 
   psql(`BEGIN;
@@ -318,30 +402,51 @@ COMMIT;`);
     planTranslations: 20,
     highlightTranslations: 20,
   });
-  console.log("PASS completed translations promote the same persisted plan to READY while leaving it inactive");
+  console.log(
+    "PASS completed translations promote the same persisted plan to READY while leaving it inactive",
+  );
 
-  psql(`UPDATE billing."MerchantPricingPlan" SET "isActive"=true WHERE "id"='arch031-draft-plan';`);
+  psql(
+    `UPDATE billing."MerchantPricingPlan" SET "isActive"=true WHERE "id"='arch031-draft-plan';`,
+  );
   assert.equal(
-    jsonQuery(`SELECT "isActive"::text FROM billing."MerchantPricingPlan" WHERE "id"='arch031-draft-plan';`),
+    jsonQuery(
+      `SELECT "isActive"::text FROM billing."MerchantPricingPlan" WHERE "id"='arch031-draft-plan';`,
+    ),
     true,
   );
-  console.log("PASS READY plan may be activated explicitly after translation completion");
+  console.log(
+    "PASS READY plan may be activated explicitly after translation completion",
+  );
 }
 
 async function main() {
   try {
     docker([
-      "run", "--detach", "--name", containerName, "--network", "none",
-      "--env", "POSTGRES_PASSWORD=fixture-only",
-      "--env", `POSTGRES_DB=${databaseName}`,
+      "run",
+      "--detach",
+      "--name",
+      containerName,
+      "--network",
+      "none",
+      "--env",
+      "POSTGRES_PASSWORD=fixture-only",
+      "--env",
+      `POSTGRES_DB=${databaseName}`,
       "pgvector/pgvector:pg17",
     ]);
     containerStarted = true;
     await awaitPostgres();
-    console.log(`ISOLATION container=${containerName} image=pgvector/pgvector:pg17 network=none mode=${mode}`);
+    console.log(
+      `ISOLATION container=${containerName} image=pgvector/pgvector:pg17 network=none mode=${mode}`,
+    );
 
     const names = migrationNames();
-    assert.equal(names.at(-1), targetMigration, "publication lifecycle migration must be the latest ordered migration");
+    assert.equal(
+      names.at(-1),
+      targetMigration,
+      "publication lifecycle migration must be the latest ordered migration",
+    );
     for (const name of names) {
       if (name === targetMigration) break;
       applyMigration(name);
@@ -356,11 +461,15 @@ async function main() {
     assertDraftLifecycle();
     assertReadyPromotion();
 
-    console.log(`ARCH-031 Merchant Pricing publication lifecycle ${mode} PostgreSQL rehearsal passed.`);
+    console.log(
+      `ARCH-031 Merchant Pricing publication lifecycle ${mode} PostgreSQL rehearsal passed.`,
+    );
   } finally {
     if (containerStarted) {
       docker(["rm", "--force", containerName]);
-      console.log(`CLEANUP removed invocation-owned container ${containerName}`);
+      console.log(
+        `CLEANUP removed invocation-owned container ${containerName}`,
+      );
     }
   }
 }

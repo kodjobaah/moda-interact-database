@@ -14,15 +14,23 @@ const migration = await readFile(
 );
 
 function prismaBlock(kind, name) {
-  const match = schema.match(new RegExp(`${kind} ${name} \\{([\\s\\S]*?)\\n\\}`, "m"));
+  const match = schema.match(
+    new RegExp(`${kind} ${name} \\{([\\s\\S]*?)\\n\\}`, "m"),
+  );
   assert.ok(match, `missing Prisma ${kind} ${name}`);
   return match[1];
 }
 
 const category = prismaBlock("model", "CommercePromptTemplateCategory");
 assert.match(category, /enabled\s+Boolean\s+@default\(false\)/);
-assert.match(category, /translations\s+CommercePromptTemplateCategoryTranslation\[\]/);
-assert.match(category, /translationRuns\s+CommerceStoreCategoryTranslationRun\[\]/);
+assert.match(
+  category,
+  /translations\s+CommercePromptTemplateCategoryTranslation\[\]/,
+);
+assert.match(
+  category,
+  /translationRuns\s+CommerceStoreCategoryTranslationRun\[\]/,
+);
 
 const categoryTranslation = prismaBlock(
   "model",

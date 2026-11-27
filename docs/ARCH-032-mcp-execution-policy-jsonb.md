@@ -41,12 +41,12 @@ root, `schemaVersion === 1`, an object for `environments`, no unknown keys,
 and, for each present entry, exactly the four named fields, each an integer
 within the following **initial proposed safety envelope** (all inclusive):
 
-| Field | Range | Reason for upper bound |
-| --- | --- | --- |
-| `toolDeadlineMs` | 1–120000 | Avoid multi-minute work occupying MCP workers; well below Node timer overflow |
-| `providerResponseTimeoutMs` | 1–60000 | Bound each external provider call to at most one minute |
-| `maxProviderRequests` | 1–64 | Bound provider-call amplification per tool execution |
-| `maxResponseBytes` | 1–1048576 | Bound aggregate serialized tool-result memory to 1 MiB |
+| Field                       | Range     | Reason for upper bound                                                        |
+| --------------------------- | --------- | ----------------------------------------------------------------------------- |
+| `toolDeadlineMs`            | 1–120000  | Avoid multi-minute work occupying MCP workers; well below Node timer overflow |
+| `providerResponseTimeoutMs` | 1–60000   | Bound each external provider call to at most one minute                       |
+| `maxProviderRequests`       | 1–64      | Bound provider-call amplification per tool execution                          |
+| `maxResponseBytes`          | 1–1048576 | Bound aggregate serialized tool-result memory to 1 MiB                        |
 
 These are **validation ceilings**, distinct from the explicitly seeded defaults.
 They permit the current 10000 ms / 12 requests / 262144 bytes while allowing reviewed

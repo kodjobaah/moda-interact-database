@@ -1,14 +1,14 @@
-import assert from 'node:assert/strict';
+import assert from "node:assert/strict";
 
-const compact = value => value.replace(/\s+/g, ' ').trim();
-const expression = value => {
+const compact = (value) => value.replace(/\s+/g, " ").trim();
+const expression = (value) => {
   let normalized = compact(value).toLowerCase();
-  while (normalized.startsWith('(') && normalized.endsWith(')')) {
+  while (normalized.startsWith("(") && normalized.endsWith(")")) {
     let depth = 0;
     let wrapsWholeExpression = true;
     for (let index = 0; index < normalized.length - 1; index += 1) {
-      if (normalized[index] === '(') depth += 1;
-      if (normalized[index] === ')') depth -= 1;
+      if (normalized[index] === "(") depth += 1;
+      if (normalized[index] === ")") depth -= 1;
       if (depth === 0) {
         wrapsWholeExpression = false;
         break;
@@ -22,67 +22,141 @@ const expression = value => {
 
 const tableColumns = {
   CommerceStoreCategoryTaxonomyMapping: [
-    '"id" TEXT NOT NULL', '"categoryId" TEXT NOT NULL', '"shopifyTaxonomyCategoryId" VARCHAR(255) NOT NULL',
-    '"weight" INTEGER NOT NULL DEFAULT 1', '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    '"id" TEXT NOT NULL',
+    '"categoryId" TEXT NOT NULL',
+    '"shopifyTaxonomyCategoryId" VARCHAR(255) NOT NULL',
+    '"weight" INTEGER NOT NULL DEFAULT 1',
+    '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
     '"updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
   ],
   CommerceShopProfile: [
-    '"id" TEXT NOT NULL', '"shopId" TEXT NOT NULL', '"activeCategoryId" TEXT', '"activeCategoryActivatedAt" TIMESTAMPTZ(3)',
-    '"pendingCategoryId" TEXT', '"pendingPromptRevisionId" TEXT', '"pendingSelectionGeneration" INTEGER NOT NULL DEFAULT 0',
-    '"pendingSelectedAt" TIMESTAMPTZ(3)', '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    '"id" TEXT NOT NULL',
+    '"shopId" TEXT NOT NULL',
+    '"activeCategoryId" TEXT',
+    '"activeCategoryActivatedAt" TIMESTAMPTZ(3)',
+    '"pendingCategoryId" TEXT',
+    '"pendingPromptRevisionId" TEXT',
+    '"pendingSelectionGeneration" INTEGER NOT NULL DEFAULT 0',
+    '"pendingSelectedAt" TIMESTAMPTZ(3)',
+    '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
     '"updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
   ],
   MerchantKnowledgePurpose: [
-    '"id" TEXT NOT NULL', '"key" VARCHAR(64) NOT NULL', '"displayName" VARCHAR(160) NOT NULL',
-    '"active" BOOLEAN NOT NULL DEFAULT true', '"displayOrder" INTEGER NOT NULL DEFAULT 0',
-    '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP', '"updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    '"id" TEXT NOT NULL',
+    '"key" VARCHAR(64) NOT NULL',
+    '"displayName" VARCHAR(160) NOT NULL',
+    '"active" BOOLEAN NOT NULL DEFAULT true',
+    '"displayOrder" INTEGER NOT NULL DEFAULT 0',
+    '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    '"updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
   ],
   MerchantKnowledgeDataFormat: [
-    '"id" TEXT NOT NULL', '"key" VARCHAR(32) NOT NULL', '"displayName" VARCHAR(160) NOT NULL',
-    '"inputKind" "commerce"."MerchantKnowledgeInputKind" NOT NULL', '"canonicalExtension" VARCHAR(16)',
-    '"acceptedContentTypes" JSONB NOT NULL', '"active" BOOLEAN NOT NULL DEFAULT true', '"displayOrder" INTEGER NOT NULL DEFAULT 0',
-    '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP', '"updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    '"id" TEXT NOT NULL',
+    '"key" VARCHAR(32) NOT NULL',
+    '"displayName" VARCHAR(160) NOT NULL',
+    '"inputKind" "commerce"."MerchantKnowledgeInputKind" NOT NULL',
+    '"canonicalExtension" VARCHAR(16)',
+    '"acceptedContentTypes" JSONB NOT NULL',
+    '"active" BOOLEAN NOT NULL DEFAULT true',
+    '"displayOrder" INTEGER NOT NULL DEFAULT 0',
+    '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    '"updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
   ],
   MerchantKnowledgePurposeDataFormat: [
-    '"purposeId" TEXT NOT NULL', '"dataFormatId" TEXT NOT NULL', '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    '"purposeId" TEXT NOT NULL',
+    '"dataFormatId" TEXT NOT NULL',
+    '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
   ],
   MerchantKnowledgeUploadedAsset: [
-    '"id" TEXT NOT NULL', '"shopId" TEXT NOT NULL', '"dataFormatId" TEXT NOT NULL',
+    '"id" TEXT NOT NULL',
+    '"shopId" TEXT NOT NULL',
+    '"dataFormatId" TEXT NOT NULL',
     '"status" "commerce"."MerchantKnowledgeUploadedAssetStatus" NOT NULL DEFAULT \'PENDING_UPLOAD\'',
-    '"objectKey" TEXT NOT NULL', '"originalFileName" VARCHAR(255) NOT NULL', '"contentType" VARCHAR(128)',
-    '"sizeBytes" BIGINT', '"sha256" VARCHAR(64)', '"uploadExpiresAt" TIMESTAMPTZ(3) NOT NULL',
-    '"availableAt" TIMESTAMPTZ(3)', '"failureCode" VARCHAR(128)', '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    '"objectKey" TEXT NOT NULL',
+    '"originalFileName" VARCHAR(255) NOT NULL',
+    '"contentType" VARCHAR(128)',
+    '"sizeBytes" BIGINT',
+    '"sha256" VARCHAR(64)',
+    '"uploadExpiresAt" TIMESTAMPTZ(3) NOT NULL',
+    '"availableAt" TIMESTAMPTZ(3)',
+    '"failureCode" VARCHAR(128)',
+    '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
     '"updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
   ],
   MerchantKnowledgeSource: [
-    '"id" TEXT NOT NULL', '"shopId" TEXT NOT NULL', '"purposeId" TEXT NOT NULL', '"dataFormatId" TEXT NOT NULL',
-    '"name" VARCHAR(160) NOT NULL', '"languageTag" VARCHAR(16) NOT NULL', '"position" INTEGER NOT NULL',
-    '"currentGeneration" INTEGER NOT NULL DEFAULT 0', '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    '"id" TEXT NOT NULL',
+    '"shopId" TEXT NOT NULL',
+    '"purposeId" TEXT NOT NULL',
+    '"dataFormatId" TEXT NOT NULL',
+    '"name" VARCHAR(160) NOT NULL',
+    '"languageTag" VARCHAR(16) NOT NULL',
+    '"position" INTEGER NOT NULL',
+    '"currentGeneration" INTEGER NOT NULL DEFAULT 0',
+    '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
     '"updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
   ],
   MerchantKnowledgeSourceRevision: [
-    '"id" TEXT NOT NULL', '"sourceId" TEXT NOT NULL', '"uploadedAssetId" TEXT', '"generation" INTEGER NOT NULL',
-    '"reason" "commerce"."MerchantKnowledgeRevisionReason" NOT NULL', '"requestedUrl" VARCHAR(2048)', '"resolvedUrl" VARCHAR(2048)',
-    '"status" "commerce"."MerchantKnowledgeRevisionStatus" NOT NULL DEFAULT \'PENDING\'', '"contentType" VARCHAR(128)',
-    '"httpStatus" INTEGER', '"normalizedContent" TEXT', '"contentUnits" INTEGER', '"contentHash" VARCHAR(64)',
-    '"truncated" BOOLEAN NOT NULL DEFAULT false', '"failureCode" VARCHAR(128)', '"requestedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
-    '"processingStartedAt" TIMESTAMPTZ(3)', '"fetchedAt" TIMESTAMPTZ(3)', '"completedAt" TIMESTAMPTZ(3)',
-    '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP', '"updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    '"id" TEXT NOT NULL',
+    '"sourceId" TEXT NOT NULL',
+    '"uploadedAssetId" TEXT',
+    '"generation" INTEGER NOT NULL',
+    '"reason" "commerce"."MerchantKnowledgeRevisionReason" NOT NULL',
+    '"requestedUrl" VARCHAR(2048)',
+    '"resolvedUrl" VARCHAR(2048)',
+    '"status" "commerce"."MerchantKnowledgeRevisionStatus" NOT NULL DEFAULT \'PENDING\'',
+    '"contentType" VARCHAR(128)',
+    '"httpStatus" INTEGER',
+    '"normalizedContent" TEXT',
+    '"contentUnits" INTEGER',
+    '"contentHash" VARCHAR(64)',
+    '"truncated" BOOLEAN NOT NULL DEFAULT false',
+    '"failureCode" VARCHAR(128)',
+    '"requestedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    '"processingStartedAt" TIMESTAMPTZ(3)',
+    '"fetchedAt" TIMESTAMPTZ(3)',
+    '"completedAt" TIMESTAMPTZ(3)',
+    '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    '"updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
   ],
   MerchantKnowledgeChunk: [
-    '"id" TEXT NOT NULL', '"revisionId" TEXT NOT NULL', '"ordinal" INTEGER NOT NULL', '"content" TEXT NOT NULL',
-    '"contentUnits" INTEGER NOT NULL', '"contentHash" VARCHAR(64) NOT NULL', '"embedding" vector NOT NULL',
-    '"embeddingProvider" VARCHAR(64) NOT NULL', '"embeddingModel" VARCHAR(255) NOT NULL',
-    '"embeddingDimensions" INTEGER NOT NULL', '"embeddingIndexVersion" VARCHAR(64) NOT NULL',
+    '"id" TEXT NOT NULL',
+    '"revisionId" TEXT NOT NULL',
+    '"ordinal" INTEGER NOT NULL',
+    '"content" TEXT NOT NULL',
+    '"contentUnits" INTEGER NOT NULL',
+    '"contentHash" VARCHAR(64) NOT NULL',
+    '"embedding" vector NOT NULL',
+    '"embeddingProvider" VARCHAR(64) NOT NULL',
+    '"embeddingModel" VARCHAR(255) NOT NULL',
+    '"embeddingDimensions" INTEGER NOT NULL',
+    '"embeddingIndexVersion" VARCHAR(64) NOT NULL',
     '"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
   ],
 };
 
 const enumContracts = {
-  MerchantKnowledgeInputKind: ['REMOTE_URL', 'UPLOAD'],
-  MerchantKnowledgeRevisionReason: ['CREATE', 'URL_CHANGE', 'FILE_REPLACE', 'REFRESH', 'REPROCESS', 'ENTITLEMENT_CHANGE'],
-  MerchantKnowledgeRevisionStatus: ['PENDING', 'PROCESSING', 'ACTIVE', 'FAILED', 'SUPERSEDED'],
-  MerchantKnowledgeUploadedAssetStatus: ['PENDING_UPLOAD', 'AVAILABLE', 'FAILED', 'DELETED'],
+  MerchantKnowledgeInputKind: ["REMOTE_URL", "UPLOAD"],
+  MerchantKnowledgeRevisionReason: [
+    "CREATE",
+    "URL_CHANGE",
+    "FILE_REPLACE",
+    "REFRESH",
+    "REPROCESS",
+    "ENTITLEMENT_CHANGE",
+  ],
+  MerchantKnowledgeRevisionStatus: [
+    "PENDING",
+    "PROCESSING",
+    "ACTIVE",
+    "FAILED",
+    "SUPERSEDED",
+  ],
+  MerchantKnowledgeUploadedAssetStatus: [
+    "PENDING_UPLOAD",
+    "AVAILABLE",
+    "FAILED",
+    "DELETED",
+  ],
 };
 
 const foreignKeys = [
@@ -107,21 +181,31 @@ const foreignKeys = [
 
 const checks = {
   CommerceStoreCategoryTaxonomyMapping_weight_positive: '"weight" > 0',
-  CommerceShopProfile_pending_generation_nonnegative: '"pendingSelectionGeneration" >= 0',
-  CommerceShopProfile_pending_tuple_check: '(("pendingCategoryId" IS NULL AND "pendingPromptRevisionId" IS NULL AND "pendingSelectedAt" IS NULL) OR ("pendingCategoryId" IS NOT NULL AND "pendingPromptRevisionId" IS NOT NULL AND "pendingSelectedAt" IS NOT NULL))',
-  CommerceShopProfile_active_category_timestamp_check: '(("activeCategoryId" IS NULL AND "activeCategoryActivatedAt" IS NULL) OR ("activeCategoryId" IS NOT NULL AND "activeCategoryActivatedAt" IS NOT NULL))',
-  MerchantKnowledgeUploadedAsset_available_fields_check: '"status" <> \'AVAILABLE\' OR ("contentType" IS NOT NULL AND btrim("contentType") <> \'\' AND "sizeBytes" IS NOT NULL AND "sizeBytes" > 0 AND "sha256" IS NOT NULL AND "sha256" ~ \'^[0-9a-f]{64}$\' AND "availableAt" IS NOT NULL)',
+  CommerceShopProfile_pending_generation_nonnegative:
+    '"pendingSelectionGeneration" >= 0',
+  CommerceShopProfile_pending_tuple_check:
+    '(("pendingCategoryId" IS NULL AND "pendingPromptRevisionId" IS NULL AND "pendingSelectedAt" IS NULL) OR ("pendingCategoryId" IS NOT NULL AND "pendingPromptRevisionId" IS NOT NULL AND "pendingSelectedAt" IS NOT NULL))',
+  CommerceShopProfile_active_category_timestamp_check:
+    '(("activeCategoryId" IS NULL AND "activeCategoryActivatedAt" IS NULL) OR ("activeCategoryId" IS NOT NULL AND "activeCategoryActivatedAt" IS NOT NULL))',
+  MerchantKnowledgeUploadedAsset_available_fields_check:
+    '"status" <> \'AVAILABLE\' OR ("contentType" IS NOT NULL AND btrim("contentType") <> \'\' AND "sizeBytes" IS NOT NULL AND "sizeBytes" > 0 AND "sha256" IS NOT NULL AND "sha256" ~ \'^[0-9a-f]{64}$\' AND "availableAt" IS NOT NULL)',
   MerchantKnowledgeSource_position_nonnegative: '"position" >= 0',
   MerchantKnowledgeSource_generation_nonnegative: '"currentGeneration" >= 0',
-  MerchantKnowledgeSourceRevision_locator_check: '("requestedUrl" IS NOT NULL) <> ("uploadedAssetId" IS NOT NULL)',
-  MerchantKnowledgeSourceRevision_resolved_url_check: '"resolvedUrl" IS NULL OR "requestedUrl" IS NOT NULL',
+  MerchantKnowledgeSourceRevision_locator_check:
+    '("requestedUrl" IS NOT NULL) <> ("uploadedAssetId" IS NOT NULL)',
+  MerchantKnowledgeSourceRevision_resolved_url_check:
+    '"resolvedUrl" IS NULL OR "requestedUrl" IS NOT NULL',
   MerchantKnowledgeSourceRevision_generation_positive: '"generation" > 0',
-  MerchantKnowledgeSourceRevision_active_content_check: '"status" NOT IN (\'ACTIVE\', \'SUPERSEDED\') OR ("contentUnits" IS NOT NULL AND "contentUnits" >= 0 AND "contentHash" IS NOT NULL AND "contentHash" ~ \'^[0-9a-f]{64}$\')',
+  MerchantKnowledgeSourceRevision_active_content_check:
+    '"status" NOT IN (\'ACTIVE\', \'SUPERSEDED\') OR ("contentUnits" IS NOT NULL AND "contentUnits" >= 0 AND "contentHash" IS NOT NULL AND "contentHash" ~ \'^[0-9a-f]{64}$\')',
   MerchantKnowledgeChunk_ordinal_nonnegative: '"ordinal" >= 0',
   MerchantKnowledgeChunk_content_units_positive: '"contentUnits" > 0',
-  MerchantKnowledgeChunk_embedding_dimensions_positive: '"embeddingDimensions" > 0',
-  MerchantKnowledgeChunk_embedding_dimensions_match: 'vector_dims("embedding") = "embeddingDimensions"',
-  MerchantKnowledgeChunk_content_hash_check: '"contentHash" ~ \'^[0-9a-f]{64}$\'',
+  MerchantKnowledgeChunk_embedding_dimensions_positive:
+    '"embeddingDimensions" > 0',
+  MerchantKnowledgeChunk_embedding_dimensions_match:
+    'vector_dims("embedding") = "embeddingDimensions"',
+  MerchantKnowledgeChunk_content_hash_check:
+    "\"contentHash\" ~ '^[0-9a-f]{64}$'",
 };
 
 const indexStatements = [
@@ -170,11 +254,11 @@ const extractCheck = (sql, name) => {
   const marker = new RegExp(`CONSTRAINT "${name}"\\s+CHECK\\s+\\(`);
   const match = marker.exec(sql);
   assert.ok(match, `${name} missing`);
-  const open = match.index + match[0].lastIndexOf('(');
+  const open = match.index + match[0].lastIndexOf("(");
   let depth = 0;
   for (let index = open; index < sql.length; index += 1) {
-    if (sql[index] === '(') depth += 1;
-    if (sql[index] === ')') {
+    if (sql[index] === "(") depth += 1;
+    if (sql[index] === ")") {
       depth -= 1;
       if (depth === 0) return sql.slice(open + 1, index);
     }
@@ -184,13 +268,31 @@ const extractCheck = (sql, name) => {
 
 export function validateMigrationContract(sql) {
   const normalized = compact(sql);
-  assert.match(sql, /CREATE EXTENSION IF NOT EXISTS vector\s*;/i, 'pgvector extension must be enabled');
+  assert.match(
+    sql,
+    /CREATE EXTENSION IF NOT EXISTS vector\s*;/i,
+    "pgvector extension must be enabled",
+  );
 
-  const enumNames = [...sql.matchAll(/CREATE TYPE "commerce"\."(MerchantKnowledge\w+)" AS ENUM \(([^)]*)\);/g)];
-  assert.deepEqual(enumNames.map(match => match[1]).sort(), Object.keys(enumContracts).sort(), 'ARCH-023 enum set differs');
+  const enumNames = [
+    ...sql.matchAll(
+      /CREATE TYPE "commerce"\."(MerchantKnowledge\w+)" AS ENUM \(([^)]*)\);/g,
+    ),
+  ];
+  assert.deepEqual(
+    enumNames.map((match) => match[1]).sort(),
+    Object.keys(enumContracts).sort(),
+    "ARCH-023 enum set differs",
+  );
   for (const match of enumNames) {
-    const actualValues = [...match[2].matchAll(/'([^']+)'/g)].map(value => value[1]);
-    assert.deepEqual(actualValues, enumContracts[match[1]], `${match[1]} values differ`);
+    const actualValues = [...match[2].matchAll(/'([^']+)'/g)].map(
+      (value) => value[1],
+    );
+    assert.deepEqual(
+      actualValues,
+      enumContracts[match[1]],
+      `${match[1]} values differ`,
+    );
   }
 
   const alterations = [
@@ -199,41 +301,121 @@ export function validateMigrationContract(sql) {
     'ALTER TABLE "commerce"."CommercePromptTemplateCategory" ADD COLUMN "defaultTemplateId" TEXT;',
     'ALTER TABLE "commerce"."CommerceAgentPromptRevision" ADD COLUMN "sourceTemplateEditVersion" INTEGER;',
   ];
-  for (const statement of alterations) assert.ok(normalized.includes(compact(statement)), `Required exact column alteration missing: ${statement}`);
+  for (const statement of alterations)
+    assert.ok(
+      normalized.includes(compact(statement)),
+      `Required exact column alteration missing: ${statement}`,
+    );
 
-  const tableNames = [...sql.matchAll(/CREATE TABLE "commerce"\."(\w+)"/g)].map(match => match[1]);
-  assert.deepEqual(tableNames.sort(), Object.keys(tableColumns).sort(), 'ARCH-023 created table set differs');
+  const tableNames = [...sql.matchAll(/CREATE TABLE "commerce"\."(\w+)"/g)].map(
+    (match) => match[1],
+  );
+  assert.deepEqual(
+    tableNames.sort(),
+    Object.keys(tableColumns).sort(),
+    "ARCH-023 created table set differs",
+  );
   for (const [name, expectedColumns] of Object.entries(tableColumns)) {
-    const match = sql.match(new RegExp(`CREATE TABLE "commerce"\\."${name}" \\(([\\s\\S]*?)\\n\\);`));
+    const match = sql.match(
+      new RegExp(`CREATE TABLE "commerce"\\."${name}" \\(([\\s\\S]*?)\\n\\);`),
+    );
     assert.ok(match, `${name} table definition missing`);
-    const actualColumns = match[1].split('\n').map(line => line.trim().replace(/,$/, '')).filter(line => line.startsWith('"'));
-    assert.deepEqual(actualColumns, expectedColumns, `${name} column types/nullability/defaults differ from contract`);
+    const actualColumns = match[1]
+      .split("\n")
+      .map((line) => line.trim().replace(/,$/, ""))
+      .filter((line) => line.startsWith('"'));
+    assert.deepEqual(
+      actualColumns,
+      expectedColumns,
+      `${name} column types/nullability/defaults differ from contract`,
+    );
   }
 
-  for (const statement of inlineConstraints) assert.ok(normalized.includes(compact(statement)), `Required key missing: ${statement}`);
-  for (const foreignKey of foreignKeys) assert.ok(normalized.includes(compact(foreignKey)), `Exact foreign key contract missing: ${foreignKey}`);
+  for (const statement of inlineConstraints)
+    assert.ok(
+      normalized.includes(compact(statement)),
+      `Required key missing: ${statement}`,
+    );
+  for (const foreignKey of foreignKeys)
+    assert.ok(
+      normalized.includes(compact(foreignKey)),
+      `Exact foreign key contract missing: ${foreignKey}`,
+    );
   const expectedConstraintNames = [
-    ...inlineConstraints.map(statement => statement.match(/CONSTRAINT "([^"]+)"/)?.[1]),
-    ...foreignKeys.map(statement => statement.match(/CONSTRAINT "([^"]+)"/)?.[1]),
+    ...inlineConstraints.map(
+      (statement) => statement.match(/CONSTRAINT "([^"]+)"/)?.[1],
+    ),
+    ...foreignKeys.map(
+      (statement) => statement.match(/CONSTRAINT "([^"]+)"/)?.[1],
+    ),
     ...Object.keys(checks),
   ].sort();
-  const actualConstraintNames = [...sql.matchAll(/CONSTRAINT "([^"]+)"/g)].map(match => match[1]).sort();
-  assert.deepEqual(actualConstraintNames, expectedConstraintNames, 'ARCH-023 named constraint set differs');
+  const actualConstraintNames = [...sql.matchAll(/CONSTRAINT "([^"]+)"/g)]
+    .map((match) => match[1])
+    .sort();
+  assert.deepEqual(
+    actualConstraintNames,
+    expectedConstraintNames,
+    "ARCH-023 named constraint set differs",
+  );
 
-  const actualIndexes = [...sql.matchAll(/CREATE (?:UNIQUE )?INDEX[^;]+;/g)].map(match => compact(match[0]));
-  assert.deepEqual(actualIndexes.sort(), indexStatements.map(compact).sort(), 'ARCH-023 index definitions differ');
+  const actualIndexes = [
+    ...sql.matchAll(/CREATE (?:UNIQUE )?INDEX[^;]+;/g),
+  ].map((match) => compact(match[0]));
+  assert.deepEqual(
+    actualIndexes.sort(),
+    indexStatements.map(compact).sort(),
+    "ARCH-023 index definitions differ",
+  );
 
-  const actualCheckNames = [...sql.matchAll(/CONSTRAINT "([^"]+)"\s+CHECK\s+\(/g)].map(match => match[1]).sort();
-  assert.deepEqual(actualCheckNames, Object.keys(checks).sort(), 'ARCH-023 check constraint set differs');
+  const actualCheckNames = [
+    ...sql.matchAll(/CONSTRAINT "([^"]+)"\s+CHECK\s+\(/g),
+  ]
+    .map((match) => match[1])
+    .sort();
+  assert.deepEqual(
+    actualCheckNames,
+    Object.keys(checks).sort(),
+    "ARCH-023 check constraint set differs",
+  );
   for (const [name, expected] of Object.entries(checks)) {
-    assert.equal(expression(extractCheck(sql, name)), expression(expected), `${name} CHECK semantics differ`);
+    assert.equal(
+      expression(extractCheck(sql, name)),
+      expression(expected),
+      `${name} CHECK semantics differ`,
+    );
   }
 
-  assert.match(normalized, /CREATE UNIQUE INDEX "MerchantKnowledgeSourceRevision_one_active_per_source" ON commerce\."MerchantKnowledgeSourceRevision" \("sourceId"\) WHERE "status" = 'ACTIVE';/);
-  assert.doesNotMatch(sql, /USING\s+(?:hnsw|ivfflat)|\b(?:HNSW|IVFFLAT)\b/i, 'ANN indexes are out of scope');
-  assert.doesNotMatch(sql, /CREATE\s+TRIGGER|CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION/i, 'ARCH-023 must not add triggers/functions');
-  const insertTargets = [...sql.matchAll(/^INSERT INTO "([^"]+)"\."([^"]+)"/gm)].map(match => `${match[1]}.${match[2]}`);
-  assert.deepEqual(insertTargets, ['commerce.MerchantKnowledgePurpose', 'commerce.MerchantKnowledgeDataFormat', 'commerce.MerchantKnowledgePurposeDataFormat']);
-  assert.doesNotMatch(sql, /'merchant_knowledge'/i, 'Do not seed a Merchant Knowledge Feature, plan, Capability, Tool, or Release');
-  assert.doesNotMatch(sql, /DROP\s+(?:TABLE|SCHEMA|COLUMN)|TRUNCATE\s+TABLE/i, 'Migration must be additive');
+  assert.match(
+    normalized,
+    /CREATE UNIQUE INDEX "MerchantKnowledgeSourceRevision_one_active_per_source" ON commerce\."MerchantKnowledgeSourceRevision" \("sourceId"\) WHERE "status" = 'ACTIVE';/,
+  );
+  assert.doesNotMatch(
+    sql,
+    /USING\s+(?:hnsw|ivfflat)|\b(?:HNSW|IVFFLAT)\b/i,
+    "ANN indexes are out of scope",
+  );
+  assert.doesNotMatch(
+    sql,
+    /CREATE\s+TRIGGER|CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION/i,
+    "ARCH-023 must not add triggers/functions",
+  );
+  const insertTargets = [
+    ...sql.matchAll(/^INSERT INTO "([^"]+)"\."([^"]+)"/gm),
+  ].map((match) => `${match[1]}.${match[2]}`);
+  assert.deepEqual(insertTargets, [
+    "commerce.MerchantKnowledgePurpose",
+    "commerce.MerchantKnowledgeDataFormat",
+    "commerce.MerchantKnowledgePurposeDataFormat",
+  ]);
+  assert.doesNotMatch(
+    sql,
+    /'merchant_knowledge'/i,
+    "Do not seed a Merchant Knowledge Feature, plan, Capability, Tool, or Release",
+  );
+  assert.doesNotMatch(
+    sql,
+    /DROP\s+(?:TABLE|SCHEMA|COLUMN)|TRUNCATE\s+TABLE/i,
+    "Migration must be additive",
+  );
 }

@@ -24,7 +24,10 @@ const requiredRefundFields = [
 ];
 
 for (const [name, type] of requiredRefundFields) {
-  assert.match(refund, new RegExp(`\\b${name}\\s+${type.replace("?", "\\?")}(?=\\s|$)`));
+  assert.match(
+    refund,
+    new RegExp(`\\b${name}\\s+${type.replace("?", "\\?")}(?=\\s|$)`),
+  );
 }
 assert.match(refund, /automaticCorrectionUsageEventId\s+String\?\s+@unique/);
 assert.match(
@@ -59,18 +62,30 @@ for (const field of [
 ]) {
   assert.doesNotMatch(usageEvent, new RegExp(`\\b${field}\\b`));
 }
-assert.doesNotMatch(schema, /providerUsageQuantityBeforeCorrectionSnapshot|expectedProviderUsageQuantityAfterCorrectionSnapshot/);
+assert.doesNotMatch(
+  schema,
+  /providerUsageQuantityBeforeCorrectionSnapshot|expectedProviderUsageQuantityAfterCorrectionSnapshot/,
+);
 
 assert.match(migration, /ADD COLUMN "automaticCorrectionUsageEventId" TEXT/);
 for (const [name] of requiredRefundFields.slice(1)) {
-  assert.match(migration, new RegExp(`ADD COLUMN "${name}" DECIMAL\\(65,30\\)`));
+  assert.match(
+    migration,
+    new RegExp(`ADD COLUMN "${name}" DECIMAL\\(65,30\\)`),
+  );
 }
-assert.match(migration, /CREATE UNIQUE INDEX "RecoveryCreditRefund_automaticCorrectionUsageEventId_key"/);
+assert.match(
+  migration,
+  /CREATE UNIQUE INDEX "RecoveryCreditRefund_automaticCorrectionUsageEventId_key"/,
+);
 assert.match(
   migration,
   /FOREIGN KEY \("automaticCorrectionUsageEventId"\) REFERENCES "billing"\."UsageEvent"\("id"\)\s+ON DELETE RESTRICT/,
 );
-assert.match(migration, /ck_arch015_refund_automatic_correction_evidence_group/);
+assert.match(
+  migration,
+  /ck_arch015_refund_automatic_correction_evidence_group/,
+);
 assert.match(migration, /ck_arch015_refund_automatic_correction_nonnegative/);
 assert.doesNotMatch(migration, /^\s*(UPDATE|INSERT)\s/im);
 
@@ -81,7 +96,12 @@ const evidenceFields = [
   "expectedProviderUsageQuantityAfterCorrection",
   "expectedProviderUsageCostAfterCorrection",
 ];
-const automaticFields = [...evidenceFields, "finalCreditQuantity", "expectedProviderAmount", "expectedProviderCurrency"];
+const automaticFields = [
+  ...evidenceFields,
+  "finalCreditQuantity",
+  "expectedProviderAmount",
+  "expectedProviderCurrency",
+];
 const evidenceGroupValid = (row) => {
   const allNull = evidenceFields.every((field) => row[field] == null);
   const allPresent = automaticFields.every((field) => row[field] != null);
@@ -115,11 +135,34 @@ const completeAutomatic = {
   expectedProviderUsageCostAfterCorrection: 1.25,
 };
 
-assert.equal(evidenceGroupValid({ ...manualFallback, finalCreditQuantity: null, expectedProviderAmount: null, expectedProviderCurrency: null }), true);
+assert.equal(
+  evidenceGroupValid({
+    ...manualFallback,
+    finalCreditQuantity: null,
+    expectedProviderAmount: null,
+    expectedProviderCurrency: null,
+  }),
+  true,
+);
 assert.equal(evidenceGroupValid(completeAutomatic), true);
-assert.equal(evidenceGroupValid({ ...completeAutomatic, providerUsageCostBeforeCorrection: null }), false);
-assert.equal(automaticNumbersValid({ ...completeAutomatic, providerUsageCostBeforeCorrection: -1 }), false);
-assert.equal(automaticNumbersValid({ ...completeAutomatic, finalCreditQuantity: 0 }), false);
+assert.equal(
+  evidenceGroupValid({
+    ...completeAutomatic,
+    providerUsageCostBeforeCorrection: null,
+  }),
+  false,
+);
+assert.equal(
+  automaticNumbersValid({
+    ...completeAutomatic,
+    providerUsageCostBeforeCorrection: -1,
+  }),
+  false,
+);
+assert.equal(
+  automaticNumbersValid({ ...completeAutomatic, finalCreditQuantity: 0 }),
+  false,
+);
 assert.equal(automaticNumbersValid(manualFallback), true);
 
 console.log("ARCH-015 refund correction evidence schema validated");

@@ -5,10 +5,14 @@ import { readFileSync, readdirSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 
 const migrationDirectory = new URL("../prisma/migrations/", import.meta.url);
-const targetMigration = "20261010093000_arch031_automatic_merchant_pricing_translation_state";
+const targetMigration =
+  "20261010093000_arch031_automatic_merchant_pricing_translation_state";
 const modeIndex = process.argv.indexOf("--mode");
 const mode = modeIndex < 0 ? undefined : process.argv[modeIndex + 1];
-assert.ok(["fresh", "upgrade"].includes(mode), "Pass an explicit --mode fresh|upgrade");
+assert.ok(
+  ["fresh", "upgrade"].includes(mode),
+  "Pass an explicit --mode fresh|upgrade",
+);
 
 const databaseName = "arch031_pricing_translation_fixture";
 const containerName = `moda-arch031-database001-${randomUUID()}`;
@@ -23,16 +27,28 @@ function docker(args, options = {}) {
     });
   } catch (error) {
     const detail = error.stderr?.toString().trim();
-    throw new Error(`Docker command failed${detail ? `: ${detail}` : ""}`, { cause: error });
+    throw new Error(`Docker command failed${detail ? `: ${detail}` : ""}`, {
+      cause: error,
+    });
   }
 }
 
 function psql(sql, { capture = false } = {}) {
   return docker(
     [
-      "exec", "-i", containerName, "psql", "-X", "-q",
+      "exec",
+      "-i",
+      containerName,
+      "psql",
+      "-X",
+      "-q",
       ...(capture ? ["-A", "-t"] : []),
-      "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", databaseName,
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-U",
+      "postgres",
+      "-d",
+      databaseName,
     ],
     { input: sql },
   );
@@ -65,7 +81,19 @@ async function awaitPostgres() {
     try {
       execFileSync(
         "docker",
-        ["exec", containerName, "psql", "-X", "-q", "-U", "postgres", "-d", databaseName, "-c", "SELECT 1"],
+        [
+          "exec",
+          containerName,
+          "psql",
+          "-X",
+          "-q",
+          "-U",
+          "postgres",
+          "-d",
+          databaseName,
+          "-c",
+          "SELECT 1",
+        ],
         { stdio: "ignore" },
       );
       return;
@@ -83,7 +111,12 @@ function migrationNames() {
 }
 
 function applyMigration(name) {
-  psql(readFileSync(new URL(`../prisma/migrations/${name}/migration.sql`, import.meta.url), "utf8"));
+  psql(
+    readFileSync(
+      new URL(`../prisma/migrations/${name}/migration.sql`, import.meta.url),
+      "utf8",
+    ),
+  );
   console.log(`APPLIED ${name}`);
 }
 
@@ -109,7 +142,9 @@ INSERT INTO commerce."CommerceTranslationModelConfiguration" (
   ('arch031-model-dev-b', 'DEVELOPMENT', 'openai', 'fixture-model-b', 'Fixture model B', true, 1, 'arch031-admin', 'arch031-admin', CURRENT_TIMESTAMP),
   ('arch031-model-test-a', 'TEST', 'openai', 'fixture-model-test', 'Fixture model test', true, 1, 'arch031-admin', 'arch031-admin', CURRENT_TIMESTAMP);
 `);
-  console.log(`SEEDED translation configuration ${beforeTarget ? "before" : "after"} ARCH-031 migration`);
+  console.log(
+    `SEEDED translation configuration ${beforeTarget ? "before" : "after"} ARCH-031 migration`,
+  );
 }
 
 function assertCatalogObjects() {
@@ -154,7 +189,9 @@ function assertCatalogObjects() {
     arch014PlanTrigger: true,
     arch014HighlightTrigger: true,
   });
-  console.log("PASS PostgreSQL catalogue contains ARCH-031 state while ARCH-014 triggers remain present");
+  console.log(
+    "PASS PostgreSQL catalogue contains ARCH-031 state while ARCH-014 triggers remain present",
+  );
 }
 
 function assertUpgradeDefaults() {
@@ -168,7 +205,9 @@ function assertUpgradeDefaults() {
     { id: "arch031-model-dev-b", automaticDefault: false },
     { id: "arch031-model-test-a", automaticDefault: false },
   ]);
-  console.log("PASS upgrade preserves existing model rows and does not infer an automatic default");
+  console.log(
+    "PASS upgrade preserves existing model rows and does not infer an automatic default",
+  );
 }
 
 function assertAutomaticDefaultRules() {
@@ -195,7 +234,9 @@ function assertAutomaticDefaultRules() {
     { environment: "DEVELOPMENT", id: "arch031-model-dev-a" },
     { environment: "TEST", id: "arch031-model-test-a" },
   ]);
-  console.log("PASS automatic defaults are unique per environment/provider and independent across environments");
+  console.log(
+    "PASS automatic defaults are unique per environment/provider and independent across environments",
+  );
 }
 
 const hashA = "a".repeat(64);
@@ -220,7 +261,8 @@ function assertRunRules() {
     jsonQuery(`SELECT jsonb_build_object(
       'runs', count(*)::int,
       'plans', (SELECT count(*)::int FROM billing."MerchantPricingPlan")
-    )::text FROM billing."MerchantPricingTranslationRun" WHERE "id"='arch031-run-a';`).plans,
+    )::text FROM billing."MerchantPricingTranslationRun" WHERE "id"='arch031-run-a';`)
+      .plans,
     0,
     "translation staging must not require a MerchantPricingPlan row",
   );
@@ -234,7 +276,9 @@ function assertRunRules() {
   psql(insertRun({ id: "arch031-run-a-retry" }));
   psql(insertRun({ id: "arch031-run-b", hash: hashB }));
   assert.equal(
-    jsonQuery(`SELECT count(*)::int::text FROM billing."MerchantPricingTranslationRun" WHERE "shopifyPlanHandle"='free';`),
+    jsonQuery(
+      `SELECT count(*)::int::text FROM billing."MerchantPricingTranslationRun" WHERE "shopifyPlanHandle"='free';`,
+    ),
     3,
   );
   expectRejected(
@@ -242,7 +286,9 @@ function assertRunRules() {
     insertRun({ id: "arch031-run-bad-hash", hash: "BAD" }),
     "23514",
   );
-  console.log("PASS run staging supports retries/source changes while preventing duplicate active work");
+  console.log(
+    "PASS run staging supports retries/source changes while preventing duplicate active work",
+  );
 }
 
 function assertItemAndBatchRules() {
@@ -344,30 +390,48 @@ function assertItemAndBatchRules() {
     'currentBatchId', item."currentBatchId",
     'historyCount', (SELECT count(*)::int FROM billing."MerchantPricingTranslationBatchItem" membership WHERE membership."translationItemId"=item."id")
   )::text FROM billing."MerchantPricingTranslationItem" item WHERE item."id"='arch031-item-highlight-title-fr';`);
-  assert.deepEqual(membership, { currentBatchId: "arch031-batch-2", historyCount: 2 });
-  console.log("PASS item identity/current Batch and immutable Batch membership support retry history");
+  assert.deepEqual(membership, {
+    currentBatchId: "arch031-batch-2",
+    historyCount: 2,
+  });
+  console.log(
+    "PASS item identity/current Batch and immutable Batch membership support retry history",
+  );
 }
 
 async function main() {
   try {
     docker([
-      "run", "--detach", "--name", containerName, "--network", "none",
-      "--env", "POSTGRES_PASSWORD=fixture-only",
-      "--env", `POSTGRES_DB=${databaseName}`,
+      "run",
+      "--detach",
+      "--name",
+      containerName,
+      "--network",
+      "none",
+      "--env",
+      "POSTGRES_PASSWORD=fixture-only",
+      "--env",
+      `POSTGRES_DB=${databaseName}`,
       "pgvector/pgvector:pg17",
     ]);
     containerStarted = true;
     await awaitPostgres();
-    console.log(`ISOLATION container=${containerName} image=pgvector/pgvector:pg17 network=none mode=${mode}`);
+    console.log(
+      `ISOLATION container=${containerName} image=pgvector/pgvector:pg17 network=none mode=${mode}`,
+    );
 
     const names = migrationNames();
-    assert.ok(names.includes(targetMigration), "ARCH-031 automatic Merchant Pricing translation migration must remain present");
+    assert.ok(
+      names.includes(targetMigration),
+      "ARCH-031 automatic Merchant Pricing translation migration must remain present",
+    );
     for (const name of names) {
       if (name === targetMigration) break;
       applyMigration(name);
     }
 
-    if (mode === "upgrade") seedAdminCredentialAndModels({ beforeTarget: true });
+    if (mode === "upgrade")
+      seedAdminCredentialAndModels({ beforeTarget: true });
     applyMigration(targetMigration);
     if (mode === "fresh") seedAdminCredentialAndModels({ beforeTarget: false });
 
@@ -377,11 +441,15 @@ async function main() {
     assertRunRules();
     assertItemAndBatchRules();
 
-    console.log(`ARCH-031 automatic Merchant Pricing translation ${mode} PostgreSQL rehearsal passed.`);
+    console.log(
+      `ARCH-031 automatic Merchant Pricing translation ${mode} PostgreSQL rehearsal passed.`,
+    );
   } finally {
     if (containerStarted) {
       docker(["rm", "--force", containerName]);
-      console.log(`CLEANUP removed invocation-owned container ${containerName}`);
+      console.log(
+        `CLEANUP removed invocation-owned container ${containerName}`,
+      );
     }
   }
 }

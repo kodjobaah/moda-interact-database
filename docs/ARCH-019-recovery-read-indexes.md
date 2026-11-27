@@ -3,12 +3,12 @@
 Adds four non-unique B-tree indexes without changing fields, rows, constraints,
 existing indexes or runtime business behaviour.
 
-| Index columns | Query supported |
-|---|---|
-| CheckoutRecovery(shopId, detectedAt, id) | Tenant/date cohort, newest-first keyset pages |
-| CheckoutRecovery(shopId, status, detectedAt, id) | Single-status tenant/date pages |
-| CheckoutRecovery(shopId, customerId, detectedAt, id) | Same-tenant customer recovery pages |
-| ConversationMessage(conversationId, createdAt, id) | Chronological/latest transcript windows with stable ties |
+| Index columns                                        | Query supported                                          |
+| ---------------------------------------------------- | -------------------------------------------------------- |
+| CheckoutRecovery(shopId, detectedAt, id)             | Tenant/date cohort, newest-first keyset pages            |
+| CheckoutRecovery(shopId, status, detectedAt, id)     | Single-status tenant/date pages                          |
+| CheckoutRecovery(shopId, customerId, detectedAt, id) | Same-tenant customer recovery pages                      |
+| ConversationMessage(conversationId, createdAt, id)   | Chronological/latest transcript windows with stable ties |
 
 Equality prefixes allow reverse B-tree scans for DESC/DESC. Multi-status IN
 filters may use the general tenant/date index or another planner-selected plan;

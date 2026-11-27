@@ -6,14 +6,19 @@ import { setTimeout as delay } from "node:timers/promises";
 
 const args = process.argv.slice(2);
 assert.ok(
-  args.length === 2 && args[0] === "--mode" && ["fresh", "upgrade"].includes(args[1]),
+  args.length === 2 &&
+    args[0] === "--mode" &&
+    ["fresh", "upgrade"].includes(args[1]),
   "Usage: --mode fresh|upgrade",
 );
 const mode = args[1];
 const target = "20261122023000_arch078_unmapped_shopify_usage_event_handles";
 const migrationsDirectory = new URL("../prisma/migrations/", import.meta.url);
 const schemaPath = new URL("../prisma/schema.prisma", import.meta.url);
-const migrationPath = new URL(`../prisma/migrations/${target}/migration.sql`, import.meta.url);
+const migrationPath = new URL(
+  `../prisma/migrations/${target}/migration.sql`,
+  import.meta.url,
+);
 const container = `moda-arch078-unmapped-usage-events-${randomUUID()}`;
 const database = "arch078_unmapped_usage_events_fixture";
 const subscriptionId = "arch078-existing-subscription";
@@ -36,9 +41,19 @@ function docker(command, options = {}) {
 function sql(statement, capture = false) {
   return docker(
     [
-      "exec", "-i", container, "psql", "-X", "-q", "-v", "ON_ERROR_STOP=1",
+      "exec",
+      "-i",
+      container,
+      "psql",
+      "-X",
+      "-q",
+      "-v",
+      "ON_ERROR_STOP=1",
       ...(capture ? ["-A", "-t"] : []),
-      "-U", "postgres", "-d", database,
+      "-U",
+      "postgres",
+      "-d",
+      database,
     ],
     { input: statement },
   ).trim();
@@ -72,7 +87,9 @@ async function waitForPostgres() {
       await delay(500);
     }
   }
-  throw new Error("Invocation-owned PostgreSQL container did not become ready.");
+  throw new Error(
+    "Invocation-owned PostgreSQL container did not become ready.",
+  );
 }
 
 function migrationNames() {
@@ -172,12 +189,16 @@ function assertColumnMetadata() {
   assert.equal(metadata.udtName, "_text");
   assert.equal(metadata.nullable, "NO");
   assert.match(metadata.defaultValue ?? "", /ARRAY\[\]::text\[\]/i);
-  console.log("PASS Subscription array column is TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]");
+  console.log(
+    "PASS Subscription array column is TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]",
+  );
 }
 
 function assertSchemaAndMigrationContract() {
   const schema = readFileSync(schemaPath, "utf8");
-  const subscriptionModel = schema.match(/model Subscription\s*\{([\s\S]*?)\n\}/)?.[1];
+  const subscriptionModel = schema.match(
+    /model Subscription\s*\{([\s\S]*?)\n\}/,
+  )?.[1];
   assert.ok(subscriptionModel, "Prisma Subscription model must exist.");
   assert.match(
     subscriptionModel,
@@ -185,7 +206,8 @@ function assertSchemaAndMigrationContract() {
     "Prisma Subscription must define the exact non-null String[] field with empty default.",
   );
   assert.equal(
-    (subscriptionModel.match(/\bunmappedShopifyUsageEventHandles\b/g) ?? []).length,
+    (subscriptionModel.match(/\bunmappedShopifyUsageEventHandles\b/g) ?? [])
+      .length,
     1,
     "The Prisma field must be declared exactly once.",
   );
@@ -209,9 +231,16 @@ async function main() {
 
   try {
     docker([
-      "run", "--detach", "--name", container, "--network", "none",
-      "--env", "POSTGRES_PASSWORD=fixture-only",
-      "--env", `POSTGRES_DB=${database}`,
+      "run",
+      "--detach",
+      "--name",
+      container,
+      "--network",
+      "none",
+      "--env",
+      "POSTGRES_PASSWORD=fixture-only",
+      "--env",
+      `POSTGRES_DB=${database}`,
       "pgvector/pgvector:pg17",
     ]);
     started = true;
@@ -236,7 +265,9 @@ async function main() {
         true,
       );
       beforeExistingRow = subscriptionCore(subscriptionId);
-      console.log("SEEDED pre-migration Subscription row for upgrade preservation.");
+      console.log(
+        "SEEDED pre-migration Subscription row for upgrade preservation.",
+      );
     }
 
     applyMigration(target);
@@ -260,7 +291,9 @@ async function main() {
         [],
         "Existing subscriptions must receive the empty-array default.",
       );
-      console.log("PASS upgrade preserves existing Subscription and initializes its new array to []");
+      console.log(
+        "PASS upgrade preserves existing Subscription and initializes its new array to []",
+      );
     } else {
       seedSubscription(
         subscriptionId,
@@ -302,7 +335,9 @@ async function main() {
       beforeArrayWrites,
       "Writing the mapping array must not change status, observed plan handle or sync-error history.",
     );
-    console.log("PASS exact unmapped handles persist without changing subscription lifecycle or sync-error fields");
+    console.log(
+      "PASS exact unmapped handles persist without changing subscription lifecycle or sync-error fields",
+    );
 
     sql(`
       UPDATE billing."Subscription"
@@ -315,7 +350,9 @@ async function main() {
       beforeArrayWrites,
       "Clearing the mapping array must not change unrelated subscription state.",
     );
-    console.log("PASS unmapped handles clear to [] without changing subscription lifecycle or sync-error fields");
+    console.log(
+      "PASS unmapped handles clear to [] without changing subscription lifecycle or sync-error fields",
+    );
 
     console.log(`PASS ARCH-078 DATABASE-001 PostgreSQL ${mode}`);
   } finally {

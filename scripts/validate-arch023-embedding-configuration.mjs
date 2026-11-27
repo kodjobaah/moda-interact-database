@@ -14,14 +14,20 @@ const migration = await readFile(
 );
 
 function prismaBlock(kind, name) {
-  const match = schema.match(new RegExp(`${kind} ${name} \\{([\\s\\S]*?)\\n\\}`, "m"));
+  const match = schema.match(
+    new RegExp(`${kind} ${name} \\{([\\s\\S]*?)\\n\\}`, "m"),
+  );
   assert.ok(match, `missing Prisma ${kind} ${name}`);
   return match[1];
 }
 
 const purpose = prismaBlock("enum", "CommerceEmbeddingPurpose");
 for (const value of ["MERCHANT_KNOWLEDGE", "REFERENCE_TAXONOMY"]) {
-  assert.match(purpose, new RegExp(`^\\s*${value}\\s*$`, "m"), `missing purpose ${value}`);
+  assert.match(
+    purpose,
+    new RegExp(`^\\s*${value}\\s*$`, "m"),
+    `missing purpose ${value}`,
+  );
 }
 
 const configuration = prismaBlock("model", "CommerceEmbeddingConfiguration");
@@ -39,7 +45,11 @@ for (const field of [
   "editVersion",
   "updatedByAdminId",
 ]) {
-  assert.match(configuration, new RegExp(`^\\s*${field}\\s+`, "m"), `missing field ${field}`);
+  assert.match(
+    configuration,
+    new RegExp(`^\\s*${field}\\s+`, "m"),
+    `missing field ${field}`,
+  );
 }
 
 assert.match(configuration, /environment\s+CommerceEnvironment/);
@@ -47,7 +57,10 @@ assert.match(configuration, /purpose\s+CommerceEmbeddingPurpose/);
 assert.match(configuration, /embeddingProvider\s+String\s+@db\.VarChar\(64\)/);
 assert.match(configuration, /embeddingModel\s+String\s+@db\.VarChar\(255\)/);
 assert.match(configuration, /embeddingDimensions\s+Int/);
-assert.match(configuration, /embeddingIndexVersion\s+String\s+@db\.VarChar\(64\)/);
+assert.match(
+  configuration,
+  /embeddingIndexVersion\s+String\s+@db\.VarChar\(64\)/,
+);
 assert.match(configuration, /@@unique\(\[environment, purpose\]\)/);
 assert.match(configuration, /@@index\(\[purpose, environment\]\)/);
 
@@ -69,8 +82,16 @@ for (const action of [
   "REPLACE_EMBEDDING_CONFIGURATION",
   "REMOVE_EMBEDDING_CONFIGURATION",
 ]) {
-  assert.match(auditAction, new RegExp(`^\\s*${action}\\s*$`, "m"), `missing audit action ${action}`);
-  assert.match(migration, new RegExp(`ADD VALUE '${action}'`), `migration missing audit action ${action}`);
+  assert.match(
+    auditAction,
+    new RegExp(`^\\s*${action}\\s*$`, "m"),
+    `missing audit action ${action}`,
+  );
+  assert.match(
+    migration,
+    new RegExp(`ADD VALUE '${action}'`),
+    `migration missing audit action ${action}`,
+  );
 }
 
 for (const constraint of [
@@ -84,7 +105,11 @@ for (const constraint of [
   "CommerceEmbeddingConfiguration_key_id_check",
   "CommerceEmbeddingConfiguration_edit_version_check",
 ]) {
-  assert.match(migration, new RegExp(constraint), `migration missing constraint ${constraint}`);
+  assert.match(
+    migration,
+    new RegExp(constraint),
+    `migration missing constraint ${constraint}`,
+  );
 }
 
 assert.match(

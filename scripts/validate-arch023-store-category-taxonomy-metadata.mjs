@@ -20,8 +20,16 @@ for (const field of [
   "referenceTaxonomyCategoryName",
   "referenceTaxonomyCategoryFullName",
 ]) {
-  assert.match(schema, new RegExp(`\\b${field}\\b`), `missing category field ${field}`);
-  assert.match(migration, new RegExp(`"${field}"`), `missing migration column ${field}`);
+  assert.match(
+    schema,
+    new RegExp(`\\b${field}\\b`),
+    `missing category field ${field}`,
+  );
+  assert.match(
+    migration,
+    new RegExp(`"${field}"`),
+    `missing migration column ${field}`,
+  );
 }
 
 for (const field of [
@@ -30,8 +38,16 @@ for (const field of [
   "taxonomyCategoryName",
   "taxonomyCategoryFullName",
 ]) {
-  assert.match(schema, new RegExp(`\\b${field}\\b`), `missing mapping field ${field}`);
-  assert.match(migration, new RegExp(`"${field}"`), `missing mapping migration column ${field}`);
+  assert.match(
+    schema,
+    new RegExp(`\\b${field}\\b`),
+    `missing mapping field ${field}`,
+  );
+  assert.match(
+    migration,
+    new RegExp(`"${field}"`),
+    `missing mapping migration column ${field}`,
+  );
 }
 
 assert.match(
