@@ -26,8 +26,8 @@ requirePattern(
 );
 
 for (const value of [
-  '"key" = \'ai_conversations\'',
-  '"activationMode" = \'ALWAYS_ENABLED\'',
+  "\"key\" = 'ai_conversations'",
+  "\"activationMode\" = 'ALWAYS_ENABLED'",
   '"systemRequired" = true',
   '"active" = true',
   'INSERT INTO "billing"."MerchantPricingPlanFeature"',
@@ -36,7 +36,11 @@ for (const value of [
   'SET "enabled" = true',
   'DELETE FROM "billing"."ShopFeaturePreference"',
 ]) {
-  requireText(migration, value, "required AI Conversations migration behaviour");
+  requireText(
+    migration,
+    value,
+    "required AI Conversations migration behaviour",
+  );
 }
 
 for (const invariant of [

@@ -8,10 +8,7 @@
     "container": "moda-arch020-database-001-rehearsal",
     "host": "127.0.0.1",
     "port": 32774,
-    "databases": [
-      "arch020_test_fresh",
-      "arch020_test_upgrade"
-    ],
+    "databases": ["arch020_test_fresh", "arch020_test_upgrade"],
     "emptyTargetVerified": true
   },
   "runs": {

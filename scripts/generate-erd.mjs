@@ -1,39 +1,18 @@
-import {
-  readFile,
-  writeFile,
-  unlink,
-  mkdir,
-} from "node:fs/promises";
+import { readFile, writeFile, unlink, mkdir } from "node:fs/promises";
 
-import {
-  execFileSync,
-} from "node:child_process";
+import { execFileSync } from "node:child_process";
 
+const sourceSchema = "prisma/schema.prisma";
 
-const sourceSchema =
-  "prisma/schema.prisma";
+const temporarySchema = "prisma/schema.erd.prisma";
 
-const temporarySchema =
-  "prisma/schema.erd.prisma";
+const outputDirectory = "docs/generated";
 
-const outputDirectory =
-  "docs/generated";
+await mkdir(outputDirectory, {
+  recursive: true,
+});
 
-
-await mkdir(
-  outputDirectory,
-  {
-    recursive: true,
-  },
-);
-
-
-const schema =
-  await readFile(
-    sourceSchema,
-    "utf8",
-  );
-
+const schema = await readFile(sourceSchema, "utf8");
 
 /*
  * Remove existing Prisma generators.
@@ -41,12 +20,10 @@ const schema =
  * We don't want the temporary ERD schema to generate
  * @prisma/client as well.
  */
-const schemaWithoutGenerators =
-  schema.replace(
-    /generator\s+\w+\s*\{[\s\S]*?\}/g,
-    "",
-  );
-
+const schemaWithoutGenerators = schema.replace(
+  /generator\s+\w+\s*\{[\s\S]*?\}/g,
+  "",
+);
 
 const plantUmlGenerator = `
 generator plantuml {
@@ -55,37 +32,20 @@ generator plantuml {
 }
 `;
 
-
 const erdSchema = `
 ${plantUmlGenerator}
 
 ${schemaWithoutGenerators}
 `;
 
-
-await writeFile(
-  temporarySchema,
-  erdSchema,
-);
-
+await writeFile(temporarySchema, erdSchema);
 
 try {
-  execFileSync(
-    "npx",
-    [
-      "prisma",
-      "generate",
-      "--schema",
-      temporarySchema,
-    ],
-    {
-      stdio: "inherit",
-    },
-  );
+  execFileSync("npx", ["prisma", "generate", "--schema", temporarySchema], {
+    stdio: "inherit",
+  });
 } finally {
-  await unlink(
-    temporarySchema,
-  ).catch(() => {});
+  await unlink(temporarySchema).catch(() => {});
 }
 
 const generatedErd = await readFile(
@@ -97,6 +57,4 @@ await writeFile(
   generatedErd.replace(/[ \t]+$/gm, ""),
 );
 
-console.log(
-  "\nPlantUML ERD generated at docs/generated/prisma-erd.puml",
-);
+console.log("\nPlantUML ERD generated at docs/generated/prisma-erd.puml");

@@ -57,22 +57,22 @@ The outbox stores the versioned commerce event envelope in `ShopifyWebhookOutbox
 
 ```ts
 type ShopifyWebhookJobV1<T> = {
-   schemaVersion: 1;
-   receiptId: string;
-   deliveryId: string;
-   eventId: string | null;
-   source: "shopify";
-   eventType: "checkout.observed" | "order.completed";
-   providerTopic: string;
-   tenant: {
-      shopId: string;
-      shopDomain: string;
-   };
-   occurredAt: string | null;
-   receivedAt: string;
-   traceId: string;
-   orderingKey: string;
-   payload: T;
+  schemaVersion: 1;
+  receiptId: string;
+  deliveryId: string;
+  eventId: string | null;
+  source: "shopify";
+  eventType: "checkout.observed" | "order.completed";
+  providerTopic: string;
+  tenant: {
+    shopId: string;
+    shopDomain: string;
+  };
+  occurredAt: string | null;
+  receivedAt: string;
+  traceId: string;
+  orderingKey: string;
+  payload: T;
 };
 ```
 

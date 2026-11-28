@@ -30,6 +30,9 @@ assert.match(
   migration,
   /ALTER COLUMN "providerUsageQuantityAfterSnapshot" TYPE DECIMAL\(65, 30\)[\s\S]*USING "providerUsageQuantityAfterSnapshot"::DECIMAL\(65, 30\)/,
 );
-assert.doesNotMatch(migration, /ALTER COLUMN "creditsGranted"|ALTER COLUMN "currentAmount"|ALTER COLUMN "reservedAmount"/);
+assert.doesNotMatch(
+  migration,
+  /ALTER COLUMN "creditsGranted"|ALTER COLUMN "currentAmount"|ALTER COLUMN "reservedAmount"/,
+);
 
 console.log("ARCH-015 fractional provider-usage snapshot schema validated");

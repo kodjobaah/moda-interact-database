@@ -41,50 +41,110 @@ for (const requirement of [
   "@@index([promotionCampaignId])",
   '@@schema("billing")',
 ]) {
-  expect(translationModel.includes(requirement), `translation model missing ${requirement}`);
+  expect(
+    translationModel.includes(requirement),
+    `translation model missing ${requirement}`,
+  );
 }
 expect(
-  (schema.match(/^\s+translations\s+PromotionCampaignTranslation\[\]\s*$/gm) ?? []).length === 1,
+  (
+    schema.match(/^\s+translations\s+PromotionCampaignTranslation\[\]\s*$/gm) ??
+    []
+  ).length === 1,
   "PromotionCampaign translations relation must exist exactly once",
 );
 
 const exactLocales = [
-  "cs", "da", "de", "en", "es", "fi", "fr", "it", "ja", "ko",
-  "nb", "nl", "pl", "pt-BR", "pt-PT", "sv", "th", "tr", "zh-Hans", "zh-Hant",
+  "cs",
+  "da",
+  "de",
+  "en",
+  "es",
+  "fi",
+  "fr",
+  "it",
+  "ja",
+  "ko",
+  "nb",
+  "nl",
+  "pl",
+  "pt-BR",
+  "pt-PT",
+  "sv",
+  "th",
+  "tr",
+  "zh-Hans",
+  "zh-Hant",
 ];
 const localeList = exactLocales.map((locale) => `'${locale}'`).join(", ");
-expect(migration.includes(`CREATE TABLE "billing"."PromotionCampaignTranslation"`), "missing translation table");
-expect(migration.includes(`"locale" IN (${localeList})`), "locale CHECK does not contain the exact 20-locale set");
 expect(
-  migration.includes('CONSTRAINT "ck_arch014_promotion_campaign_translation_title" CHECK (\n      char_length(btrim("merchantTitle")) BETWEEN 1 AND 255\n    )'),
+  migration.includes(`CREATE TABLE "billing"."PromotionCampaignTranslation"`),
+  "missing translation table",
+);
+expect(
+  migration.includes(`"locale" IN (${localeList})`),
+  "locale CHECK does not contain the exact 20-locale set",
+);
+expect(
+  migration.includes(
+    'CONSTRAINT "ck_arch014_promotion_campaign_translation_title" CHECK (\n      char_length(btrim("merchantTitle")) BETWEEN 1 AND 255\n    )',
+  ),
   "title CHECK is not exact",
 );
 expect(
-  migration.includes('CONSTRAINT "ck_arch014_promotion_campaign_translation_description" CHECK (\n      char_length(btrim("merchantDescription")) BETWEEN 1 AND 10000\n    )'),
+  migration.includes(
+    'CONSTRAINT "ck_arch014_promotion_campaign_translation_description" CHECK (\n      char_length(btrim("merchantDescription")) BETWEEN 1 AND 10000\n    )',
+  ),
   "description CHECK is not exact",
 );
 expect(
-  migration.includes('CONSTRAINT "uq_arch014_promotion_campaign_translation_locale" UNIQUE ("promotionCampaignId", "locale")'),
+  migration.includes(
+    'CONSTRAINT "uq_arch014_promotion_campaign_translation_locale" UNIQUE ("promotionCampaignId", "locale")',
+  ),
   "translation uniqueness is missing",
 );
 expect(
-  migration.includes('FOREIGN KEY ("promotionCampaignId")\n      REFERENCES "billing"."PromotionCampaign"("id")\n      ON DELETE CASCADE ON UPDATE CASCADE'),
+  migration.includes(
+    'FOREIGN KEY ("promotionCampaignId")\n      REFERENCES "billing"."PromotionCampaign"("id")\n      ON DELETE CASCADE ON UPDATE CASCADE',
+  ),
   "campaign foreign key does not cascade",
 );
 expect(
-  migration.includes('CREATE INDEX "PromotionCampaignTranslation_promotionCampaignId_idx"'),
+  migration.includes(
+    'CREATE INDEX "PromotionCampaignTranslation_promotionCampaignId_idx"',
+  ),
   "campaign foreign-key index is missing",
 );
-expect(!/CREATE TRIGGER|CREATE CONSTRAINT TRIGGER|CREATE OR REPLACE FUNCTION/i.test(migration), "migration must not create triggers or functions");
-expect(!/ALTER TABLE\s+"billing"\."(?!PromotionCampaignTranslation")/i.test(migration), "migration alters a pre-existing table");
-expect((migration.match(/CREATE TABLE /g) ?? []).length === 1, "migration creates more than one table");
+expect(
+  !/CREATE TRIGGER|CREATE CONSTRAINT TRIGGER|CREATE OR REPLACE FUNCTION/i.test(
+    migration,
+  ),
+  "migration must not create triggers or functions",
+);
+expect(
+  !/ALTER TABLE\s+"billing"\."(?!PromotionCampaignTranslation")/i.test(
+    migration,
+  ),
+  "migration alters a pre-existing table",
+);
+expect(
+  (migration.match(/CREATE TABLE /g) ?? []).length === 1,
+  "migration creates more than one table",
+);
 
 const forbiddenMigrationReferences = [
-  '"BillingPlan"', '"PromotionCampaignEvent"', '"PromotionalCreditGrant"',
-  '"PromotionCampaign"("merchantDescription")', "DROP COLUMN", "RENAME COLUMN",
+  '"BillingPlan"',
+  '"PromotionCampaignEvent"',
+  '"PromotionalCreditGrant"',
+  '"PromotionCampaign"("merchantDescription")',
+  "DROP COLUMN",
+  "RENAME COLUMN",
 ];
 for (const forbidden of forbiddenMigrationReferences) {
-  expect(!migration.includes(forbidden), `migration contains forbidden reference ${forbidden}`);
+  expect(
+    !migration.includes(forbidden),
+    `migration contains forbidden reference ${forbidden}`,
+  );
 }
 
 const preservedModels = [
@@ -98,10 +158,14 @@ const preservedModels = [
 ];
 let baselineSchema;
 try {
-  baselineSchema = execFileSync("git", ["show", "f202931c58dba7f9fcc53c74333736e978e8b6de:prisma/schema.prisma"], {
-    cwd: repositoryRoot,
-    encoding: "utf8",
-  });
+  baselineSchema = execFileSync(
+    "git",
+    ["show", "f202931c58dba7f9fcc53c74333736e978e8b6de:prisma/schema.prisma"],
+    {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+    },
+  );
 } catch {
   failures.push("unable to read the supplied database baseline schema");
 }
@@ -111,13 +175,26 @@ if (baselineSchema) {
     const original = modelBlock(baselineSchema, name);
     expect(current === original, `pre-existing model ${name} changed`);
   }
-  for (const name of ["PromotionTargetScope", "PromotionCampaignStatus", "PromotionCampaignEventType", "BillingPlanKind"]) {
-    expect(modelBlock(schema, name) === modelBlock(baselineSchema, name), `pre-existing enum ${name} changed`);
+  for (const name of [
+    "PromotionTargetScope",
+    "PromotionCampaignStatus",
+    "PromotionCampaignEventType",
+    "BillingPlanKind",
+  ]) {
+    expect(
+      modelBlock(schema, name) === modelBlock(baselineSchema, name),
+      `pre-existing enum ${name} changed`,
+    );
   }
 }
 
-const changedFiles = execFileSync("git", ["status", "--short"], { cwd: repositoryRoot, encoding: "utf8" })
-  .split("\n").filter(Boolean).map((line) => line.slice(3));
+const changedFiles = execFileSync("git", ["status", "--short"], {
+  cwd: repositoryRoot,
+  encoding: "utf8",
+})
+  .split("\n")
+  .filter(Boolean)
+  .map((line) => line.slice(3));
 const allowedFiles = new Set([
   "package.json",
   "prisma/schema.prisma",
@@ -135,4 +212,6 @@ if (failures.length > 0) {
   console.error(failures.map((failure) => `FAIL: ${failure}`).join("\n"));
   process.exit(1);
 }
-console.log("ARCH-014 promotion campaign translations static validation passed.");
+console.log(
+  "ARCH-014 promotion campaign translations static validation passed.",
+);

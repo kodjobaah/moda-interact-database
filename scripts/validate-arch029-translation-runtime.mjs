@@ -14,12 +14,17 @@ const migration = await readFile(
 );
 
 function prismaBlock(kind, name) {
-  const match = schema.match(new RegExp(`${kind} ${name} \\{([\\s\\S]*?)\\n\\}`, "m"));
+  const match = schema.match(
+    new RegExp(`${kind} ${name} \\{([\\s\\S]*?)\\n\\}`, "m"),
+  );
   assert.ok(match, `missing Prisma ${kind} ${name}`);
   return match[1];
 }
 
-const credential = prismaBlock("model", "CommerceTranslationProviderCredential");
+const credential = prismaBlock(
+  "model",
+  "CommerceTranslationProviderCredential",
+);
 for (const field of [
   "environment",
   "provider",

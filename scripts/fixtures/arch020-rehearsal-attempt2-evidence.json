@@ -15,10 +15,7 @@
     "postgresVersion": "15.19",
     "host": "127.0.0.1",
     "port": 32775,
-    "databases": [
-      "arch020_test_fresh",
-      "arch020_test_upgrade"
-    ],
+    "databases": ["arch020_test_fresh", "arch020_test_upgrade"],
     "emptyTargetsVerified": true,
     "containerRemoved": true
   },

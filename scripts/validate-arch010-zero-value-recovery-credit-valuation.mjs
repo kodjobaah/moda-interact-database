@@ -15,7 +15,7 @@ assert.match(
 );
 
 for (const condition of [
-  '"status" = \'REQUESTED\'',
+  "\"status\" = 'REQUESTED'",
   '"providerUsageQuantityAfterSnapshot" IS NOT NULL',
   '"providerUsageQuantityAfterSnapshot" > "providerUsageQuantityBeforeSnapshot"',
   '"providerUsageCostAfterSnapshot" IS NOT NULL',
@@ -30,7 +30,10 @@ for (const condition of [
   '"providerUsageCostAfterSnapshot" >= "providerUsageCostBeforeSnapshot"',
   '"providerPurchaseAmount" = "providerUsageCostAfterSnapshot" - "providerUsageCostBeforeSnapshot"',
 ]) {
-  assert.ok(migration.includes(condition), `missing valuation condition ${condition}`);
+  assert.ok(
+    migration.includes(condition),
+    `missing valuation condition ${condition}`,
+  );
 }
 
 assert.doesNotMatch(migration, /"providerPurchaseAmount"\s*>\s*0/);
@@ -45,4 +48,6 @@ assert.doesNotMatch(migration, /34e580f7-4625-4484-b029-a28d7e4a8d40/i);
 assert.doesNotMatch(migration, /bronze-top-up-free/i);
 assert.doesNotMatch(migration, /^\s*(UPDATE|INSERT\s+INTO|DELETE\s+FROM)\b/im);
 
-console.log("ARCH-010 zero-value recovery-credit valuation migration validation passed.");
+console.log(
+  "ARCH-010 zero-value recovery-credit valuation migration validation passed.",
+);

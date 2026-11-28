@@ -1,5 +1,6 @@
-const q = value => `'${String(value).replaceAll("'", "''")}'`;
-const hash = n => `decode(repeat('${Number(n).toString(16).padStart(2, '0')}', 32), 'hex')`;
+const q = (value) => `'${String(value).replaceAll("'", "''")}'`;
+const hash = (n) =>
+  `decode(repeat('${Number(n).toString(16).padStart(2, "0")}', 32), 'hex')`;
 
 export function legacyBaseSql() {
   return `
@@ -44,7 +45,7 @@ INSERT INTO "commerce"."MerchantKnowledgeSourceRevision"
 `;
 }
 
-export function templateCommandSql(id, key, stateSetup = '') {
+export function templateCommandSql(id, key, stateSetup = "") {
   return `INSERT INTO "whatsapp"."MerchantConversationSendCommand"
     ("id","shopId","conversationId","idempotencyKey","payloadSha256","expectedControlRevision",
      "kind","recipientSnapshot","templateName","templateLanguageCode","templateParameters",

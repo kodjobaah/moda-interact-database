@@ -33,4 +33,6 @@ assert.doesNotMatch(
   /eugene-|myshopify\.com|34e580f7|344badd8|bronze-top-up-free/i,
 );
 
-console.log("ARCH-015 partner-development test refund schema validation passed.");
+console.log(
+  "ARCH-015 partner-development test refund schema validation passed.",
+);
